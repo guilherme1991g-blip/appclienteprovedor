@@ -98,6 +98,10 @@ function formatAutoDocument(value: string): string {
   }
 }
 
+interface ClientInfo {
+  name: string;
+}
+
 export default function LoginScreen() {
   const [documentInput, setDocumentInput] = useState('');
   const [detectedType, setDetectedType] = useState<'CPF' | 'CNPJ'>('CPF');
@@ -106,6 +110,7 @@ export default function LoginScreen() {
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
 
   const handleInputChange = (text: string) => {
     const formatted = formatAutoDocument(text);
@@ -136,11 +141,47 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    // Simulates an API call
-    setTimeout(() => {
-      setLoading(false);
-      setSuccess(true);
-    }, 1500);
+    setErrorMsg('');
+
+    // Calls the client validation API provided by the user
+    fetch('https://webcnnect.sgp.tsmx.com.br/api/ura/clientes/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app: 'APP',
+        token: '	9720002b-a4f6-4c48-9a20-65f86669f6d6}',
+        cpfcnpj: raw,
+      }),
+    })
+      .then(async (response) => {
+        setLoading(false);
+        const data = await response.json();
+        console.log('API Result:', data);
+
+        if (response.ok && data) {
+          // Extraction of client's name if returned in an array or direct object
+          let name = '';
+          if (Array.isArray(data) && data.length > 0) {
+            name = data[0].nome || data[0].razao_social || data[0].name || '';
+          } else if (typeof data === 'object') {
+            name = data.nome || data.razao_social || data.name || '';
+          }
+          
+          setClientInfo({ name: name || 'Cliente' });
+          setSuccess(true);
+        } else {
+          // Handles server/API returned messages
+          const message = data?.message || data?.error || 'Documento não localizado na base.';
+          setErrorMsg(message);
+        }
+      })
+      .catch((err) => {
+        setLoading(false);
+        console.error('API Connect Error:', err);
+        setErrorMsg('Erro de conexão. Verifique sua rede e tente novamente.');
+      });
   };
 
   return (
@@ -259,7 +300,7 @@ export default function LoginScreen() {
               </Text>
               
               <Text style={styles.successSubtitle}>
-                Buscando os dados do seu plano WebConnect...
+                Olá, {clientInfo?.name}! Buscando os dados do seu plano WebConnect...
               </Text>
 
               <ActivityIndicator size="small" color="#0052FF" style={{ marginVertical: 15 }} />
@@ -270,6 +311,7 @@ export default function LoginScreen() {
                   setSuccess(false);
                   setDocumentInput('');
                   setIsValid(false);
+                  setClientInfo(null);
                 }}
               >
                 <Text style={styles.backBtnText}>
