@@ -411,7 +411,7 @@ export default function LoginScreen() {
                     onPress={() => setScreenState('LOGIN')}
                     activeOpacity={0.7}
                   >
-                    <ArrowLeft size={16} color="#64748B" />
+                    <ArrowLeft size={16} color="#FFFFFF" />
                     <Text style={styles.backToLoginText}>Voltar para o Login</Text>
                   </TouchableOpacity>
 
@@ -687,17 +687,20 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   backToLoginButton: {
+    height: 46,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
-    gap: 6,
-    paddingVertical: 8,
+    gap: 8,
   },
   backToLoginText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#FFFFFF',
   },
   successCard: {
     width: '100%',
