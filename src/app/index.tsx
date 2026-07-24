@@ -283,31 +283,34 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'flex-start',
+    paddingTop: Platform.OS === 'ios' ? 40 : 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
     backgroundColor: '#000000',
   },
   cardContainer: {
     width: '100%',
     maxWidth: 450,
     alignSelf: 'center',
+    marginTop: 20,
   },
   welcomeContainer: {
     alignItems: 'center',
-    marginBottom: 28,
+    marginBottom: 20,
   },
   welcomeTitle: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
     marginBottom: 8,
     color: '#FFFFFF',
   },
   formGroup: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -316,14 +319,14 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     borderWidth: 1.5,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 16,
-    height: 54,
+    height: 46, // reduced from 54
     justifyContent: 'center',
     backgroundColor: '#0F172A',
   },
   textInput: {
-    fontSize: 16,
+    fontSize: 15, // reduced from 16
     fontWeight: '600',
     letterSpacing: 0.5,
     color: '#FFFFFF',
@@ -348,8 +351,8 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
   submitButton: {
-    height: 52,
-    borderRadius: 12,
+    height: 46, // reduced from 52
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0052FF',
@@ -387,6 +390,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 4,
+    marginTop: 40,
   },
   successTitle: {
     fontSize: 22,
