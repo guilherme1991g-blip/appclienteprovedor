@@ -9,10 +9,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, HelpCircle, CheckCircle, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
 // Helper function to validate CPF (Brazilian Taxpayer Registry for Individuals)
@@ -144,10 +143,6 @@ export default function LoginScreen() {
     }, 1500);
   };
 
-  const handleSupportPress = () => {
-    Linking.openURL('https://wa.me/558000000000?text=Preciso%20de%20ajuda%20para%20acessar%20a%20minha%20conta');
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -162,9 +157,6 @@ export default function LoginScreen() {
 
               <View style={styles.welcomeContainer}>
                 <Text style={styles.welcomeTitle}>Área do Cliente</Text>
-                <Text style={styles.welcomeSubtitle}>
-                  O login é automático. Digite seu CPF ou CNPJ para acessar faturas e suporte.
-                </Text>
               </View>
 
               {/* Form Input Group */}
@@ -187,7 +179,7 @@ export default function LoginScreen() {
                 >
                   <TextInput
                     style={styles.textInput}
-                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                    placeholder="CPF ou CNPJ"
                     placeholderTextColor="#64748B"
                     keyboardType="numeric"
                     value={documentInput}
@@ -235,18 +227,6 @@ export default function LoginScreen() {
                     <ArrowRight size={18} color="#FFFFFF" style={styles.btnIcon} />
                   </View>
                 )}
-              </TouchableOpacity>
-
-              {/* Support link */}
-              <TouchableOpacity
-                onPress={handleSupportPress}
-                style={styles.supportLink}
-                activeOpacity={0.7}
-              >
-                <HelpCircle size={16} color="#0052FF" />
-                <Text style={styles.supportLinkText}>
-                  Precisa de ajuda? Fale com o suporte
-                </Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -323,13 +303,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#FFFFFF',
   },
-  welcomeSubtitle: {
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 10,
-    color: '#94A3B8',
-  },
   formGroup: {
     marginBottom: 24,
   },
@@ -398,18 +371,6 @@ const styles = StyleSheet.create({
   },
   btnIcon: {
     marginLeft: 8,
-  },
-  supportLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    gap: 6,
-  },
-  supportLinkText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0052FF',
   },
   successCard: {
     width: '100%',
