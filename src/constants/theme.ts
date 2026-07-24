@@ -1,0 +1,75 @@
+/**
+ * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
+ * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://reactnativeunistyles.vercel.app), etc.
+ */
+
+import '@/global.css';
+
+import { Platform } from 'react-native';
+
+export const Colors = {
+  light: {
+    text: '#0F172A',
+    background: '#F8FAFC',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#E2E8F0',
+    textSecondary: '#64748B',
+    primary: '#0052FF',
+    primaryGradient: ['#0052FF', '#00C4FF'],
+    accent: '#00D8A6',
+    border: '#E2E8F0',
+    card: '#FFFFFF',
+  },
+  dark: {
+    text: '#F8FAFC',
+    background: '#0B0F19',
+    backgroundElement: '#151B2C',
+    backgroundSelected: '#1E293B',
+    textSecondary: '#94A3B8',
+    primary: '#3B82F6',
+    primaryGradient: ['#3B82F6', '#06B6D4'],
+    accent: '#10B981',
+    border: '#1E293B',
+    card: '#151B2C',
+  },
+} as const;
+
+export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
+
+export const Fonts = Platform.select({
+  ios: {
+    /** iOS `UIFontDescriptorSystemDesignDefault` */
+    sans: 'system-ui',
+    /** iOS `UIFontDescriptorSystemDesignSerif` */
+    serif: 'ui-serif',
+    /** iOS `UIFontDescriptorSystemDesignRounded` */
+    rounded: 'ui-rounded',
+    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
+    mono: 'ui-monospace',
+  },
+  default: {
+    sans: 'normal',
+    serif: 'serif',
+    rounded: 'normal',
+    mono: 'monospace',
+  },
+  web: {
+    sans: 'var(--font-display)',
+    serif: 'var(--font-serif)',
+    rounded: 'var(--font-rounded)',
+    mono: 'var(--font-mono)',
+  },
+});
+
+export const Spacing = {
+  half: 2,
+  one: 4,
+  two: 8,
+  three: 16,
+  four: 24,
+  five: 32,
+  six: 64,
+} as const;
+
+export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+export const MaxContentWidth = 800;
