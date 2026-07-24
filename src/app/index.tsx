@@ -151,7 +151,7 @@ export default function LoginScreen() {
       },
       body: JSON.stringify({
         app: 'App',
-        token: '	9720002b-a4f6-4c48-9a20-65f86669f6d6}',
+        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
         cpfcnpj: raw,
       }),
     })
@@ -163,9 +163,11 @@ export default function LoginScreen() {
         if (response.ok && data) {
           // Extraction of client's name if returned in an array or direct object
           let name = '';
-          if (Array.isArray(data) && data.length > 0) {
+          if (data && data.clientes && Array.isArray(data.clientes) && data.clientes.length > 0) {
+            name = data.clientes[0].nome || data.clientes[0].razao_social || data.clientes[0].name || '';
+          } else if (Array.isArray(data) && data.length > 0) {
             name = data[0].nome || data[0].razao_social || data[0].name || '';
-          } else if (typeof data === 'object') {
+          } else if (typeof data === 'object' && data) {
             name = data.nome || data.razao_social || data.name || '';
           }
           
