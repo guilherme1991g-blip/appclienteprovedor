@@ -11,7 +11,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react-native';
+import { ArrowRight, CheckCircle, ShieldCheck, Wifi, Globe, MapPin, ArrowLeft } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
 // Helper function to validate CPF (Brazilian Taxpayer Registry for Individuals)
@@ -98,9 +98,15 @@ function formatAutoDocument(value: string): string {
   }
 }
 
-interface ClientInfo {
-  name: string;
+interface ContractDisplay {
+  id: number;
+  planName: string;
+  address: string;
+  status: string;
+  clientName: string;
 }
+
+type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'SUCCESS';
 
 export default function LoginScreen() {
   const [documentInput, setDocumentInput] = useState('');
@@ -109,8 +115,10 @@ export default function LoginScreen() {
   const [isValid, setIsValid] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
+  
+  const [screenState, setScreenState] = useState<ScreenState>('LOGIN');
+  const [contracts, setContracts] = useState<ContractDisplay[]>([]);
+  const [selectedContract, setSelectedContract] = useState<ContractDisplay | null>(null);
 
   const handleInputChange = (text: string) => {
     const formatted = formatAutoDocument(text);
@@ -143,7 +151,7 @@ export default function LoginScreen() {
     setLoading(true);
     setErrorMsg('');
 
-    // Calls the client validation API provided by the user
+    // Calls URA clientes API
     fetch('https://webcnnect.sgp.tsmx.com.br/api/ura/clientes/', {
       method: 'POST',
       headers: {
@@ -161,20 +169,57 @@ export default function LoginScreen() {
         console.log('API Result:', data);
 
         if (response.ok && data) {
-          // Extraction of client's name if returned in an array or direct object
-          let name = '';
-          if (data && data.clientes && Array.isArray(data.clientes) && data.clientes.length > 0) {
-            name = data.clientes[0].nome || data.clientes[0].razao_social || data.clientes[0].name || '';
-          } else if (Array.isArray(data) && data.length > 0) {
-            name = data[0].nome || data[0].razao_social || data[0].name || '';
-          } else if (typeof data === 'object' && data) {
-            name = data.nome || data.razao_social || data.name || '';
-          }
+          const parsedContracts: ContractDisplay[] = [];
           
-          setClientInfo({ name: name || 'Cliente' });
-          setSuccess(true);
+          const clientsList = data.clientes || [];
+          clientsList.forEach((client: any) => {
+            const contractsList = client.contratos || [];
+            contractsList.forEach((contrato: any) => {
+              // Extract plan name from services list
+              let planName = 'Plano de Internet';
+              if (contrato.servicos && Array.isArray(contrato.servicos) && contrato.servicos.length > 0) {
+                planName = contrato.servicos[0].plano || 'Plano de Internet';
+              }
+              
+              // Extract and format address
+              let addressStr = '';
+              const addr = contrato.endereco || client.endereco;
+              if (addr) {
+                if (typeof addr === 'object') {
+                  const parts = [];
+                  if (addr.logradouro) parts.push(addr.logradouro);
+                  if (addr.numero) parts.push(addr.numero);
+                  if (addr.bairro) parts.push(addr.bairro);
+                  if (addr.cidade) parts.push(addr.cidade);
+                  if (addr.uf) parts.push(addr.uf);
+                  addressStr = parts.join(', ');
+                } else if (typeof addr === 'string') {
+                  addressStr = addr;
+                }
+              }
+              
+              parsedContracts.push({
+                id: contrato.id,
+                planName,
+                address: addressStr || 'Endereço não cadastrado',
+                status: contrato.status || 'Ativo',
+                clientName: client.nome || 'Cliente',
+              });
+            });
+          });
+
+          if (parsedContracts.length === 0) {
+            setErrorMsg('Nenhum contrato ativo localizado.');
+          } else if (parsedContracts.length === 1) {
+            // If customer has exactly 1 contract, log in immediately
+            setSelectedContract(parsedContracts[0]);
+            setScreenState('SUCCESS');
+          } else {
+            // If customer has multiple contracts, show the contract selection screen
+            setContracts(parsedContracts);
+            setScreenState('SELECT_CONTRACT');
+          }
         } else {
-          // Handles server/API returned messages
           const message = data?.message || data?.error || 'Documento não localizado na base.';
           setErrorMsg(message);
         }
@@ -186,6 +231,11 @@ export default function LoginScreen() {
       });
   };
 
+  const handleContractSelect = (contract: ContractDisplay) => {
+    setSelectedContract(contract);
+    setScreenState('SUCCESS');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -194,15 +244,14 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           
-          {!success ? (
+          {screenState === 'LOGIN' && (
             <View style={styles.mainWrapper}>
-              
               {/* TOP CONTAINER - Logo */}
               <View style={styles.topContainer}>
                 <BrandLogo />
               </View>
 
-              {/* CENTER CONTAINER - Title, Input, Button in the Middle */}
+              {/* CENTER CONTAINER - Form */}
               <View style={styles.centerContainer}>
                 <View style={styles.cardContainer}>
                   <View style={styles.welcomeContainer}>
@@ -281,7 +330,88 @@ export default function LoginScreen() {
                 </View>
               </View>
 
-              {/* BOTTOM CONTAINER - App Version Footer */}
+              {/* BOTTOM CONTAINER - Footer */}
+              <View style={styles.bottomContainer}>
+                <View style={styles.footer}>
+                  <ShieldCheck size={14} color="#64748B" />
+                  <Text style={styles.footerText}>
+                    WebConnect App v1.0.0 • Conexão Segura
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {screenState === 'SELECT_CONTRACT' && (
+            <View style={styles.mainWrapper}>
+              
+              {/* TOP CONTAINER - Logo */}
+              <View style={styles.topContainer}>
+                <BrandLogo />
+              </View>
+
+              {/* CENTER CONTAINER - Selection Card list */}
+              <View style={styles.centerContainer}>
+                <View style={styles.cardContainer}>
+                  <View style={styles.welcomeContainer}>
+                    <Text style={styles.welcomeTitle}>Selecione o Contrato</Text>
+                    <Text style={styles.welcomeSubtitle}>
+                      Identificamos mais de um plano ativo no seu documento. Escolha qual deseja acessar:
+                    </Text>
+                  </View>
+
+                  {/* Contracts List */}
+                  {contracts.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.contractItemCard}
+                      onPress={() => handleContractSelect(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.contractCardHeader}>
+                        <View style={styles.contractIconBackground}>
+                          <Wifi size={20} color="#0052FF" />
+                        </View>
+                        <View style={styles.contractMainInfo}>
+                          <Text style={styles.contractPlanTitle}>{item.planName.toUpperCase()}</Text>
+                          <Text style={styles.contractIdText}>Contrato #{item.id}</Text>
+                        </View>
+                        <View style={[
+                          styles.statusBadge, 
+                          { backgroundColor: item.status.toLowerCase() === 'ativo' ? '#10B98120' : '#EF444420' }
+                        ]}>
+                          <Text style={[
+                            styles.statusBadgeText,
+                            { color: item.status.toLowerCase() === 'ativo' ? '#10B981' : '#EF4444' }
+                          ]}>
+                            {item.status}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={styles.contractAddressRow}>
+                        <MapPin size={14} color="#64748B" style={styles.addressIcon} />
+                        <Text style={styles.contractAddressText} numberOfLines={2}>
+                          {item.address}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Back button */}
+                  <TouchableOpacity
+                    style={styles.backToLoginButton}
+                    onPress={() => setScreenState('LOGIN')}
+                    activeOpacity={0.7}
+                  >
+                    <ArrowLeft size={16} color="#64748B" />
+                    <Text style={styles.backToLoginText}>Voltar para o Login</Text>
+                  </TouchableOpacity>
+
+                </View>
+              </View>
+
+              {/* BOTTOM CONTAINER - Footer */}
               <View style={styles.bottomContainer}>
                 <View style={styles.footer}>
                   <ShieldCheck size={14} color="#64748B" />
@@ -292,8 +422,10 @@ export default function LoginScreen() {
               </View>
 
             </View>
-          ) : (
-            /* Success View Mock */
+          )}
+
+          {screenState === 'SUCCESS' && selectedContract && (
+            /* Success View */
             <View style={styles.successCard}>
               <CheckCircle size={64} color="#10B981" strokeWidth={2} />
               
@@ -301,8 +433,27 @@ export default function LoginScreen() {
                 Acesso Autorizado!
               </Text>
               
+              <Text style={styles.successGreeting}>
+                Olá, {selectedContract.clientName}!
+              </Text>
+
+              <View style={styles.selectedContractBox}>
+                <View style={styles.selectedContractRow}>
+                  <Globe size={16} color="#0052FF" />
+                  <Text style={styles.selectedContractPlan}>
+                    {selectedContract.planName}
+                  </Text>
+                </View>
+                <Text style={styles.selectedContractId}>
+                  Contrato ID: {selectedContract.id} ({selectedContract.status})
+                </Text>
+                <Text style={styles.selectedContractAddress}>
+                  {selectedContract.address}
+                </Text>
+              </View>
+
               <Text style={styles.successSubtitle}>
-                Olá, {clientInfo?.name}! Buscando os dados do seu plano WebConnect...
+                Carregando as informações do seu plano e faturas...
               </Text>
 
               <ActivityIndicator size="small" color="#0052FF" style={{ marginVertical: 15 }} />
@@ -310,10 +461,11 @@ export default function LoginScreen() {
               <TouchableOpacity
                 style={styles.backBtn}
                 onPress={() => {
-                  setSuccess(false);
+                  setScreenState('LOGIN');
                   setDocumentInput('');
                   setIsValid(false);
-                  setClientInfo(null);
+                  setSelectedContract(null);
+                  setContracts([]);
                 }}
               >
                 <Text style={styles.backBtnText}>
@@ -380,6 +532,14 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 8,
     color: '#FFFFFF',
+    textAlign: 'center',
+  },
+  welcomeSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    color: '#94A3B8',
+    lineHeight: 18,
+    paddingHorizontal: 15,
   },
   formGroup: {
     marginBottom: 20,
@@ -450,6 +610,88 @@ const styles = StyleSheet.create({
   btnIcon: {
     marginLeft: 8,
   },
+  contractItemCard: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  contractCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  contractIconBackground: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#0052FF15',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  contractMainInfo: {
+    flex: 1,
+  },
+  contractPlanTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
+  },
+  contractIdText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  contractAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+  },
+  addressIcon: {
+    marginRight: 6,
+    marginTop: 2,
+  },
+  contractAddressText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 16,
+  },
+  backToLoginButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+    gap: 6,
+    paddingVertical: 8,
+  },
+  backToLoginText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
   successCard: {
     width: '100%',
     maxWidth: 450,
@@ -471,15 +713,53 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 4,
     textAlign: 'center',
     color: '#FFFFFF',
   },
-  successSubtitle: {
-    fontSize: 14,
+  successGreeting: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#3B82F6',
     textAlign: 'center',
-    lineHeight: 22,
     marginBottom: 20,
+  },
+  selectedContractBox: {
+    width: '100%',
+    backgroundColor: '#00000030',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  selectedContractRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  selectedContractPlan: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  selectedContractId: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  selectedContractAddress: {
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 16,
+  },
+  successSubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 10,
     color: '#94A3B8',
   },
   backBtn: {
