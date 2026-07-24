@@ -178,7 +178,14 @@ export default function LoginScreen() {
               // Extract plan name from services list
               let planName = 'Plano de Internet';
               if (contrato.servicos && Array.isArray(contrato.servicos) && contrato.servicos.length > 0) {
-                planName = contrato.servicos[0].plano || 'Plano de Internet';
+                const serv = contrato.servicos[0];
+                if (serv.plano) {
+                  if (typeof serv.plano === 'object') {
+                    planName = serv.plano.descricao || serv.plano.nome || serv.plano.description || 'Plano de Internet';
+                  } else if (typeof serv.plano === 'string') {
+                    planName = serv.plano;
+                  }
+                }
               }
               
               // Extract and format address
