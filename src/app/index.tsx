@@ -152,82 +152,102 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
           
           {!success ? (
-            <View style={styles.cardContainer}>
-              <BrandLogo />
-
-              <View style={styles.welcomeContainer}>
-                <Text style={styles.welcomeTitle}>Área do Cliente</Text>
+            <View style={styles.mainWrapper}>
+              
+              {/* TOP CONTAINER - Logo */}
+              <View style={styles.topContainer}>
+                <BrandLogo />
               </View>
 
-              {/* Form Input Group */}
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>
-                  CPF ou CNPJ
-                </Text>
-                
-                <View
-                  style={[
-                    styles.inputContainer,
-                    {
-                      borderColor: errorMsg
-                        ? '#EF4444'
-                        : isFocused
-                        ? '#0052FF'
-                        : '#334155',
-                    },
-                  ]}
-                >
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="CPF ou CNPJ"
-                    placeholderTextColor="#64748B"
-                    keyboardType="numeric"
-                    value={documentInput}
-                    onChangeText={handleInputChange}
-                    onFocus={() => setIsFocused(true)}
-                    onBlur={() => setIsFocused(false)}
-                    editable={!loading}
-                    maxLength={18}
-                  />
-                </View>
-
-                {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-                
-                {!errorMsg && documentInput.length > 0 && !isValid && (
-                  <Text style={styles.warningText}>
-                    Detectado: {detectedType} (aguardando documento válido...)
-                  </Text>
-                )}
-
-                {!errorMsg && isValid && (
-                  <Text style={styles.successValidationText}>
-                    ✓ {detectedType} válido e pronto para acessar!
-                  </Text>
-                )}
-              </View>
-
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[
-                  styles.submitButton,
-                  {
-                    backgroundColor: '#0052FF',
-                    opacity: isValid && !loading ? 1 : 0.5,
-                  },
-                ]}
-                onPress={handleLogin}
-                disabled={!isValid || loading}
-                activeOpacity={0.8}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <View style={styles.submitBtnContent}>
-                    <Text style={styles.submitBtnText}>Entrar</Text>
-                    <ArrowRight size={18} color="#FFFFFF" style={styles.btnIcon} />
+              {/* CENTER CONTAINER - Title, Input, Button in the Middle */}
+              <View style={styles.centerContainer}>
+                <View style={styles.cardContainer}>
+                  <View style={styles.welcomeContainer}>
+                    <Text style={styles.welcomeTitle}>Área do Cliente</Text>
                   </View>
-                )}
-              </TouchableOpacity>
+
+                  {/* Form Input Group */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.inputLabel}>
+                      CPF ou CNPJ
+                    </Text>
+                    
+                    <View
+                      style={[
+                        styles.inputContainer,
+                        {
+                          borderColor: errorMsg
+                            ? '#EF4444'
+                            : isFocused
+                            ? '#0052FF'
+                            : '#334155',
+                        },
+                      ]}
+                    >
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="CPF ou CNPJ"
+                        placeholderTextColor="#64748B"
+                        keyboardType="numeric"
+                        value={documentInput}
+                        onChangeText={handleInputChange}
+                        onFocus={() => setIsFocused(true)}
+                        onBlur={() => setIsFocused(false)}
+                        editable={!loading}
+                        maxLength={18}
+                      />
+                    </View>
+
+                    {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+                    
+                    {!errorMsg && documentInput.length > 0 && !isValid && (
+                      <Text style={styles.warningText}>
+                        Detectado: {detectedType} (aguardando documento válido...)
+                      </Text>
+                    )}
+
+                    {!errorMsg && isValid && (
+                      <Text style={styles.successValidationText}>
+                        ✓ {detectedType} válido e pronto para acessar!
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Submit Button */}
+                  <TouchableOpacity
+                    style={[
+                      styles.submitButton,
+                      {
+                        backgroundColor: '#0052FF',
+                        opacity: isValid && !loading ? 1 : 0.5,
+                      },
+                    ]}
+                    onPress={handleLogin}
+                    disabled={!isValid || loading}
+                    activeOpacity={0.8}
+                  >
+                    {loading ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <View style={styles.submitBtnContent}>
+                        <Text style={styles.submitBtnText}>Entrar</Text>
+                        <ArrowRight size={18} color="#FFFFFF" style={styles.btnIcon} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* BOTTOM CONTAINER - App Version Footer */}
+              <View style={styles.bottomContainer}>
+                <View style={styles.footer}>
+                  <ShieldCheck size={14} color="#64748B" />
+                  <Text style={styles.footerText}>
+                    WebConnect App v1.0.0 • Conexão Segura
+                  </Text>
+                </View>
+              </View>
+
             </View>
           ) : (
             /* Success View Mock */
@@ -259,14 +279,6 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* App Footer Info */}
-          <View style={styles.footer}>
-            <ShieldCheck size={14} color="#64748B" />
-            <Text style={styles.footerText}>
-              WebConnect App v1.0.0 • Conexão Segura
-            </Text>
-          </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -283,17 +295,36 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'flex-start',
-    paddingTop: Platform.OS === 'ios' ? 40 : 20,
-    paddingHorizontal: 24,
-    paddingBottom: 24,
     backgroundColor: '#000000',
+  },
+  mainWrapper: {
+    flex: 1,
+    width: '100%',
+    minHeight: Platform.OS === 'ios' ? '92%' : '95%',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+  },
+  topContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: Platform.OS === 'ios' ? 10 : 5,
+  },
+  centerContainer: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+  },
+  bottomContainer: {
+    width: '100%',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 10 : 5,
   },
   cardContainer: {
     width: '100%',
     maxWidth: 450,
     alignSelf: 'center',
-    marginTop: 20,
   },
   welcomeContainer: {
     alignItems: 'center',
@@ -321,12 +352,12 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: 10,
     paddingHorizontal: 16,
-    height: 46, // reduced from 54
+    height: 46,
     justifyContent: 'center',
     backgroundColor: '#0F172A',
   },
   textInput: {
-    fontSize: 15, // reduced from 16
+    fontSize: 15,
     fontWeight: '600',
     letterSpacing: 0.5,
     color: '#FFFFFF',
@@ -351,7 +382,7 @@ const styles = StyleSheet.create({
     color: '#10B981',
   },
   submitButton: {
-    height: 46, // reduced from 52
+    height: 46,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -390,7 +421,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 4,
-    marginTop: 40,
+    marginTop: 80,
   },
   successTitle: {
     fontSize: 22,
@@ -426,7 +457,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 40,
     gap: 4,
   },
   footerText: {
