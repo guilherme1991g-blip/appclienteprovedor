@@ -373,7 +373,7 @@ export default function LoginScreen() {
                           <Wifi size={20} color="#0052FF" />
                         </View>
                         <View style={styles.contractMainInfo}>
-                          <Text style={styles.contractPlanTitle}>{item.planName.toUpperCase()}</Text>
+                          <Text style={styles.contractPlanTitle}>{String(item.planName || '').toUpperCase()}</Text>
                           <Text style={styles.contractIdText}>Contrato #{item.id}</Text>
                         </View>
                         <View style={[
