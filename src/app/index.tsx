@@ -150,7 +150,7 @@ export default function LoginScreen() {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        app: 'APP',
+        app: 'App',
         token: '	9720002b-a4f6-4c48-9a20-65f86669f6d6}',
         cpfcnpj: raw,
       }),
