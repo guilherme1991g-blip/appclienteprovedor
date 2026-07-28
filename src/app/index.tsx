@@ -289,396 +289,402 @@ export default function LoginScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-          
-          {screenState === 'LOGIN' && (
-            <View style={styles.mainWrapper}>
-              {/* TOP CONTAINER - Logo */}
-              <View style={styles.topContainer}>
-                <BrandLogo />
-              </View>
+        {screenState === 'DASHBOARD' && selectedContract ? (
+          /* Dashboard rendering outside ScrollView to keep bottom menu fixed and safe */
+          (() => {
+            const statusLower = (selectedContract.status || '').toLowerCase().trim();
+            const isActiveOrSuspended = statusLower === 'ativo' || statusLower === 'suspenso';
+            const firstName = (selectedContract.clientName || '').split(' ')[0];
 
-              {/* CENTER CONTAINER - Form */}
-              <View style={styles.centerContainer}>
-                <View style={styles.cardContainer}>
-                  <View style={styles.welcomeContainer}>
-                    <Text style={styles.welcomeTitle}>Área do Cliente</Text>
-                  </View>
-
-                  {/* Form Input Group */}
-                  <View style={styles.formGroup}>
-                    <Text style={styles.inputLabel}>
-                      CPF ou CNPJ
-                    </Text>
-                    
-                    <View
-                      style={[
-                        styles.inputContainer,
-                        {
-                          borderColor: errorMsg
-                            ? '#EF4444'
-                            : isFocused
-                            ? '#0052FF'
-                            : '#334155',
-                        },
-                      ]}
-                    >
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="CPF ou CNPJ"
-                        placeholderTextColor="#64748B"
-                        keyboardType="numeric"
-                        value={documentInput}
-                        onChangeText={handleInputChange}
-                        onFocus={() => setIsFocused(true)}
-                        onBlur={() => setIsFocused(false)}
-                        editable={!loading}
-                        maxLength={18}
-                      />
-                    </View>
-
-                    {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
-                    
-                    {!errorMsg && documentInput.length > 0 && !isValid && (
-                      <Text style={styles.warningText}>
-                        Detectado: {detectedType} (aguardando documento válido...)
-                      </Text>
-                    )}
-
-                    {!errorMsg && isValid && (
-                      <Text style={styles.successValidationText}>
-                        ✓ {detectedType} válido e pronto para acessar!
-                      </Text>
-                    )}
-                  </View>
-
-                  {/* Submit Button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.submitButton,
-                      {
-                        backgroundColor: '#0052FF',
-                        opacity: isValid && !loading ? 1 : 0.5,
-                      },
-                    ]}
-                    onPress={handleLogin}
-                    disabled={!isValid || loading}
-                    activeOpacity={0.8}
-                  >
-                    {loading ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <View style={styles.submitBtnContent}>
-                        <Text style={styles.submitBtnText}>Entrar</Text>
-                        <ArrowRight size={18} color="#FFFFFF" style={styles.btnIcon} />
+            if (isActiveOrSuspended) {
+              return (
+                <View style={styles.dashboardWrapper}>
+                  
+                  {/* TOP HEADER BAR */}
+                  <View style={styles.dashboardHeader}>
+                    <View style={styles.headerInfoLeft}>
+                      <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
+                      <View style={styles.headerMetaRow}>
+                        <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
+                        <Text style={styles.headerMetaSeparator}>•</Text>
+                        <Text style={[
+                          styles.headerMetaStatus,
+                          { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
+                        ]}>
+                          {selectedContract.status}
+                        </Text>
+                        <Text style={styles.headerMetaSeparator}>•</Text>
+                        <Text style={styles.headerMetaPlan} numberOfLines={1}>
+                          {selectedContract.planName}
+                        </Text>
                       </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* BOTTOM CONTAINER - Footer */}
-              <View style={styles.bottomContainer}>
-                <View style={styles.footer}>
-                  <ShieldCheck size={14} color="#64748B" />
-                  <Text style={styles.footerText}>
-                    WebConnect App v1.0.0 • Conexão Segura
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {screenState === 'SELECT_CONTRACT' && (
-            <View style={styles.mainWrapper}>
-              
-              {/* TOP CONTAINER - Logo */}
-              <View style={styles.topContainer}>
-                <BrandLogo />
-              </View>
-
-              {/* CENTER CONTAINER - Selection Card list */}
-              <View style={styles.centerContainer}>
-                <View style={styles.cardContainer}>
-                  <View style={styles.welcomeContainer}>
-                    <Text style={styles.welcomeTitle}>Selecione o Contrato</Text>
-                    <Text style={styles.welcomeSubtitle}>
-                      Identificamos mais de um plano ativo no seu documento. Escolha qual deseja acessar:
-                    </Text>
-                  </View>
-
-                  {/* Contracts List */}
-                  {contracts.map((item) => (
+                    </View>
                     <TouchableOpacity
-                      key={item.id}
-                      style={styles.contractItemCard}
-                      onPress={() => handleContractSelect(item)}
+                      style={styles.logoutButton}
+                      onPress={handleLogout}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.contractCardHeader}>
-                        <View style={styles.contractIconBackground}>
-                          <Wifi size={20} color="#0052FF" />
-                        </View>
-                        <View style={styles.contractMainInfo}>
-                          <Text style={styles.contractPlanTitle}>{String(item.planName || '').toUpperCase()}</Text>
-                          <Text style={styles.contractIdText}>Contrato #{item.id}</Text>
-                        </View>
-                        <View style={[
-                          styles.statusBadge, 
-                          { backgroundColor: item.status.toLowerCase() === 'ativo' ? '#10B98120' : '#EF444420' }
-                        ]}>
-                          <Text style={[
-                            styles.statusBadgeText,
-                            { color: item.status.toLowerCase() === 'ativo' ? '#10B981' : '#EF4444' }
-                          ]}>
-                            {item.status}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View style={styles.contractAddressRow}>
-                        <MapPin size={14} color="#64748B" style={styles.addressIcon} />
-                        <Text style={styles.contractAddressText} numberOfLines={2}>
-                          {item.address}
-                        </Text>
-                      </View>
+                      <LogOut size={20} color="#EF4444" />
                     </TouchableOpacity>
-                  ))}
+                  </View>
 
-                  {/* Back button */}
-                  <TouchableOpacity
-                    style={styles.backToLoginButton}
-                    onPress={() => setScreenState('LOGIN')}
-                    activeOpacity={0.7}
+                  {/* CENTER CONTENT AREA (Scrollable separately) */}
+                  <ScrollView 
+                    style={styles.dashboardScroll}
+                    contentContainerStyle={styles.dashboardContent}
+                    keyboardShouldPersistTaps="handled"
                   >
-                    <ArrowLeft size={16} color="#FFFFFF" />
-                    <Text style={styles.backToLoginText}>Voltar para o Login</Text>
-                  </TouchableOpacity>
-
-                </View>
-              </View>
-
-              {/* BOTTOM CONTAINER - Footer */}
-              <View style={styles.bottomContainer}>
-                <View style={styles.footer}>
-                  <ShieldCheck size={14} color="#64748B" />
-                  <Text style={styles.footerText}>
-                    WebConnect App v1.0.0 • Conexão Segura
-                  </Text>
-                </View>
-              </View>
-
-            </View>
-          )}
-
-          {screenState === 'DASHBOARD' && selectedContract && (
-            /* Dashboard View */
-            <View style={styles.dashboardContainer}>
-              {(() => {
-                const statusLower = (selectedContract.status || '').toLowerCase().trim();
-                const isActiveOrSuspended = statusLower === 'ativo' || statusLower === 'suspenso';
-                const firstName = (selectedContract.clientName || '').split(' ')[0];
-
-                if (isActiveOrSuspended) {
-                  return (
-                    <View style={styles.dashboardWrapper}>
-                      
-                      {/* 1. TOP HEADER BAR */}
-                      <View style={styles.dashboardHeader}>
-                        <View style={styles.headerInfoLeft}>
-                          <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
-                          <View style={styles.headerMetaRow}>
-                            <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
-                            <Text style={styles.headerMetaSeparator}>•</Text>
-                            <Text style={[
-                              styles.headerMetaStatus,
-                              { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
-                            ]}>
-                              {selectedContract.status}
-                            </Text>
-                            <Text style={styles.headerMetaSeparator}>•</Text>
-                            <Text style={styles.headerMetaPlan} numberOfLines={1}>
-                              {selectedContract.planName}
-                            </Text>
-                          </View>
-                        </View>
-                        <TouchableOpacity
-                          style={styles.logoutButton}
-                          onPress={handleLogout}
-                          activeOpacity={0.7}
-                        >
-                          <LogOut size={20} color="#EF4444" />
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* 2. CENTER CONTENT AREA (placeholder based on tab) */}
-                      <View style={styles.dashboardContent}>
-                        {activeTab === 'HOME' && (
-                          <View style={styles.tabContentCard}>
-                            <Home size={36} color="#0052FF" style={styles.tabContentIcon} />
-                            <Text style={styles.tabContentTitle}>Início</Text>
-                            <Text style={styles.tabContentDesc}>
-                              Bem-vindo à Central do Cliente WebConnect. Use o menu abaixo para navegar pelo seu aplicativo.
-                            </Text>
-                          </View>
-                        )}
-
-                        {activeTab === 'PLANO' && (
-                          <View style={styles.tabContentCard}>
-                            <FileText size={36} color="#0052FF" style={styles.tabContentIcon} />
-                            <Text style={styles.tabContentTitle}>Meu Plano</Text>
-                            <Text style={styles.tabContentDesc}>
-                              Informações detalhadas sobre a velocidade contratada, taxas de upload/download e dados do serviço de internet.
-                            </Text>
-                          </View>
-                        )}
-
-                        {activeTab === 'FINANCEIRO' && (
-                          <View style={styles.tabContentCard}>
-                            <CreditCard size={36} color="#0052FF" style={styles.tabContentIcon} />
-                            <Text style={styles.tabContentTitle}>Financeiro</Text>
-                            <Text style={styles.tabContentDesc}>
-                              Gerencie suas faturas, visualize códigos de barras para pagamento, boleto PDF e chaves Pix copia e cola.
-                            </Text>
-                          </View>
-                        )}
-
-                        {activeTab === 'SUPORTE' && (
-                          <View style={styles.tabContentCard}>
-                            <MessageSquare size={36} color="#0052FF" style={styles.tabContentIcon} />
-                            <Text style={styles.tabContentTitle}>Suporte Técnico</Text>
-                            <Text style={styles.tabContentDesc}>
-                              Abra chamados para suporte de conexão lenta, queda de sinal ou solicitações de visitas técnicas.
-                            </Text>
-                          </View>
-                        )}
-
-                        {activeTab === 'TESTE' && (
-                          <View style={styles.tabContentCard}>
-                            <Activity size={36} color="#0052FF" style={styles.tabContentIcon} />
-                            <Text style={styles.tabContentTitle}>Teste de Velocidade</Text>
-                            <Text style={styles.tabContentDesc}>
-                              Inicie o diagnóstico em tempo real da latência (ping), velocidade de download e integridade de sua conexão.
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-
-                      {/* 3. BOTTOM TAB NAVIGATION BAR */}
-                      <View style={styles.bottomTabBar}>
-                        {/* Tab 1: Plano */}
-                        <TouchableOpacity
-                          style={styles.tabButton}
-                          onPress={() => setActiveTab('PLANO')}
-                          activeOpacity={0.7}
-                        >
-                          <FileText size={20} color={activeTab === 'PLANO' ? '#0052FF' : '#64748B'} />
-                          <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#0052FF' : '#64748B' }]}>
-                            Plano
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Tab 2: Financeiro */}
-                        <TouchableOpacity
-                          style={styles.tabButton}
-                          onPress={() => setActiveTab('FINANCEIRO')}
-                          activeOpacity={0.7}
-                        >
-                          <CreditCard size={20} color={activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B'} />
-                          <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B' }]}>
-                            Financeiro
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Tab 3: Home (Floating Button in the middle, larger) */}
-                        <View style={styles.floatingHomeButtonContainer}>
-                          <TouchableOpacity
-                            style={[
-                              styles.floatingHomeButton,
-                              { backgroundColor: activeTab === 'HOME' ? '#0052FF' : '#1E293B' }
-                            ]}
-                            onPress={() => setActiveTab('HOME')}
-                            activeOpacity={0.8}
-                          >
-                            <Home size={24} color="#FFFFFF" />
-                          </TouchableOpacity>
-                          <Text style={[styles.tabLabel, { marginTop: 4, color: activeTab === 'HOME' ? '#0052FF' : '#64748B' }]}>
-                            Home
-                          </Text>
-                        </View>
-
-                        {/* Tab 4: Suporte */}
-                        <TouchableOpacity
-                          style={styles.tabButton}
-                          onPress={() => setActiveTab('SUPORTE')}
-                          activeOpacity={0.7}
-                        >
-                          <MessageSquare size={20} color={activeTab === 'SUPORTE' ? '#0052FF' : '#64748B'} />
-                          <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#0052FF' : '#64748B' }]}>
-                            Suporte
-                          </Text>
-                        </TouchableOpacity>
-
-                        {/* Tab 5: Teste de Conexão */}
-                        <TouchableOpacity
-                          style={styles.tabButton}
-                          onPress={() => setActiveTab('TESTE')}
-                          activeOpacity={0.7}
-                        >
-                          <Activity size={20} color={activeTab === 'TESTE' ? '#0052FF' : '#64748B'} />
-                          <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#0052FF' : '#64748B' }]}>
-                            Conexão
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                } else {
-                  /* Cancelled view - locks account */
-                  return (
-                    <View style={styles.successCard}>
-                      <ShieldCheck size={64} color="#EF4444" strokeWidth={2} style={{ alignSelf: 'center' }} />
-                      
-                      <Text style={styles.cancelledTitle}>
-                        Contrato Cancelado
-                      </Text>
-                      
-                      <Text style={styles.successGreeting}>
-                        Olá, {firstName}!
-                      </Text>
-
-                      <View style={styles.cancelledMessageBox}>
-                        <Text style={styles.cancelledMessageText}>
-                          No momento você está com o contrato cancelado. Entre em contato com o provedor pelo WhatsApp (81) 98256-8282.
+                    {activeTab === 'HOME' && (
+                      <View style={styles.tabContentCard}>
+                        <Home size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Text style={styles.tabContentTitle}>Início</Text>
+                        <Text style={styles.tabContentDesc}>
+                          Bem-vindo à Central do Cliente WebConnect. Use o menu abaixo para navegar pelo seu aplicativo.
                         </Text>
                       </View>
+                    )}
 
+                    {activeTab === 'PLANO' && (
+                      <View style={styles.tabContentCard}>
+                        <FileText size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Text style={styles.tabContentTitle}>Meu Plano</Text>
+                        <Text style={styles.tabContentDesc}>
+                          Informações detalhadas sobre a velocidade contratada, taxas de upload/download e dados do serviço de internet.
+                        </Text>
+                      </View>
+                    )}
+
+                    {activeTab === 'FINANCEIRO' && (
+                      <View style={styles.tabContentCard}>
+                        <CreditCard size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Text style={styles.tabContentTitle}>Financeiro</Text>
+                        <Text style={styles.tabContentDesc}>
+                          Gerencie suas faturas, visualize códigos de barras para pagamento, boleto PDF e chaves Pix copia e cola.
+                        </Text>
+                      </View>
+                    )}
+
+                    {activeTab === 'SUPORTE' && (
+                      <View style={styles.tabContentCard}>
+                        <MessageSquare size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Text style={styles.tabContentTitle}>Suporte Técnico</Text>
+                        <Text style={styles.tabContentDesc}>
+                          Abra chamados para suporte de conexão lenta, queda de sinal ou solicitações de visitas técnicas.
+                        </Text>
+                      </View>
+                    )}
+
+                    {activeTab === 'TESTE' && (
+                      <View style={styles.tabContentCard}>
+                        <Activity size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Text style={styles.tabContentTitle}>Teste de Velocidade</Text>
+                        <Text style={styles.tabContentDesc}>
+                          Inicie o diagnóstico em tempo real da latência (ping), velocidade de download e integridade de sua conexão.
+                        </Text>
+                      </View>
+                    )}
+                  </ScrollView>
+
+                  {/* BOTTOM TAB NAVIGATION BAR (Anchored to screen bottom, safe inset padding) */}
+                  <View style={styles.bottomTabBar}>
+                    
+                    {/* Tab 1: Plano */}
+                    <TouchableOpacity
+                      style={styles.tabButton}
+                      onPress={() => setActiveTab('PLANO')}
+                      activeOpacity={0.7}
+                    >
+                      <FileText size={20} color={activeTab === 'PLANO' ? '#0052FF' : '#64748B'} />
+                      <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#0052FF' : '#64748B' }]}>
+                        Plano
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Tab 2: Financeiro */}
+                    <TouchableOpacity
+                      style={styles.tabButton}
+                      onPress={() => setActiveTab('FINANCEIRO')}
+                      activeOpacity={0.7}
+                    >
+                      <CreditCard size={20} color={activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B'} />
+                      <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B' }]}>
+                        Financeiro
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Tab 3: Home (Floating Central Button, Larger size) */}
+                    <View style={styles.floatingHomeButtonContainer}>
                       <TouchableOpacity
-                        style={styles.whatsappButton}
-                        onPress={() => {
-                          Linking.openURL('https://wa.me/5581982568282?text=Olá!%20Meu%20contrato%20consta%20como%20cancelado%20no%20app%20da%20WebConnect.');
-                        }}
+                        style={[
+                          styles.floatingHomeButton,
+                          { backgroundColor: activeTab === 'HOME' ? '#0052FF' : '#161F30' }
+                        ]}
+                        onPress={() => setActiveTab('HOME')}
                         activeOpacity={0.8}
                       >
-                        <Text style={styles.whatsappButtonText}>Falar no WhatsApp</Text>
+                        <Home size={24} color="#FFFFFF" />
                       </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.backBtn, { marginTop: 10 }]}
-                        onPress={handleLogout}
-                      >
-                        <Text style={styles.backBtnText}>
-                          Voltar
-                        </Text>
-                      </TouchableOpacity>
+                      <Text style={[styles.tabLabel, { marginTop: 4, color: activeTab === 'HOME' ? '#0052FF' : '#64748B' }]}>
+                        Home
+                      </Text>
                     </View>
-                  );
-                }
-              })()}
-            </View>
-          )}
 
-        </ScrollView>
+                    {/* Tab 4: Suporte */}
+                    <TouchableOpacity
+                      style={styles.tabButton}
+                      onPress={() => setActiveTab('SUPORTE')}
+                      activeOpacity={0.7}
+                    >
+                      <MessageSquare size={20} color={activeTab === 'SUPORTE' ? '#0052FF' : '#64748B'} />
+                      <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#0052FF' : '#64748B' }]}>
+                        Suporte
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* Tab 5: Teste de Conexão */}
+                    <TouchableOpacity
+                      style={styles.tabButton}
+                      onPress={() => setActiveTab('TESTE')}
+                      activeOpacity={0.7}
+                    >
+                      <Activity size={20} color={activeTab === 'TESTE' ? '#0052FF' : '#64748B'} />
+                      <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#0052FF' : '#64748B' }]}>
+                        Conexão
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            } else {
+              /* Cancelled View - Locks Account */
+              return (
+                <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+                  <View style={styles.successCard}>
+                    <ShieldCheck size={64} color="#EF4444" strokeWidth={2} style={{ alignSelf: 'center' }} />
+                    
+                    <Text style={styles.cancelledTitle}>
+                      Contrato Cancelado
+                    </Text>
+                    
+                    <Text style={styles.successGreeting}>
+                      Olá, {firstName}!
+                    </Text>
+
+                    <View style={styles.cancelledMessageBox}>
+                      <Text style={styles.cancelledMessageText}>
+                        No momento você está com o contrato cancelado. Entre em contato com o provedor pelo WhatsApp (81) 98256-8282.
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.whatsappButton}
+                      onPress={() => {
+                        Linking.openURL('https://wa.me/5581982568282?text=Olá!%20Meu%20contrato%20consta%20como%20cancelado%20no%20app%20da%20WebConnect.');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.whatsappButtonText}>Falar no WhatsApp</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.backBtn, { marginTop: 10 }]}
+                      onPress={handleLogout}
+                    >
+                      <Text style={styles.backBtnText}>
+                        Voltar
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </ScrollView>
+              );
+            }
+          })()
+        ) : (
+          /* LOGIN and SELECT_CONTRACT States inside ScrollView container */
+          <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+            
+            {screenState === 'LOGIN' && (
+              <View style={styles.mainWrapper}>
+                {/* TOP CONTAINER - Logo */}
+                <View style={styles.topContainer}>
+                  <BrandLogo />
+                </View>
+
+                {/* CENTER CONTAINER - Form */}
+                <View style={styles.centerContainer}>
+                  <View style={styles.cardContainer}>
+                    <View style={styles.welcomeContainer}>
+                      <Text style={styles.welcomeTitle}>Área do Cliente</Text>
+                    </View>
+
+                    {/* Form Input Group */}
+                    <View style={styles.formGroup}>
+                      <Text style={styles.inputLabel}>
+                        CPF ou CNPJ
+                      </Text>
+                      
+                      <View
+                        style={[
+                          styles.inputContainer,
+                          {
+                            borderColor: errorMsg
+                              ? '#EF4444'
+                              : isFocused
+                              ? '#0052FF'
+                              : '#28354E',
+                          },
+                        ]}
+                      >
+                        <TextInput
+                          style={styles.textInput}
+                          placeholder="CPF ou CNPJ"
+                          placeholderTextColor="#64748B"
+                          keyboardType="numeric"
+                          value={documentInput}
+                          onChangeText={handleInputChange}
+                          onFocus={() => setIsFocused(true)}
+                          onBlur={() => setIsFocused(false)}
+                          editable={!loading}
+                          maxLength={18}
+                        />
+                      </View>
+
+                      {errorMsg ? <Text style={styles.errorText}>{errorMsg}</Text> : null}
+                      
+                      {!errorMsg && documentInput.length > 0 && !isValid && (
+                        <Text style={styles.warningText}>
+                          Detectado: {detectedType} (aguardando documento válido...)
+                        </Text>
+                      )}
+
+                      {!errorMsg && isValid && (
+                        <Text style={styles.successValidationText}>
+                          ✓ {detectedType} válido e pronto para acessar!
+                        </Text>
+                      )}
+                    </View>
+
+                    {/* Submit Button */}
+                    <TouchableOpacity
+                      style={[
+                        styles.submitButton,
+                        {
+                          backgroundColor: '#0052FF',
+                          opacity: isValid && !loading ? 1 : 0.5,
+                        },
+                      ]}
+                      onPress={handleLogin}
+                      disabled={!isValid || loading}
+                      activeOpacity={0.8}
+                    >
+                      {loading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <View style={styles.submitBtnContent}>
+                          <Text style={styles.submitBtnText}>Entrar</Text>
+                          <ArrowRight size={18} color="#FFFFFF" style={styles.btnIcon} />
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* BOTTOM CONTAINER - Footer */}
+                <View style={styles.bottomContainer}>
+                  <View style={styles.footer}>
+                    <ShieldCheck size={14} color="#64748B" />
+                    <Text style={styles.footerText}>
+                      WebConnect App v1.0.0 • Conexão Segura
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {screenState === 'SELECT_CONTRACT' && (
+              <View style={styles.mainWrapper}>
+                
+                {/* TOP CONTAINER - Logo */}
+                <View style={styles.topContainer}>
+                  <BrandLogo />
+                </View>
+
+                {/* CENTER CONTAINER - Selection Card list */}
+                <View style={styles.centerContainer}>
+                  <View style={styles.cardContainer}>
+                    <View style={styles.welcomeContainer}>
+                      <Text style={styles.welcomeTitle}>Selecione o Contrato</Text>
+                      <Text style={styles.welcomeSubtitle}>
+                        Identificamos mais de um plano ativo no seu documento. Escolha qual deseja acessar:
+                      </Text>
+                    </View>
+
+                    {/* Contracts List */}
+                    {contracts.map((item) => (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.contractItemCard}
+                        onPress={() => handleContractSelect(item)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.contractCardHeader}>
+                          <View style={styles.contractIconBackground}>
+                            <Wifi size={20} color="#0052FF" />
+                          </View>
+                          <View style={styles.contractMainInfo}>
+                            <Text style={styles.contractPlanTitle}>{String(item.planName || '').toUpperCase()}</Text>
+                            <Text style={styles.contractIdText}>Contrato #{item.id}</Text>
+                          </View>
+                          <View style={[
+                            styles.statusBadge, 
+                            { backgroundColor: item.status.toLowerCase() === 'ativo' ? '#10B98120' : '#EF444420' }
+                          ]}>
+                            <Text style={[
+                              styles.statusBadgeText,
+                              { color: item.status.toLowerCase() === 'ativo' ? '#10B981' : '#EF4444' }
+                            ]}>
+                              {item.status}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View style={styles.contractAddressRow}>
+                          <MapPin size={14} color="#64748B" style={styles.addressIcon} />
+                          <Text style={styles.contractAddressText} numberOfLines={2}>
+                            {item.address}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Back button */}
+                    <TouchableOpacity
+                      style={styles.backToLoginButton}
+                      onPress={() => setScreenState('LOGIN')}
+                      activeOpacity={0.7}
+                    >
+                      <ArrowLeft size={16} color="#FFFFFF" />
+                      <Text style={styles.backToLoginText}>Voltar para o Login</Text>
+                    </TouchableOpacity>
+
+                  </View>
+                </View>
+
+                {/* BOTTOM CONTAINER - Footer */}
+                <View style={styles.bottomContainer}>
+                  <View style={styles.footer}>
+                    <ShieldCheck size={14} color="#64748B" />
+                    <Text style={styles.footerText}>
+                      WebConnect App v1.0.0 • Conexão Segura
+                    </Text>
+                  </View>
+                </View>
+
+              </View>
+            )}
+
+          </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -687,14 +693,14 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#080B11', // Almost-black dark Obsidian tone
   },
   keyboardAvoid: {
     flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#080B11',
   },
   mainWrapper: {
     flex: 1,
@@ -761,7 +767,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     height: 46,
     justifyContent: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625', // Slate Obsidian card background
+    borderColor: '#28354E',
   },
   textInput: {
     fontSize: 15,
@@ -814,9 +821,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   contractItemCard: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625', // Slate Obsidian
     borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderColor: '#28354E',
     borderRadius: 14,
     padding: 16,
     marginBottom: 12,
@@ -870,7 +877,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: '#28354E',
   },
   addressIcon: {
     marginRight: 6,
@@ -885,13 +892,14 @@ const styles = StyleSheet.create({
   backToLoginButton: {
     height: 46,
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: '#28354E',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 16,
     gap: 8,
+    backgroundColor: '#111625',
   },
   backToLoginText: {
     fontSize: 14,
@@ -903,10 +911,10 @@ const styles = StyleSheet.create({
     maxWidth: 450,
     alignSelf: 'center',
     borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderColor: '#28354E',
     borderRadius: 24,
     padding: 32,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
@@ -931,9 +939,9 @@ const styles = StyleSheet.create({
   },
   selectedContractBox: {
     width: '100%',
-    backgroundColor: '#00000030',
+    backgroundColor: '#080B1130',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#28354E',
     borderRadius: 14,
     padding: 16,
     marginBottom: 20,
@@ -969,13 +977,14 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: '#28354E',
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 24,
     width: '100%',
     alignItems: 'center',
     marginTop: 10,
+    backgroundColor: '#161F30',
   },
   backBtnText: {
     fontSize: 14,
@@ -1043,23 +1052,18 @@ const styles = StyleSheet.create({
   },
 
   /* DASHBOARD STYLES */
-  dashboardContainer: {
-    width: '100%',
-    alignSelf: 'stretch',
-    backgroundColor: '#000000',
-  },
   dashboardWrapper: {
-    width: '100%',
-    minHeight: Platform.OS === 'ios' ? '92%' : '95%',
+    flex: 1,
     justifyContent: 'space-between',
+    backgroundColor: '#080B11',
   },
   dashboardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625', // Slate obsidian top bar
     borderBottomWidth: 1.5,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#28354E',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -1086,7 +1090,7 @@ const styles = StyleSheet.create({
   headerMetaSeparator: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#334155',
+    color: '#28354E',
     marginHorizontal: 5,
   },
   headerMetaStatus: {
@@ -1104,23 +1108,25 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 8,
-    backgroundColor: '#EF444410',
+    backgroundColor: '#EF444415',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dashboardContent: {
+  dashboardScroll: {
     flex: 1,
+  },
+  dashboardContent: {
+    flexGrow: 1,
     padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 300,
   },
   tabContentCard: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625', // Slate obsidian content cards
     borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderColor: '#28354E',
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
@@ -1146,21 +1152,22 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   bottomTabBar: {
-    height: 70,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#111625', // Anchored Slate obsidian bottom bar
     borderTopWidth: 1.5,
-    borderTopColor: '#1E293B',
+    borderTopColor: '#28354E',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
     position: 'relative',
+    height: Platform.OS === 'ios' ? 84 : 74,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 12,
+    paddingTop: 10,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
   },
   tabLabel: {
     fontSize: 10,
@@ -1179,13 +1186,13 @@ const styles = StyleSheet.create({
     borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -30,
+    marginTop: -38, // Float above the bar
     shadowColor: '#0052FF',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 5,
-    borderWidth: 3,
-    borderColor: '#000000',
+    borderWidth: 4,
+    borderColor: '#080B11', // Outer boundary matching body to blend floating effect
   },
 });
