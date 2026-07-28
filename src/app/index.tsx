@@ -316,8 +316,7 @@ export default function LoginScreen() {
     const bodyData = {
       token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
       app: 'App',
-      cpfcnpj: documentInput.replace(/\D/g, ''),
-      contrato: selectedContract.id.toString()
+      cpfcnpj: documentInput.replace(/\D/g, '')
     };
 
     const postData = Object.keys(bodyData)
