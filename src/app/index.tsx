@@ -30,6 +30,8 @@ import {
   Eye,
   EyeOff,
   Copy,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -117,6 +119,21 @@ function formatAutoDocument(value: string): string {
   }
 }
 
+// Helper to format Date string to DD/MM/YYYY
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+// Helper to format currency
+function formatCurrency(val: number | string): string {
+  const num = typeof val === 'string' ? parseFloat(val) : val;
+  if (isNaN(num)) return 'R$ 0,00';
+  return `R$ ${num.toFixed(2).replace('.', ',')}`;
+}
+
 interface ContractDisplay {
   id: number;
   planName: string;
@@ -165,6 +182,9 @@ export default function LoginScreen() {
   const [contracts, setContracts] = useState<ContractDisplay[]>([]);
   const [selectedContract, setSelectedContract] = useState<ContractDisplay | null>(null);
   const [activeTab, setActiveTab] = useState<TabName>('HOME');
+
+  // Invoices (Titulos) State
+  const [allTitulos, setAllTitulos] = useState<any[]>([]);
 
   // Toggle Visibility for passwords
   const [showPppoePassword, setShowPppoePassword] = useState(false);
@@ -221,8 +241,16 @@ export default function LoginScreen() {
         if (response.ok && data) {
           const parsedContracts: ContractDisplay[] = [];
           
+          // Store raw titles
+          let rawTitulos: any[] = [];
+
           const clientsList = data.clientes || [];
           clientsList.forEach((client: any) => {
+            // Concat client titles
+            if (client.titulos && Array.isArray(client.titulos)) {
+              rawTitulos = rawTitulos.concat(client.titulos);
+            }
+
             const contractsList = client.contratos || [];
             contractsList.forEach((contrato: any) => {
               // Extract plan name and service details
@@ -319,6 +347,8 @@ export default function LoginScreen() {
             });
           });
 
+          setAllTitulos(rawTitulos);
+
           const validContracts = parsedContracts.filter(c => {
             const statusLower = (c.status || '').toLowerCase().trim();
             return statusLower === 'ativo' || statusLower === 'suspenso';
@@ -368,6 +398,7 @@ export default function LoginScreen() {
     setIsValid(false);
     setSelectedContract(null);
     setContracts([]);
+    setAllTitulos([]);
     setShowPppoePassword(false);
     setShowWifiPassword(false);
   };
@@ -480,8 +511,6 @@ export default function LoginScreen() {
                             <Text style={styles.infoValue}>{selectedContract.grupo || 'Fibra'}</Text>
                           </View>
                         </View>
-
-
 
                         {/* 3. WI-FI CARD (Only render if Wi-Fi SSID exists) */}
                         {(selectedContract.wifiSsid || selectedContract.wifiSsid5) ? (
@@ -623,12 +652,188 @@ export default function LoginScreen() {
                     )}
 
                     {activeTab === 'FINANCEIRO' && (
-                      <View style={styles.tabContentCard}>
-                        <CreditCard size={32} color="#0052FF" style={styles.tabContentIcon} />
-                        <Text style={styles.tabContentTitle}>Financeiro</Text>
-                        <Text style={styles.tabContentDesc}>
-                          Gerencie suas faturas, visualize códigos de barras para pagamento, boleto PDF e chaves Pix copia e cola.
-                        </Text>
+                      <View style={styles.financeiroTabWrapper}>
+                        
+                        {/* SECTION 1: OPEN / OVERDUE INVOICES */}
+                        <View style={styles.sectionHeaderRow}>
+                          <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                          <Text style={styles.sectionTitle}>Boletos em Aberto / A Vencer</Text>
+                        </View>
+
+                        {(() => {
+                          // Filter titles for current contract
+                          const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
+                          
+                          const today = new Date();
+                          today.setHours(0,0,0,0);
+
+                          // Select and mark overdue vs pending open bills
+                          const openBills = contractTitulos
+                            .filter(t => t.status !== 'pago' && t.status !== 'cancelado')
+                            .map(t => {
+                              // Use 12:00:00 to avoid timezone offset shifts on parse
+                              const dueDate = new Date(t.dataVencimento + 'T12:00:00');
+                              const isOverdue = dueDate.getTime() < today.getTime();
+                              return { ...t, isOverdue };
+                            })
+                            .sort((a, b) => {
+                              // Overdue (Vencidos) always first
+                              if (a.isOverdue && !b.isOverdue) return -1;
+                              if (!a.isOverdue && b.isOverdue) return 1;
+                              // Closest due date next
+                              return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
+                            });
+
+                          // Pick top 3 open invoices
+                          const displayOpenBills = openBills.slice(0, 3);
+
+                          if (displayOpenBills.length === 0) {
+                            return (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 24 }]}>
+                                <CheckCircle size={36} color="#10B981" style={{ marginBottom: 10 }} />
+                                <Text style={styles.noBillsTitle}>Nenhum boleto em aberto!</Text>
+                                <Text style={styles.noBillsDesc}>Seu faturamento está em dia. Parabéns! 🎉</Text>
+                              </View>
+                            );
+                          }
+
+                          return displayOpenBills.map((bill) => (
+                            <View 
+                              key={bill.id} 
+                              style={[
+                                styles.billCard, 
+                                { borderColor: bill.isOverdue ? '#EF4444' : '#28354E' }
+                              ]}
+                            >
+                              <View style={styles.billHeader}>
+                                <View style={styles.billMeta}>
+                                  <Text style={styles.billDueLabel}>VENCIMENTO</Text>
+                                  <Text style={styles.billDueDate}>{formatDateBR(bill.dataVencimento)}</Text>
+                                </View>
+                                <View style={[
+                                  styles.billStatusBadge,
+                                  { backgroundColor: bill.isOverdue ? '#EF444420' : '#0052FF20' }
+                                ]}>
+                                  <Text style={[
+                                    styles.billStatusText,
+                                    { color: bill.isOverdue ? '#EF4444' : '#0052FF' }
+                                  ]}>
+                                    {bill.isOverdue ? 'VENCIDO' : 'A VENCER'}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={styles.billPriceRow}>
+                                <Text style={styles.billPriceLabel}>Valor do Boleto:</Text>
+                                <Text style={styles.billPriceValue}>
+                                  {formatCurrency(bill.valorCorrigido || bill.valor)}
+                                </Text>
+                              </View>
+
+                              {/* ACTIONS BUTTONS ROW */}
+                              <View style={styles.billActionsContainer}>
+                                {bill.codigoPix ? (
+                                  <TouchableOpacity
+                                    style={styles.actionPillBtn}
+                                    onPress={() => {
+                                      Clipboard.setString(bill.codigoPix);
+                                      alert('Chave Pix Copia e Cola copiada com sucesso!');
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Copy size={12} color="#FFFFFF" />
+                                    <Text style={styles.actionPillText}>Copiar PIX</Text>
+                                  </TouchableOpacity>
+                                ) : null}
+
+                                {bill.linhaDigitavel ? (
+                                  <TouchableOpacity
+                                    style={styles.actionPillBtn}
+                                    onPress={() => {
+                                      Clipboard.setString(bill.linhaDigitavel);
+                                      alert('Código de barras copiado com sucesso!');
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Copy size={12} color="#FFFFFF" />
+                                    <Text style={styles.actionPillText}>Código Barras</Text>
+                                  </TouchableOpacity>
+                                ) : null}
+
+                                {bill.link ? (
+                                  <TouchableOpacity
+                                    style={[styles.actionPillBtn, { backgroundColor: '#1E293B' }]}
+                                    onPress={() => Linking.openURL(bill.link)}
+                                    activeOpacity={0.7}
+                                  >
+                                    <ExternalLink size={12} color="#FFFFFF" />
+                                    <Text style={styles.actionPillText}>PDF</Text>
+                                  </TouchableOpacity>
+                                ) : null}
+                              </View>
+                            </View>
+                          ));
+                        })()}
+
+                        {/* SECTION 2: LAST PAID INVOICES */}
+                        <View style={[styles.sectionHeaderRow, { marginTop: 12 }]}>
+                          <CheckCircle size={16} color="#10B981" style={{ marginRight: 6 }} />
+                          <Text style={styles.sectionTitle}>Últimos Boletos Pagos</Text>
+                        </View>
+
+                        {(() => {
+                          const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
+                          
+                          // Get paid invoices sorted by due date descending (latest first)
+                          const paidBills = contractTitulos
+                            .filter(t => t.status === 'pago')
+                            .sort((a, b) => new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime());
+
+                          const displayPaidBills = paidBills.slice(0, 3);
+
+                          if (displayPaidBills.length === 0) {
+                            return (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 20 }]}>
+                                <Text style={styles.noBillsTitle}>Nenhum boleto pago localizado.</Text>
+                              </View>
+                            );
+                          }
+
+                          return displayPaidBills.map((bill) => (
+                            <View key={bill.id} style={styles.paidBillCard}>
+                              <View style={styles.paidBillInfo}>
+                                <View>
+                                  <Text style={styles.paidBillTitle}>
+                                    {formatCurrency(bill.valorPago || bill.valor)}
+                                  </Text>
+                                  <Text style={styles.paidBillSub}>
+                                    Vencimento: {formatDateBR(bill.dataVencimento)}
+                                  </Text>
+                                  {bill.dataPagamento ? (
+                                    <Text style={styles.paidBillDate}>
+                                      Pago em: {formatDateBR(bill.dataPagamento)}
+                                    </Text>
+                                  ) : null}
+                                </View>
+                                <View style={styles.paidBadge}>
+                                  <Text style={styles.paidBadgeText}>PAGO</Text>
+                                </View>
+                              </View>
+                              
+                              {bill.link ? (
+                                <TouchableOpacity
+                                  style={styles.paidPdfBtn}
+                                  onPress={() => Linking.openURL(bill.link)}
+                                  activeOpacity={0.7}
+                                >
+                                  <ExternalLink size={13} color="#0052FF" />
+                                  <Text style={styles.paidPdfBtnText}>Visualizar PDF</Text>
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
+                          ));
+                        })()}
+
                       </View>
                     )}
 
@@ -1596,5 +1801,178 @@ const styles = StyleSheet.create({
   copyIconBtn: {
     padding: 4,
     marginLeft: 4,
+  },
+
+  /* FINANCEIRO TAB STYLES */
+  financeiroTabWrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 12,
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  billCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
+    borderWidth: 1.5,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  billHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#161F30',
+    paddingBottom: 10,
+    marginBottom: 12,
+  },
+  billMeta: {
+    justifyContent: 'center',
+  },
+  billDueLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  billDueDate: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  billStatusBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  billStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  billPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  billPriceLabel: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  billPriceValue: {
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  billActionsContainer: {
+    flexDirection: 'row',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  actionPillBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#0052FF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  actionPillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noBillsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 4,
+  },
+  noBillsDesc: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  paidBillCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
+    borderWidth: 1.5,
+    borderColor: '#28354E',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+  },
+  paidBillInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: '#161F30',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  paidBillTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  paidBillSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+  paidBillDate: {
+    fontSize: 11,
+    color: '#10B981',
+    marginTop: 2,
+    fontWeight: '700',
+  },
+  paidBadge: {
+    backgroundColor: '#10B98115',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  paidBadgeText: {
+    color: '#10B981',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  paidPdfBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  paidPdfBtnText: {
+    color: '#0052FF',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
