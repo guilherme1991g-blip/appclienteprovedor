@@ -335,15 +335,6 @@ export default function LoginScreen() {
   };
 
   const handleSubmitSupport = () => {
-    if (!supportContact.trim()) {
-      alert('Por favor, informe o nome do contato.');
-      return;
-    }
-    const rawPhone = supportPhone.replace(/\D/g, '');
-    if (rawPhone.length < 10) {
-      alert('Por favor, informe um telefone de contato válido.');
-      return;
-    }
     if (!supportContent.trim()) {
       alert('Por favor, descreva o problema.');
       return;
@@ -374,11 +365,12 @@ export default function LoginScreen() {
       cpfcnpj: documentInput.replace(/\D/g, ''),
       contrato: selectedContract!.id.toString(),
       conteudo: supportContent.trim(),
-      contato: supportContact.trim(),
-      contato_numero: rawPhone,
+      contato: selectedContract!.clientName || 'Cliente',
       os_prioridade: '2',
       motivoos,
       ocorrenciatipo,
+      data_hora_agendamento: getNearestBusinessDayString(),
+      os_tecnico_responsavel: 'samuel',
       setor: '1'
     };
 
@@ -425,9 +417,6 @@ export default function LoginScreen() {
   React.useEffect(() => {
     if (screenState === 'DASHBOARD' && activeTab === 'SUPORTE' && selectedContract) {
       fetchSupportTickets();
-      if (!supportContact) {
-        setSupportContact(selectedContract.clientName || '');
-      }
     }
   }, [activeTab, screenState, selectedContract]);
 
