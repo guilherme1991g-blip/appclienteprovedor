@@ -300,23 +300,19 @@ export default function LoginScreen() {
               return (
                 <View style={styles.dashboardWrapper}>
                   
-                  {/* TOP HEADER BAR */}
+                  {/* TOP HEADER BAR (Sleek layout with initials avatar and metadata badges) */}
                   <View style={styles.dashboardHeader}>
                     <View style={styles.headerInfoLeft}>
-                      <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
-                      <View style={styles.headerMetaRow}>
-                        <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
-                        <Text style={styles.headerMetaSeparator}>•</Text>
-                        <Text style={[
-                          styles.headerMetaStatus,
-                          { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
-                        ]}>
-                          {selectedContract.status}
-                        </Text>
-                        <Text style={styles.headerMetaSeparator}>•</Text>
-                        <Text style={styles.headerMetaPlan} numberOfLines={1}>
-                          {selectedContract.planName}
-                        </Text>
+                      <View style={styles.avatarRow}>
+                        <View style={styles.avatarCircle}>
+                          <Text style={styles.avatarText}>
+                            {firstName.substring(0, 1).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.headerGreetingCol}>
+                          <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
+                          <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
+                        </View>
                       </View>
                     </View>
                     <TouchableOpacity
@@ -324,11 +320,36 @@ export default function LoginScreen() {
                       onPress={handleLogout}
                       activeOpacity={0.7}
                     >
-                      <LogOut size={20} color="#EF4444" />
+                      <LogOut size={16} color="#EF4444" />
                     </TouchableOpacity>
                   </View>
 
-                  {/* CENTER CONTENT AREA (Scrollable separately) */}
+                  {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
+                  <View style={styles.badgesRow}>
+                    <View style={styles.badgeItem}>
+                      <Wifi size={12} color="#0052FF" style={{ marginRight: 5 }} />
+                      <Text style={styles.badgeText} numberOfLines={1}>
+                        {selectedContract.planName.toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.statusBadgeItem,
+                      { backgroundColor: statusLower === 'ativo' ? '#10B98115' : '#F59E0B15' }
+                    ]}>
+                      <View style={[
+                        styles.statusDot,
+                        { backgroundColor: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
+                      ]} />
+                      <Text style={[
+                        styles.statusBadgeText,
+                        { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
+                      ]}>
+                        {selectedContract.status.toUpperCase()}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* CENTER CONTENT AREA (Scrolls independently inside dashboard) */}
                   <ScrollView 
                     style={styles.dashboardScroll}
                     contentContainerStyle={styles.dashboardContent}
@@ -336,7 +357,7 @@ export default function LoginScreen() {
                   >
                     {activeTab === 'HOME' && (
                       <View style={styles.tabContentCard}>
-                        <Home size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Home size={32} color="#0052FF" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Início</Text>
                         <Text style={styles.tabContentDesc}>
                           Bem-vindo à Central do Cliente WebConnect. Use o menu abaixo para navegar pelo seu aplicativo.
@@ -346,7 +367,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'PLANO' && (
                       <View style={styles.tabContentCard}>
-                        <FileText size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <FileText size={32} color="#0052FF" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Meu Plano</Text>
                         <Text style={styles.tabContentDesc}>
                           Informações detalhadas sobre a velocidade contratada, taxas de upload/download e dados do serviço de internet.
@@ -356,7 +377,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'FINANCEIRO' && (
                       <View style={styles.tabContentCard}>
-                        <CreditCard size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <CreditCard size={32} color="#0052FF" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Financeiro</Text>
                         <Text style={styles.tabContentDesc}>
                           Gerencie suas faturas, visualize códigos de barras para pagamento, boleto PDF e chaves Pix copia e cola.
@@ -366,7 +387,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'SUPORTE' && (
                       <View style={styles.tabContentCard}>
-                        <MessageSquare size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <MessageSquare size={32} color="#0052FF" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Suporte Técnico</Text>
                         <Text style={styles.tabContentDesc}>
                           Abra chamados para suporte de conexão lenta, queda de sinal ou solicitações de visitas técnicas.
@@ -376,7 +397,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'TESTE' && (
                       <View style={styles.tabContentCard}>
-                        <Activity size={36} color="#0052FF" style={styles.tabContentIcon} />
+                        <Activity size={32} color="#0052FF" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Teste de Velocidade</Text>
                         <Text style={styles.tabContentDesc}>
                           Inicie o diagnóstico em tempo real da latência (ping), velocidade de download e integridade de sua conexão.
@@ -385,74 +406,76 @@ export default function LoginScreen() {
                     )}
                   </ScrollView>
 
-                  {/* BOTTOM TAB NAVIGATION BAR (Anchored to screen bottom, safe inset padding) */}
-                  <View style={styles.bottomTabBar}>
-                    
-                    {/* Tab 1: Plano */}
-                    <TouchableOpacity
-                      style={styles.tabButton}
-                      onPress={() => setActiveTab('PLANO')}
-                      activeOpacity={0.7}
-                    >
-                      <FileText size={20} color={activeTab === 'PLANO' ? '#0052FF' : '#64748B'} />
-                      <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#0052FF' : '#64748B' }]}>
-                        Plano
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Tab 2: Financeiro */}
-                    <TouchableOpacity
-                      style={styles.tabButton}
-                      onPress={() => setActiveTab('FINANCEIRO')}
-                      activeOpacity={0.7}
-                    >
-                      <CreditCard size={20} color={activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B'} />
-                      <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B' }]}>
-                        Financeiro
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Tab 3: Home (Floating Central Button, Larger size) */}
-                    <View style={styles.floatingHomeButtonContainer}>
+                  {/* BOTTOM NAVIGATION TAB BAR (Floating capsule with shadows) */}
+                  <View style={styles.bottomTabBarContainer}>
+                    <View style={styles.bottomTabBar}>
+                      {/* Tab 1: Plano */}
                       <TouchableOpacity
-                        style={[
-                          styles.floatingHomeButton,
-                          { backgroundColor: activeTab === 'HOME' ? '#0052FF' : '#161F30' }
-                        ]}
-                        onPress={() => setActiveTab('HOME')}
-                        activeOpacity={0.8}
+                        style={styles.tabButton}
+                        onPress={() => setActiveTab('PLANO')}
+                        activeOpacity={0.7}
                       >
-                        <Home size={24} color="#FFFFFF" />
+                        <FileText size={18} color={activeTab === 'PLANO' ? '#0052FF' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#0052FF' : '#64748B' }]}>
+                          Plano
+                        </Text>
                       </TouchableOpacity>
-                      <Text style={[styles.tabLabel, { marginTop: 4, color: activeTab === 'HOME' ? '#0052FF' : '#64748B' }]}>
-                        Home
-                      </Text>
+
+                      {/* Tab 2: Financeiro */}
+                      <TouchableOpacity
+                        style={styles.tabButton}
+                        onPress={() => setActiveTab('FINANCEIRO')}
+                        activeOpacity={0.7}
+                      >
+                        <CreditCard size={18} color={activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B' }]}>
+                          Financeiro
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Tab 3: Home (Floating central button, raised layout) */}
+                      <View style={styles.floatingHomeButtonContainer}>
+                        <TouchableOpacity
+                          style={[
+                            styles.floatingHomeButton,
+                            { backgroundColor: activeTab === 'HOME' ? '#0052FF' : '#1E293B' }
+                          ]}
+                          onPress={() => setActiveTab('HOME')}
+                          activeOpacity={0.8}
+                        >
+                          <Home size={20} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <Text style={[styles.tabLabel, { marginTop: 2, color: activeTab === 'HOME' ? '#0052FF' : '#64748B' }]}>
+                          Home
+                        </Text>
+                      </View>
+
+                      {/* Tab 4: Suporte */}
+                      <TouchableOpacity
+                        style={styles.tabButton}
+                        onPress={() => setActiveTab('SUPORTE')}
+                        activeOpacity={0.7}
+                      >
+                        <MessageSquare size={18} color={activeTab === 'SUPORTE' ? '#0052FF' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#0052FF' : '#64748B' }]}>
+                          Suporte
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Tab 5: Teste de Conexão */}
+                      <TouchableOpacity
+                        style={styles.tabButton}
+                        onPress={() => setActiveTab('TESTE')}
+                        activeOpacity={0.7}
+                      >
+                        <Activity size={18} color={activeTab === 'TESTE' ? '#0052FF' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#0052FF' : '#64748B' }]}>
+                          Conexão
+                        </Text>
+                      </TouchableOpacity>
                     </View>
-
-                    {/* Tab 4: Suporte */}
-                    <TouchableOpacity
-                      style={styles.tabButton}
-                      onPress={() => setActiveTab('SUPORTE')}
-                      activeOpacity={0.7}
-                    >
-                      <MessageSquare size={20} color={activeTab === 'SUPORTE' ? '#0052FF' : '#64748B'} />
-                      <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#0052FF' : '#64748B' }]}>
-                        Suporte
-                      </Text>
-                    </TouchableOpacity>
-
-                    {/* Tab 5: Teste de Conexão */}
-                    <TouchableOpacity
-                      style={styles.tabButton}
-                      onPress={() => setActiveTab('TESTE')}
-                      activeOpacity={0.7}
-                    >
-                      <Activity size={20} color={activeTab === 'TESTE' ? '#0052FF' : '#64748B'} />
-                      <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#0052FF' : '#64748B' }]}>
-                        Conexão
-                      </Text>
-                    </TouchableOpacity>
                   </View>
+
                 </View>
               );
             } else {
@@ -1054,71 +1077,120 @@ const styles = StyleSheet.create({
   /* DASHBOARD STYLES */
   dashboardWrapper: {
     flex: 1,
-    justifyContent: 'space-between',
     backgroundColor: '#080B11',
   },
   dashboardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#111625', // Slate obsidian top bar
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#28354E',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 16 : 20,
+    paddingBottom: 10,
+    backgroundColor: '#080B11', // Flat borderless header integrated with background
   },
-  headerInfoLeft: {
-    flex: 1,
-    paddingRight: 8,
+  avatarRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatarCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#0052FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#0052FF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  avatarText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  headerGreetingCol: {
+    justifyContent: 'center',
   },
   headerGreeting: {
     fontSize: 18,
     fontWeight: '800',
     color: '#FFFFFF',
-    marginBottom: 4,
-  },
-  headerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    letterSpacing: -0.3,
   },
   headerMetaText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#64748B',
-  },
-  headerMetaSeparator: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#28354E',
-    marginHorizontal: 5,
-  },
-  headerMetaStatus: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  headerMetaPlan: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#3B82F6',
-    flexShrink: 1,
+    marginTop: 2,
   },
   logoutButton: {
     width: 38,
     height: 38,
-    borderRadius: 8,
-    backgroundColor: '#EF444415',
+    borderRadius: 19,
+    borderWidth: 1.5,
+    borderColor: '#28354E',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#111625',
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 14,
+    gap: 8,
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#161F30',
+  },
+  badgeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#111625',
+    borderWidth: 1.2,
+    borderColor: '#28354E',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    flexShrink: 1,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  statusBadgeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#10B98130',
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  statusBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   dashboardScroll: {
     flex: 1,
   },
   dashboardContent: {
     flexGrow: 1,
-    padding: 20,
-    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 120, // Give extra bottom space to prevent items hidden behind floating bar
+    justifyContent: 'flex-start',
     alignItems: 'center',
   },
   tabContentCard: {
@@ -1151,48 +1223,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
+  bottomTabBarContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 24 : 16, // floating offsets
+    left: 16,
+    right: 16,
+    zIndex: 100,
+  },
   bottomTabBar: {
-    backgroundColor: '#111625', // Anchored Slate obsidian bottom bar
-    borderTopWidth: 1.5,
-    borderTopColor: '#28354E',
+    backgroundColor: '#111625', // Floating Slate obsidian capsule
+    borderWidth: 1.5,
+    borderColor: '#28354E',
+    borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    position: 'relative',
-    height: Platform.OS === 'ios' ? 84 : 74,
-    paddingBottom: Platform.OS === 'ios' ? 22 : 12,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    height: 64,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.35,
+    shadowRadius: 15,
+    elevation: 8,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    height: '100%',
+    paddingTop: 4,
   },
   tabLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    marginTop: 4,
+    fontSize: 9,
+    fontWeight: '800',
+    marginTop: 3,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   floatingHomeButtonContainer: {
-    width: 70,
+    width: 66,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 10,
   },
   floatingHomeButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -38, // Float above the bar
+    marginTop: -32, // Floating height offset
     shadowColor: '#0052FF',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
     elevation: 5,
-    borderWidth: 4,
-    borderColor: '#080B11', // Outer boundary matching body to blend floating effect
+    borderWidth: 3,
+    borderColor: '#080B11', // Outer border to blend floating effect
   },
 });
