@@ -1204,29 +1204,6 @@ export default function LoginScreen() {
                           </View>
 
                           <View style={styles.formGroup}>
-                            <Text style={styles.formLabel}>Nome do Solicitante</Text>
-                            <TextInput
-                              style={styles.formInput}
-                              placeholder="Seu nome"
-                              placeholderTextColor="#64748B"
-                              value={supportContact}
-                              onChangeText={setSupportContact}
-                            />
-                          </View>
-
-                          <View style={styles.formGroup}>
-                            <Text style={styles.formLabel}>Telefone de Contato</Text>
-                            <TextInput
-                              style={styles.formInput}
-                              placeholder="(00) 00000-0000"
-                              placeholderTextColor="#64748B"
-                              keyboardType="phone-pad"
-                              value={supportPhone}
-                              onChangeText={(text) => setSupportPhone(formatPhone(text))}
-                            />
-                          </View>
-
-                          <View style={styles.formGroup}>
                             <Text style={styles.formLabel}>Motivo do Chamado</Text>
                             <View style={styles.motiveChipsRow}>
                               {[
