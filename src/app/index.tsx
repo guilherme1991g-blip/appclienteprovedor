@@ -481,69 +481,7 @@ export default function LoginScreen() {
                           </View>
                         </View>
 
-                        {/* 2. PPPOE CREDENTIALS CARD */}
-                        <View style={styles.infoCard}>
-                          <View style={styles.infoCardHeader}>
-                            <ShieldCheck size={18} color="#0052FF" style={{ marginRight: 8 }} />
-                            <Text style={styles.infoCardHeaderTitle}>Credenciais de Conexão (PPPoE)</Text>
-                          </View>
-                          
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Usuário (Login)</Text>
-                            <View style={styles.copyRow}>
-                              <Text style={styles.infoValue} numberOfLines={1}>
-                                {selectedContract.pppoeLogin || 'Não configurado'}
-                              </Text>
-                              {selectedContract.pppoeLogin ? (
-                                <TouchableOpacity 
-                                  onPress={() => {
-                                    Clipboard.setString(selectedContract.pppoeLogin || '');
-                                    alert('Login copiado!');
-                                  }} 
-                                  style={styles.copyIconBtn}
-                                >
-                                  <Copy size={14} color="#64748B" />
-                                </TouchableOpacity>
-                              ) : null}
-                            </View>
-                          </View>
-                          
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Senha de Conexão</Text>
-                            <View style={styles.copyRow}>
-                              <Text style={styles.infoValue}>
-                                {showPppoePassword ? selectedContract.pppoeSenha : '••••••••'}
-                              </Text>
-                              <TouchableOpacity 
-                                onPress={() => setShowPppoePassword(!showPppoePassword)} 
-                                style={styles.copyIconBtn}
-                              >
-                                {showPppoePassword ? <EyeOff size={14} color="#64748B" /> : <Eye size={14} color="#64748B" />}
-                              </TouchableOpacity>
-                              {selectedContract.pppoeSenha ? (
-                                <TouchableOpacity 
-                                  onPress={() => {
-                                    Clipboard.setString(selectedContract.pppoeSenha || '');
-                                    alert('Senha copiada!');
-                                  }} 
-                                  style={styles.copyIconBtn}
-                                >
-                                  <Copy size={14} color="#64748B" />
-                                </TouchableOpacity>
-                              ) : null}
-                            </View>
-                          </View>
 
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Endereço IP</Text>
-                            <Text style={styles.infoValue}>{selectedContract.ip || 'Dinâmico'}</Text>
-                          </View>
-                          
-                          <View style={styles.infoRow}>
-                            <Text style={styles.infoLabel}>Endereço MAC</Text>
-                            <Text style={styles.infoValue}>{selectedContract.mac || 'Não capturado'}</Text>
-                          </View>
-                        </View>
 
                         {/* 3. WI-FI CARD (Only render if Wi-Fi SSID exists) */}
                         {(selectedContract.wifiSsid || selectedContract.wifiSsid5) ? (
