@@ -332,6 +332,23 @@ export default function LoginScreen() {
 
     setSubmittingSupport(true);
 
+    let motivoos = '100';
+    let ocorrenciatipo = '5';
+
+    if (supportMotive === '1') {
+      motivoos = '1';
+      ocorrenciatipo = '3';
+    } else if (supportMotive === '2') {
+      motivoos = '2';
+      ocorrenciatipo = '1';
+    } else if (supportMotive === '4') {
+      motivoos = '4';
+      ocorrenciatipo = '5';
+    } else if (supportMotive === '5') {
+      motivoos = '100';
+      ocorrenciatipo = '5';
+    }
+
     const bodyData = {
       token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
       app: 'App',
@@ -341,7 +358,8 @@ export default function LoginScreen() {
       contato: supportContact.trim(),
       contato_numero: rawPhone,
       os_prioridade: '2',
-      motivoos: supportMotive,
+      motivoos,
+      ocorrenciatipo,
       setor: '1'
     };
 
@@ -367,8 +385,8 @@ export default function LoginScreen() {
         if (res.ok && data) {
           if (data.status === 3) {
             alert(`Você já possui um chamado aberto para esta categoria (Protocolo: ${data.protocolo}).`);
-          } else if (data.status === 0) {
-            alert(`Erro ao abrir chamado: ${data.msg || 'Parâmetro inválido'}`);
+          } else if (data.status === 0 && data.msg && data.msg !== '') {
+            alert(`Erro ao abrir chamado: ${data.msg}`);
           } else {
             alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
             setSupportContent('');
@@ -1232,7 +1250,10 @@ export default function LoginScreen() {
                           </View>
 
                           <TouchableOpacity
-                            style={[styles.speedTestBtn, { marginTop: 8 }]}
+                            style={[
+                              styles.supportSubmitBtn,
+                              { backgroundColor: submittingSupport ? '#1E293B' : '#2563EB' }
+                            ]}
                             onPress={handleSubmitSupport}
                             disabled={submittingSupport}
                             activeOpacity={0.8}
@@ -1240,7 +1261,7 @@ export default function LoginScreen() {
                             {submittingSupport ? (
                               <ActivityIndicator size="small" color="#FFFFFF" />
                             ) : (
-                              <Text style={styles.speedTestBtnText}>Enviar Solicitação</Text>
+                              <Text style={styles.supportSubmitBtnText}>Enviar Solicitação</Text>
                             )}
                           </TouchableOpacity>
                         </View>
@@ -2921,6 +2942,26 @@ const styles = StyleSheet.create({
   osDetailsStatus: {
     fontSize: 11,
     fontWeight: '800',
+  },
+
+  supportSubmitBtn: {
+    height: 46,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 4,
+    marginTop: 12,
+  },
+  supportSubmitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 
   /* MODAL STYLES */
