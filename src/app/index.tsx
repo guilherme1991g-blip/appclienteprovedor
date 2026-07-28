@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, CheckCircle, ShieldCheck, Wifi, Globe, MapPin, ArrowLeft } from 'lucide-react-native';
@@ -432,53 +433,109 @@ export default function LoginScreen() {
           )}
 
           {screenState === 'SUCCESS' && selectedContract && (
-            /* Success View */
+            /* Success or Warning View depending on contract status */
             <View style={styles.successCard}>
-              <CheckCircle size={64} color="#10B981" strokeWidth={2} />
-              
-              <Text style={styles.successTitle}>
-                Acesso Autorizado!
-              </Text>
-              
-              <Text style={styles.successGreeting}>
-                Olá, {selectedContract.clientName}!
-              </Text>
+              {(() => {
+                const statusLower = (selectedContract.status || '').toLowerCase().trim();
+                const isActiveOrSuspended = statusLower === 'ativo' || statusLower === 'suspenso';
+                
+                if (isActiveOrSuspended) {
+                  return (
+                    <View style={styles.innerCard}>
+                      <CheckCircle size={64} color="#10B981" strokeWidth={2} style={{ alignSelf: 'center' }} />
+                      
+                      <Text style={styles.successTitle}>
+                        Acesso Autorizado!
+                      </Text>
+                      
+                      <Text style={styles.successGreeting}>
+                        Olá, {selectedContract.clientName}!
+                      </Text>
 
-              <View style={styles.selectedContractBox}>
-                <View style={styles.selectedContractRow}>
-                  <Globe size={16} color="#0052FF" />
-                  <Text style={styles.selectedContractPlan}>
-                    {selectedContract.planName}
-                  </Text>
-                </View>
-                <Text style={styles.selectedContractId}>
-                  Contrato ID: {selectedContract.id} ({selectedContract.status})
-                </Text>
-                <Text style={styles.selectedContractAddress}>
-                  {selectedContract.address}
-                </Text>
-              </View>
+                      <View style={styles.selectedContractBox}>
+                        <View style={styles.selectedContractRow}>
+                          <Globe size={16} color="#0052FF" />
+                          <Text style={styles.selectedContractPlan}>
+                            {selectedContract.planName}
+                          </Text>
+                        </View>
+                        <Text style={styles.selectedContractId}>
+                          Contrato ID: {selectedContract.id} ({selectedContract.status})
+                        </Text>
+                        <Text style={styles.selectedContractAddress}>
+                          {selectedContract.address}
+                        </Text>
+                      </View>
 
-              <Text style={styles.successSubtitle}>
-                Carregando as informações do seu plano e faturas...
-              </Text>
+                      <Text style={styles.successSubtitle}>
+                        Carregando as informações do seu plano e faturas...
+                      </Text>
 
-              <ActivityIndicator size="small" color="#0052FF" style={{ marginVertical: 15 }} />
+                      <ActivityIndicator size="small" color="#0052FF" style={{ marginVertical: 15 }} />
 
-              <TouchableOpacity
-                style={styles.backBtn}
-                onPress={() => {
-                  setScreenState('LOGIN');
-                  setDocumentInput('');
-                  setIsValid(false);
-                  setSelectedContract(null);
-                  setContracts([]);
-                }}
-              >
-                <Text style={styles.backBtnText}>
-                  Sair
-                </Text>
-              </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.backBtn}
+                        onPress={() => {
+                          setScreenState('LOGIN');
+                          setDocumentInput('');
+                          setIsValid(false);
+                          setSelectedContract(null);
+                          setContracts([]);
+                        }}
+                      >
+                        <Text style={styles.backBtnText}>
+                          Sair
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                } else {
+                  return (
+                    <View style={styles.innerCard}>
+                      <ShieldCheck size={64} color="#EF4444" strokeWidth={2} style={{ alignSelf: 'center' }} />
+                      
+                      <Text style={styles.cancelledTitle}>
+                        Contrato Cancelado
+                      </Text>
+                      
+                      <Text style={styles.successGreeting}>
+                        Olá, {selectedContract.clientName}!
+                      </Text>
+
+                      <View style={styles.cancelledMessageBox}>
+                        <Text style={styles.cancelledMessageText}>
+                          No momento você está com o contrato cancelado. Entre em contato com o provedor pelo WhatsApp (81) 98256-8282.
+                        </Text>
+                      </View>
+
+                      <TouchableOpacity
+                        style={styles.whatsappButton}
+                        onPress={() => {
+                          Linking.openURL('https://wa.me/5581982568282?text=Olá!%20Meu%20contrato%20consta%20como%20cancelado%20no%20app%20da%20WebConnect.');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.whatsappButtonText}>Falar no WhatsApp</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.backBtn, { marginTop: 10 }]}
+                        onPress={() => {
+                          setScreenState('LOGIN');
+                          setDocumentInput('');
+                          setIsValid(false);
+                          setSelectedContract(null);
+                          setContracts([]);
+                        }}
+                      >
+                        <Text style={styles.backBtnText}>
+                          Voltar
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }
+              })()}
             </View>
           )}
 
@@ -797,5 +854,53 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: '#64748B',
+  },
+  innerCard: {
+    width: '100%',
+    alignItems: 'stretch',
+  },
+  cancelledTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 20,
+    marginBottom: 4,
+    textAlign: 'center',
+    color: '#EF4444',
+  },
+  cancelledMessageBox: {
+    width: '100%',
+    backgroundColor: '#EF444410',
+    borderWidth: 1.5,
+    borderColor: '#EF444430',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 20,
+  },
+  cancelledMessageText: {
+    fontSize: 14,
+    color: '#F87171',
+    textAlign: 'center',
+    lineHeight: 20,
+    fontWeight: '600',
+  },
+  whatsappButton: {
+    height: 46,
+    width: '100%',
+    backgroundColor: '#25D366',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#25D366',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  whatsappButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
