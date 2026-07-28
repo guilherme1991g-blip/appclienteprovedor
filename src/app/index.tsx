@@ -317,64 +317,66 @@ export default function LoginScreen() {
   };
 
   const runDownloadTest = async (): Promise<number> => {
-    const chunkSizeBytes = 2000000; // 2 MB per chunk
-    const numChunks = 3;
-    const speeds: number[] = [];
+    const chunkSizeBytes = 4000000; // 4 MB chunks
+    const testDurationMs = 6000; // 6 seconds duration
+    const startTime = Date.now();
+    let totalBytesDownloaded = 0;
 
-    // Start a background interval to smoothly fluctuate the live dial speed
-    let currentJitterSpeed = 20 + Math.random() * 30;
+    // Smooth dial updates while loading chunks
+    let currentLiveSpeed = 10;
     const intervalId = setInterval(() => {
-      // Slightly fluctuate around target
-      const target = speeds.length > 0 ? speeds[speeds.length - 1] : currentJitterSpeed;
-      const step = (target - currentJitterSpeed) * 0.2 + (Math.random() - 0.5) * 5;
-      currentJitterSpeed = Math.max(currentJitterSpeed + step, 1);
-      setLiveSpeed(parseFloat(currentJitterSpeed.toFixed(1)));
+      const elapsed = (Date.now() - startTime) / 1000;
+      let calculatedSpeed = currentLiveSpeed;
+      if (elapsed > 0.1 && totalBytesDownloaded > 0) {
+        calculatedSpeed = (totalBytesDownloaded * 8) / (elapsed * 1024 * 1024);
+      }
+      const step = (calculatedSpeed - currentLiveSpeed) * 0.15 + (Math.random() - 0.5) * 4;
+      currentLiveSpeed = Math.max(currentLiveSpeed + step, 1);
+      setLiveSpeed(parseFloat(currentLiveSpeed.toFixed(1)));
     }, 100);
 
     try {
-      for (let i = 0; i < numChunks; i++) {
-        const start = Date.now();
+      while (Date.now() - startTime < testDurationMs) {
         const res = await fetch(`https://speed.cloudflare.com/__down?bytes=${chunkSizeBytes}`, { cache: 'no-store' });
         if (!res.ok) throw new Error('Download failed');
-        
-        // Fully load the body to measure download completion
-        await res.text();
-        const duration = (Date.now() - start) / 1000;
-        
-        if (duration > 0.05) {
-          const mbps = (chunkSizeBytes * 8) / (duration * 1024 * 1024);
-          speeds.push(mbps);
-          currentJitterSpeed = mbps; // update jitter anchor
-        }
+        await res.text(); // fully download chunk data
+        totalBytesDownloaded += chunkSizeBytes;
       }
     } catch (e) {
-      console.error('Download speedtest error:', e);
+      console.error('Download loop error:', e);
     } finally {
       clearInterval(intervalId);
     }
 
-    if (speeds.length === 0) return 0;
-    const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
-    return parseFloat(avgSpeed.toFixed(1));
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed > 0.1 && totalBytesDownloaded > 0) {
+      const finalSpeed = (totalBytesDownloaded * 8) / (elapsed * 1024 * 1024);
+      return parseFloat(finalSpeed.toFixed(1));
+    }
+    return 0;
   };
 
   const runUploadTest = async (): Promise<number> => {
-    const chunkSizeBytes = 800000; // 800 KB per chunk (fast and memory safe)
-    const numChunks = 3;
-    const speeds: number[] = [];
+    const chunkSizeBytes = 1200000; // 1.2 MB chunks (fast upload allocation)
+    const testDurationMs = 5000; // 5 seconds duration
+    const startTime = Date.now();
+    let totalBytesUploaded = 0;
     const payload = 'U'.repeat(chunkSizeBytes);
 
-    let currentJitterSpeed = downloadResult ? downloadResult * 0.4 : 15;
+    let currentLiveSpeed = downloadResult ? downloadResult * 0.4 : 15;
     const intervalId = setInterval(() => {
-      const target = speeds.length > 0 ? speeds[speeds.length - 1] : currentJitterSpeed;
-      const step = (target - currentJitterSpeed) * 0.2 + (Math.random() - 0.5) * 3;
-      currentJitterSpeed = Math.max(currentJitterSpeed + step, 1);
-      setLiveSpeed(parseFloat(currentJitterSpeed.toFixed(1)));
+      const elapsed = (Date.now() - startTime) / 1000;
+      let calculatedSpeed = currentLiveSpeed;
+      if (elapsed > 0.1 && totalBytesUploaded > 0) {
+        calculatedSpeed = (totalBytesUploaded * 8) / (elapsed * 1024 * 1024);
+      }
+      const step = (calculatedSpeed - currentLiveSpeed) * 0.15 + (Math.random() - 0.5) * 3;
+      currentLiveSpeed = Math.max(currentLiveSpeed + step, 1);
+      setLiveSpeed(parseFloat(currentLiveSpeed.toFixed(1)));
     }, 100);
 
     try {
-      for (let i = 0; i < numChunks; i++) {
-        const start = Date.now();
+      while (Date.now() - startTime < testDurationMs) {
         const res = await fetch('https://speed.cloudflare.com/__up', {
           method: 'POST',
           body: payload,
@@ -383,25 +385,21 @@ export default function LoginScreen() {
           },
         });
         if (!res.ok) throw new Error('Upload failed');
-        
         await res.text();
-        const duration = (Date.now() - start) / 1000;
-        
-        if (duration > 0.05) {
-          const mbps = (chunkSizeBytes * 8) / (duration * 1024 * 1024);
-          speeds.push(mbps);
-          currentJitterSpeed = mbps;
-        }
+        totalBytesUploaded += chunkSizeBytes;
       }
     } catch (e) {
-      console.error('Upload speedtest error:', e);
+      console.error('Upload loop error:', e);
     } finally {
       clearInterval(intervalId);
     }
 
-    if (speeds.length === 0) return 0;
-    const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
-    return parseFloat(avgSpeed.toFixed(1));
+    const elapsed = (Date.now() - startTime) / 1000;
+    if (elapsed > 0.1 && totalBytesUploaded > 0) {
+      const finalSpeed = (totalBytesUploaded * 8) / (elapsed * 1024 * 1024);
+      return parseFloat(finalSpeed.toFixed(1));
+    }
+    return 0;
   };
 
   const startSpeedTest = () => {
