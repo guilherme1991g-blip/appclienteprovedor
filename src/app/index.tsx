@@ -326,6 +326,8 @@ export default function LoginScreen() {
       setor: '1'
     };
 
+    console.log('Enviando solicitação de chamado com dados:', bodyData);
+
     const postData = Object.keys(bodyData)
       .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
       .join('&');
@@ -338,7 +340,10 @@ export default function LoginScreen() {
       body: postData
     })
       .then(async (res) => {
+        console.log('Resposta HTTP do chamado:', res.status);
         const data = await res.json();
+        console.log('Corpo da resposta do chamado:', data);
+        
         setSubmittingSupport(false);
         if (res.ok && data) {
           if (data.status === 3) {
@@ -356,7 +361,7 @@ export default function LoginScreen() {
       })
       .catch((err) => {
         setSubmittingSupport(false);
-        console.error('Submit ticket error:', err);
+        console.error('Submit ticket error detail:', err);
         alert('Erro ao enviar sua solicitação. Tente novamente.');
       });
   };
@@ -1172,7 +1177,7 @@ export default function LoginScreen() {
                                 { label: 'Acesso Lento', value: '1' },
                                 { label: 'Sem Conexão', value: '2' },
                                 { label: 'Mudança de Endereço', value: '4' },
-                                { label: 'Outros Assuntos', value: '100' }
+                                { label: 'Outros Assuntos', value: '5' }
                               ].map((item) => (
                                 <TouchableOpacity
                                   key={item.value}
@@ -1238,7 +1243,10 @@ export default function LoginScreen() {
                             <Text style={styles.noBillsDesc}>Qualquer chamado aberto aparecerá listado aqui.</Text>
                           </View>
                         ) : (
-                          suporteTickets.map((ticket, index) => {
+                          suporteTickets
+                            .sort((a, b) => (b.oc_protocolo || '').localeCompare(a.oc_protocolo || ''))
+                            .slice(0, 5)
+                            .map((ticket, index) => {
                             const isClosed = (ticket.oc_status_descricao || '').toLowerCase().includes('encerra');
                             return (
                               <View key={index} style={styles.ticketCard}>
