@@ -415,6 +415,7 @@ export default function LoginScreen() {
           } else {
             alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
             setSupportContent('');
+            setSupportMotive('5');
             fetchSupportTickets();
           }
         } else {
