@@ -10,6 +10,7 @@ import {
   Platform,
   ScrollView,
   Linking,
+  Clipboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -26,6 +27,9 @@ import {
   MessageSquare,
   Activity,
   LogOut,
+  Eye,
+  EyeOff,
+  Copy,
 } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -119,6 +123,31 @@ interface ContractDisplay {
   address: string;
   status: string;
   clientName: string;
+  // Metadata Details
+  popId?: string;
+  dataCadastro?: string;
+  vencimento?: string | number;
+  formaCobranca?: string;
+  centralLogin?: string;
+  centralSenha?: string;
+  // Connection Details
+  pppoeLogin?: string;
+  pppoeSenha?: string;
+  ip?: string;
+  mac?: string;
+  grupo?: string;
+  // Wi-Fi Details
+  wifiSsid?: string;
+  wifiPassword?: string;
+  wifiSsid5?: string;
+  wifiPassword5?: string;
+  // Detailed address
+  street?: string;
+  number?: string;
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  cep?: string;
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
@@ -136,6 +165,10 @@ export default function LoginScreen() {
   const [contracts, setContracts] = useState<ContractDisplay[]>([]);
   const [selectedContract, setSelectedContract] = useState<ContractDisplay | null>(null);
   const [activeTab, setActiveTab] = useState<TabName>('HOME');
+
+  // Toggle Visibility for passwords
+  const [showPppoePassword, setShowPppoePassword] = useState(false);
+  const [showWifiPassword, setShowWifiPassword] = useState(false);
 
   const handleInputChange = (text: string) => {
     const formatted = formatAutoDocument(text);
@@ -192,8 +225,18 @@ export default function LoginScreen() {
           clientsList.forEach((client: any) => {
             const contractsList = client.contratos || [];
             contractsList.forEach((contrato: any) => {
-              // Extract plan name from services list
+              // Extract plan name and service details
               let planName = 'Plano de Internet';
+              let pppoeLogin = '';
+              let pppoeSenha = '';
+              let ip = '';
+              let mac = '';
+              let grupo = '';
+              let wifiSsid = '';
+              let wifiPassword = '';
+              let wifiSsid5 = '';
+              let wifiPassword5 = '';
+
               if (contrato.servicos && Array.isArray(contrato.servicos) && contrato.servicos.length > 0) {
                 const serv = contrato.servicos[0];
                 if (serv.plano) {
@@ -203,13 +246,36 @@ export default function LoginScreen() {
                     planName = serv.plano;
                   }
                 }
+                pppoeLogin = serv.login || '';
+                pppoeSenha = serv.senha || '';
+                ip = serv.ip || '';
+                mac = serv.mac || '';
+                grupo = serv.grupo || '';
+                wifiSsid = serv.wifi_ssid || '';
+                wifiPassword = serv.wifi_password || '';
+                wifiSsid5 = serv.wifi_ssid_5 || '';
+                wifiPassword5 = serv.wifi_password_5 || '';
               }
               
               // Extract and format address
               let addressStr = '';
+              let street = '';
+              let num = '';
+              let neighborhood = '';
+              let city = '';
+              let state = '';
+              let cep = '';
+
               const addr = contrato.endereco || client.endereco;
               if (addr) {
                 if (typeof addr === 'object') {
+                  street = addr.logradouro || '';
+                  num = addr.numero || '';
+                  neighborhood = addr.bairro || '';
+                  city = addr.cidade || '';
+                  state = addr.uf || '';
+                  cep = addr.cep || '';
+
                   const parts = [];
                   if (addr.logradouro) parts.push(addr.logradouro);
                   if (addr.numero) parts.push(addr.numero);
@@ -228,6 +294,27 @@ export default function LoginScreen() {
                 address: addressStr || 'Endereço não cadastrado',
                 status: contrato.status || 'Ativo',
                 clientName: client.nome || 'Cliente',
+                popId: contrato.pop_id || '',
+                dataCadastro: contrato.dataCadastro || '',
+                vencimento: contrato.vencimento || '',
+                formaCobranca: contrato.formaCobranca || '',
+                centralLogin: contrato.contratoCentralLogin || '',
+                centralSenha: contrato.contratoCentralSenha || '',
+                pppoeLogin,
+                pppoeSenha,
+                ip,
+                mac,
+                grupo,
+                wifiSsid,
+                wifiPassword,
+                wifiSsid5,
+                wifiPassword5,
+                street,
+                number: num,
+                neighborhood,
+                city,
+                state,
+                cep,
               });
             });
           });
@@ -281,6 +368,8 @@ export default function LoginScreen() {
     setIsValid(false);
     setSelectedContract(null);
     setContracts([]);
+    setShowPppoePassword(false);
+    setShowWifiPassword(false);
   };
 
   return (
@@ -366,12 +455,232 @@ export default function LoginScreen() {
                     )}
 
                     {activeTab === 'PLANO' && (
-                      <View style={styles.tabContentCard}>
-                        <FileText size={32} color="#0052FF" style={styles.tabContentIcon} />
-                        <Text style={styles.tabContentTitle}>Meu Plano</Text>
-                        <Text style={styles.tabContentDesc}>
-                          Informações detalhadas sobre a velocidade contratada, taxas de upload/download e dados do serviço de internet.
-                        </Text>
+                      <View style={styles.planoTabWrapper}>
+                        
+                        {/* 1. PLAN DETAILED CARD */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <Globe size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Plano Contratado</Text>
+                          </View>
+                          <Text style={styles.planoMainTitle}>{selectedContract.planName}</Text>
+                          
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Tecnologia</Text>
+                            <Text style={styles.infoValue}>
+                              {selectedContract.pppoeLogin ? 'Fibra Óptica' : 'Cabo/Rádio'}
+                            </Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Status do Serviço</Text>
+                            <Text style={[styles.infoValue, { color: '#10B981' }]}>{selectedContract.status}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Grupo</Text>
+                            <Text style={styles.infoValue}>{selectedContract.grupo || 'Fibra'}</Text>
+                          </View>
+                        </View>
+
+                        {/* 2. PPPOE CREDENTIALS CARD */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <ShieldCheck size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Credenciais de Conexão (PPPoE)</Text>
+                          </View>
+                          
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Usuário (Login)</Text>
+                            <View style={styles.copyRow}>
+                              <Text style={styles.infoValue} numberOfLines={1}>
+                                {selectedContract.pppoeLogin || 'Não configurado'}
+                              </Text>
+                              {selectedContract.pppoeLogin ? (
+                                <TouchableOpacity 
+                                  onPress={() => {
+                                    Clipboard.setString(selectedContract.pppoeLogin || '');
+                                    alert('Login copiado!');
+                                  }} 
+                                  style={styles.copyIconBtn}
+                                >
+                                  <Copy size={14} color="#64748B" />
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
+                          </View>
+                          
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Senha de Conexão</Text>
+                            <View style={styles.copyRow}>
+                              <Text style={styles.infoValue}>
+                                {showPppoePassword ? selectedContract.pppoeSenha : '••••••••'}
+                              </Text>
+                              <TouchableOpacity 
+                                onPress={() => setShowPppoePassword(!showPppoePassword)} 
+                                style={styles.copyIconBtn}
+                              >
+                                {showPppoePassword ? <EyeOff size={14} color="#64748B" /> : <Eye size={14} color="#64748B" />}
+                              </TouchableOpacity>
+                              {selectedContract.pppoeSenha ? (
+                                <TouchableOpacity 
+                                  onPress={() => {
+                                    Clipboard.setString(selectedContract.pppoeSenha || '');
+                                    alert('Senha copiada!');
+                                  }} 
+                                  style={styles.copyIconBtn}
+                                >
+                                  <Copy size={14} color="#64748B" />
+                                </TouchableOpacity>
+                              ) : null}
+                            </View>
+                          </View>
+
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Endereço IP</Text>
+                            <Text style={styles.infoValue}>{selectedContract.ip || 'Dinâmico'}</Text>
+                          </View>
+                          
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Endereço MAC</Text>
+                            <Text style={styles.infoValue}>{selectedContract.mac || 'Não capturado'}</Text>
+                          </View>
+                        </View>
+
+                        {/* 3. WI-FI CARD (Only render if Wi-Fi SSID exists) */}
+                        {(selectedContract.wifiSsid || selectedContract.wifiSsid5) ? (
+                          <View style={styles.infoCard}>
+                            <View style={styles.infoCardHeader}>
+                              <Wifi size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                              <Text style={styles.infoCardHeaderTitle}>Dados do Roteador Wi-Fi</Text>
+                            </View>
+
+                            {selectedContract.wifiSsid ? (
+                              <>
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Rede 2.4 GHz (SSID)</Text>
+                                  <Text style={styles.infoValue}>{selectedContract.wifiSsid}</Text>
+                                </View>
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Senha 2.4 GHz</Text>
+                                  <View style={styles.copyRow}>
+                                    <Text style={styles.infoValue}>
+                                      {showWifiPassword ? selectedContract.wifiPassword : '••••••••'}
+                                    </Text>
+                                    <TouchableOpacity 
+                                      onPress={() => setShowWifiPassword(!showWifiPassword)} 
+                                      style={styles.copyIconBtn}
+                                    >
+                                      {showWifiPassword ? <EyeOff size={14} color="#64748B" /> : <Eye size={14} color="#64748B" />}
+                                    </TouchableOpacity>
+                                    {selectedContract.wifiPassword ? (
+                                      <TouchableOpacity 
+                                        onPress={() => {
+                                          Clipboard.setString(selectedContract.wifiPassword || '');
+                                          alert('Senha Wi-Fi copiada!');
+                                        }} 
+                                        style={styles.copyIconBtn}
+                                      >
+                                        <Copy size={14} color="#64748B" />
+                                      </TouchableOpacity>
+                                    ) : null}
+                                  </View>
+                                </View>
+                              </>
+                            ) : null}
+
+                            {selectedContract.wifiSsid5 ? (
+                              <>
+                                <View style={[styles.infoRow, { marginTop: 10 }]}>
+                                  <Text style={styles.infoLabel}>Rede 5.0 GHz (SSID)</Text>
+                                  <Text style={styles.infoValue}>{selectedContract.wifiSsid5}</Text>
+                                </View>
+                                <View style={styles.infoRow}>
+                                  <Text style={styles.infoLabel}>Senha 5.0 GHz</Text>
+                                  <View style={styles.copyRow}>
+                                    <Text style={styles.infoValue}>
+                                      {showWifiPassword ? selectedContract.wifiPassword5 : '••••••••'}
+                                    </Text>
+                                    <TouchableOpacity 
+                                      onPress={() => setShowWifiPassword(!showWifiPassword)} 
+                                      style={styles.copyIconBtn}
+                                    >
+                                      {showWifiPassword ? <EyeOff size={14} color="#64748B" /> : <Eye size={14} color="#64748B" />}
+                                    </TouchableOpacity>
+                                    {selectedContract.wifiPassword5 ? (
+                                      <TouchableOpacity 
+                                        onPress={() => {
+                                          Clipboard.setString(selectedContract.wifiPassword5 || '');
+                                          alert('Senha Wi-Fi 5G copiada!');
+                                        }} 
+                                        style={styles.copyIconBtn}
+                                      >
+                                        <Copy size={14} color="#64748B" />
+                                      </TouchableOpacity>
+                                    ) : null}
+                                  </View>
+                                </View>
+                              </>
+                            ) : null}
+                          </View>
+                        ) : null}
+
+                        {/* 4. BILLING/CONTRACT INFO CARD */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <CreditCard size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Contrato e Faturamento</Text>
+                          </View>
+
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>ID do Contrato</Text>
+                            <Text style={styles.infoValue}>#{selectedContract.id}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Dia de Vencimento</Text>
+                            <Text style={styles.infoValue}>Dia {selectedContract.vencimento || 'Não informado'}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Forma de Pagamento</Text>
+                            <Text style={styles.infoValue}>{selectedContract.formaCobranca || 'Boleto Bancário'}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Login da Central</Text>
+                            <Text style={styles.infoValue}>{selectedContract.centralLogin || 'Não cadastrado'}</Text>
+                          </View>
+                        </View>
+
+                        {/* 5. ADDRESS CARD */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <MapPin size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Endereço de Instalação</Text>
+                          </View>
+
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Logradouro</Text>
+                            <Text style={styles.infoValue} numberOfLines={1}>
+                              {selectedContract.street || 'Não informado'}
+                            </Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Número</Text>
+                            <Text style={styles.infoValue}>{selectedContract.number || 'S/N'}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Bairro</Text>
+                            <Text style={styles.infoValue}>{selectedContract.neighborhood || 'Não informado'}</Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>Cidade / UF</Text>
+                            <Text style={styles.infoValue}>
+                              {selectedContract.city ? `${selectedContract.city} - ${selectedContract.state || ''}` : 'Não informada'}
+                            </Text>
+                          </View>
+                          <View style={styles.infoRow}>
+                            <Text style={styles.infoLabel}>CEP</Text>
+                            <Text style={styles.infoValue}>{selectedContract.cep || 'Não informado'}</Text>
+                          </View>
+                        </View>
+
                       </View>
                     )}
 
@@ -500,6 +809,7 @@ export default function LoginScreen() {
                     </View>
 
                     <TouchableOpacity
+                      style.whatsappButton
                       style={styles.whatsappButton}
                       onPress={() => {
                         Linking.openURL('https://wa.me/5581982568282?text=Olá!%20Meu%20contrato%20consta%20como%20cancelado%20no%20app%20da%20WebConnect.');
@@ -1188,7 +1498,7 @@ const styles = StyleSheet.create({
   dashboardContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 30,
+    paddingTop: 20,
     paddingBottom: 120, // Give extra bottom space to prevent items hidden behind floating bar
     justifyContent: 'flex-start',
     alignItems: 'center',
@@ -1279,5 +1589,75 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 3,
     borderColor: '#080B11', // Outer border to blend floating effect
+  },
+
+  /* PLAN TAB STYLES */
+  planoTabWrapper: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  infoCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
+    borderWidth: 1.5,
+    borderColor: '#28354E',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#161F30',
+    paddingBottom: 8,
+  },
+  infoCardHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  planoMainTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#161F30',
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  infoValue: {
+    fontSize: 13,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  copyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  copyIconBtn: {
+    padding: 4,
+    marginLeft: 4,
   },
 });
