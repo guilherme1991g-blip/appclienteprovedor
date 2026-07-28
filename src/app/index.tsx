@@ -235,6 +235,140 @@ export default function LoginScreen() {
   const [showPppoePassword, setShowPppoePassword] = useState(false);
   const [showWifiPassword, setShowWifiPassword] = useState(false);
 
+  // Support Tickets & Form States
+  const [loadingSuporte, setLoadingSuporte] = useState(false);
+  const [suporteTickets, setSuporteTickets] = useState<any[]>([]);
+  const [supportContact, setSupportContact] = useState('');
+  const [supportPhone, setSupportPhone] = useState('');
+  const [supportMotive, setSupportMotive] = useState('2'); // default to '2' (Suporte - Sem Acesso)
+  const [supportContent, setSupportContent] = useState('');
+  const [submittingSupport, setSubmittingSupport] = useState(false);
+
+  const formatPhone = (text: string) => {
+    const raw = text.replace(/\D/g, '').substring(0, 11);
+    if (raw.length <= 2) {
+      return raw;
+    } else if (raw.length <= 6) {
+      return `(${raw.substring(0, 2)}) ${raw.substring(2)}`;
+    } else if (raw.length <= 10) {
+      return `(${raw.substring(0, 2)}) ${raw.substring(2, 6)}-${raw.substring(6)}`;
+    } else {
+      return `(${raw.substring(0, 2)}) ${raw.substring(2, 7)}-${raw.substring(7)}`;
+    }
+  };
+
+  const fetchSupportTickets = () => {
+    if (!selectedContract) return;
+    setLoadingSuporte(true);
+
+    const bodyData = {
+      token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+      app: 'App',
+      cpfcnpj: documentInput.replace(/\D/g, ''),
+      contrato: selectedContract.id.toString()
+    };
+
+    const postData = Object.keys(bodyData)
+      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
+      .join('&');
+
+    fetch('https://webcnnect.sgp.tsmx.com.br/api/central/chamado/list/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: postData
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        setLoadingSuporte(false);
+        if (Array.isArray(data)) {
+          setSuporteTickets(data);
+        } else {
+          setSuporteTickets([]);
+        }
+      })
+      .catch((err) => {
+        setLoadingSuporte(false);
+        console.error('Fetch support tickets error:', err);
+        setSuporteTickets([]);
+      });
+  };
+
+  const handleSubmitSupport = () => {
+    if (!supportContact.trim()) {
+      alert('Por favor, informe o nome do contato.');
+      return;
+    }
+    const rawPhone = supportPhone.replace(/\D/g, '');
+    if (rawPhone.length < 10) {
+      alert('Por favor, informe um telefone de contato válido.');
+      return;
+    }
+    if (!supportContent.trim()) {
+      alert('Por favor, descreva o problema.');
+      return;
+    }
+
+    setSubmittingSupport(true);
+
+    const bodyData = {
+      token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+      app: 'App',
+      cpfcnpj: documentInput.replace(/\D/g, ''),
+      contrato: selectedContract!.id.toString(),
+      conteudo: supportContent.trim(),
+      contato: supportContact.trim(),
+      contato_numero: rawPhone,
+      os_prioridade: '2',
+      motivoos: supportMotive,
+      setor: '1'
+    };
+
+    const postData = Object.keys(bodyData)
+      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
+      .join('&');
+
+    fetch('https://webcnnect.sgp.tsmx.com.br/api/central/chamado/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: postData
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        setSubmittingSupport(false);
+        if (res.ok && data) {
+          if (data.status === 3) {
+            alert(`Você já possui um chamado aberto para esta categoria (Protocolo: ${data.protocolo}).`);
+          } else if (data.status === 0) {
+            alert(`Erro ao abrir chamado: ${data.msg || 'Parâmetro inválido'}`);
+          } else {
+            alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
+            setSupportContent('');
+            fetchSupportTickets();
+          }
+        } else {
+          alert('Erro de comunicação com o servidor.');
+        }
+      })
+      .catch((err) => {
+        setSubmittingSupport(false);
+        console.error('Submit ticket error:', err);
+        alert('Erro ao enviar sua solicitação. Tente novamente.');
+      });
+  };
+
+  React.useEffect(() => {
+    if (screenState === 'DASHBOARD' && activeTab === 'SUPORTE' && selectedContract) {
+      fetchSupportTickets();
+      if (!supportContact) {
+        setSupportContact(selectedContract.clientName || '');
+      }
+    }
+  }, [activeTab, screenState, selectedContract]);
+
   // Fetch connection status and history dynamically
   React.useEffect(() => {
     if (screenState === 'DASHBOARD' && activeTab === 'TESTE' && selectedContract && selectedContract.pppoeLogin) {
@@ -948,12 +1082,164 @@ export default function LoginScreen() {
                     )}
 
                     {activeTab === 'SUPORTE' && (
-                      <View style={styles.tabContentCard}>
-                        <MessageSquare size={32} color="#2563EB" style={styles.tabContentIcon} />
-                        <Text style={styles.tabContentTitle}>Suporte Técnico</Text>
-                        <Text style={styles.tabContentDesc}>
-                          Abra chamados para suporte de conexão lenta, queda de sinal ou solicitações de visitas técnicas.
-                        </Text>
+                      <View style={styles.planoTabWrapper}>
+                        {/* A. NEW TICKET FORM */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <MessageSquare size={18} color="#2563EB" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Abrir Ordem de Serviço</Text>
+                          </View>
+
+                          <View style={styles.formGroup}>
+                            <Text style={styles.formLabel}>Nome do Solicitante</Text>
+                            <TextInput
+                              style={styles.formInput}
+                              placeholder="Seu nome"
+                              placeholderTextColor="#64748B"
+                              value={supportContact}
+                              onChangeText={setSupportContact}
+                            />
+                          </View>
+
+                          <View style={styles.formGroup}>
+                            <Text style={styles.formLabel}>Telefone de Contato</Text>
+                            <TextInput
+                              style={styles.formInput}
+                              placeholder="(00) 00000-0000"
+                              placeholderTextColor="#64748B"
+                              keyboardType="phone-pad"
+                              value={supportPhone}
+                              onChangeText={(text) => setSupportPhone(formatPhone(text))}
+                            />
+                          </View>
+
+                          <View style={styles.formGroup}>
+                            <Text style={styles.formLabel}>Motivo do Chamado</Text>
+                            <View style={styles.motiveChipsRow}>
+                              {[
+                                { label: 'Acesso Lento', value: '1' },
+                                { label: 'Sem Conexão', value: '2' },
+                                { label: 'Mudança de Endereço', value: '4' },
+                                { label: 'Outros Assuntos', value: '100' }
+                              ].map((item) => (
+                                <TouchableOpacity
+                                  key={item.value}
+                                  style={[
+                                    styles.motiveChip,
+                                    supportMotive === item.value && styles.motiveChipActive
+                                  ]}
+                                  onPress={() => setSupportMotive(item.value)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={[
+                                    styles.motiveChipText,
+                                    supportMotive === item.value && styles.motiveChipTextActive
+                                  ]}>
+                                    {item.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          </View>
+
+                          <View style={styles.formGroup}>
+                            <Text style={styles.formLabel}>Descrição do Problema</Text>
+                            <TextInput
+                              style={[styles.formInput, styles.formInputTextArea]}
+                              placeholder="Descreva aqui detalhadamente o seu problema..."
+                              placeholderTextColor="#64748B"
+                              multiline={true}
+                              numberOfLines={4}
+                              value={supportContent}
+                              onChangeText={setSupportContent}
+                            />
+                          </View>
+
+                          <TouchableOpacity
+                            style={[styles.speedTestBtn, { marginTop: 8 }]}
+                            onPress={handleSubmitSupport}
+                            disabled={submittingSupport}
+                            activeOpacity={0.8}
+                          >
+                            {submittingSupport ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <Text style={styles.speedTestBtnText}>Enviar Solicitação</Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* B. TICKETS HISTORY */}
+                        <View style={[styles.sectionHeaderRow, { marginTop: 12 }]}>
+                          <Clock size={16} color="#2563EB" style={{ marginRight: 6 }} />
+                          <Text style={styles.sectionTitle}>Histórico de Ocorrências</Text>
+                        </View>
+
+                        {loadingSuporte ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 30 }]}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                            <Text style={[styles.noBillsTitle, { marginTop: 12 }]}>Carregando histórico...</Text>
+                          </View>
+                        ) : suporteTickets.length === 0 ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 30 }]}>
+                            <Text style={styles.noBillsTitle}>Nenhum chamado anterior localizado.</Text>
+                            <Text style={styles.noBillsDesc}>Qualquer chamado aberto aparecerá listado aqui.</Text>
+                          </View>
+                        ) : (
+                          suporteTickets.map((ticket, index) => {
+                            const isClosed = (ticket.oc_status_descricao || '').toLowerCase().includes('encerra');
+                            return (
+                              <View key={index} style={styles.ticketCard}>
+                                <View style={styles.ticketHeader}>
+                                  <View style={styles.ticketTypeRow}>
+                                    <View style={[
+                                      styles.ticketStatusDot,
+                                      { backgroundColor: isClosed ? '#10B981' : '#F59E0B' }
+                                    ]} />
+                                    <Text style={styles.ticketTypeTitle}>{ticket.oc_tipo_descricao || 'Suporte'}</Text>
+                                  </View>
+                                  <View style={[
+                                    styles.billStatusBadge,
+                                    { backgroundColor: isClosed ? '#10B98115' : '#F59E0B15' }
+                                  ]}>
+                                    <Text style={[
+                                      styles.billStatusText,
+                                      { color: isClosed ? '#10B981' : '#F59E0B', fontSize: 9 }
+                                    ]}>
+                                      {(ticket.oc_status_descricao || 'Aberta').toUpperCase()}
+                                    </Text>
+                                  </View>
+                                </View>
+
+                                <View style={styles.ticketBody}>
+                                  <Text style={styles.ticketProtocolText}>Protocolo: {ticket.oc_protocolo}</Text>
+                                  <Text style={styles.ticketDateText}>Aberto em: {ticket.oc_data_cadastro}</Text>
+                                  
+                                  {ticket.oc_conteudo ? (
+                                    <View style={styles.ticketContentBox}>
+                                      <Text style={styles.ticketContentText}>{ticket.oc_conteudo.trim()}</Text>
+                                    </View>
+                                  ) : null}
+
+                                  {ticket.os_id ? (
+                                    <View style={styles.osDetailsContainer}>
+                                      <Text style={styles.osDetailsTitle}>Ordem de Serviço Vinculada</Text>
+                                      <View style={styles.osDetailsRow}>
+                                        <Text style={styles.osDetailsLabel}>OS nº {ticket.os_id}</Text>
+                                        <Text style={[
+                                          styles.osDetailsStatus,
+                                          { color: (ticket.os_status_descricao || '').toLowerCase().includes('encerra') ? '#10B981' : '#3B82F6' }
+                                        ]}>
+                                          {ticket.os_status_descricao || 'Pendente'}
+                                        </Text>
+                                      </View>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              </View>
+                            );
+                          })
+                        )}
                       </View>
                     )}
 
@@ -2412,6 +2698,150 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
+  },
+
+  /* SUPPORT FORM & TICKETS STYLES */
+  formGroup: {
+    width: '100%',
+    marginBottom: 12,
+  },
+  formLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 5,
+  },
+  formInput: {
+    width: '100%',
+    height: 40,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  formInputTextArea: {
+    height: 80,
+    paddingVertical: 10,
+    textAlignVertical: 'top',
+  },
+  motiveChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  motiveChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+  },
+  motiveChipActive: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  motiveChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  motiveChipTextActive: {
+    color: '#FFFFFF',
+  },
+  ticketCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+  },
+  ticketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#161F30',
+    paddingBottom: 8,
+    marginBottom: 8,
+  },
+  ticketTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  ticketStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  ticketTypeTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  ticketBody: {
+    width: '100%',
+  },
+  ticketProtocolText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  ticketDateText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  ticketContentBox: {
+    backgroundColor: '#161F30',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+  },
+  ticketContentText: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    lineHeight: 16,
+  },
+  osDetailsContainer: {
+    borderTopWidth: 1,
+    borderTopColor: '#161F30',
+    paddingTop: 8,
+    marginTop: 8,
+  },
+  osDetailsTitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  osDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  osDetailsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  osDetailsStatus: {
+    fontSize: 11,
+    fontWeight: '800',
   },
 
   /* MODAL STYLES */
