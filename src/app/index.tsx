@@ -11,6 +11,8 @@ import {
   ScrollView,
   Linking,
   Clipboard,
+  Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -32,6 +34,7 @@ import {
   Copy,
   AlertTriangle,
   ExternalLink,
+  QrCode,
 } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -185,6 +188,10 @@ export default function LoginScreen() {
 
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
+
+  // Pix Modal States
+  const [selectedPixCode, setSelectedPixCode] = useState<string | null>(null);
+  const [selectedPixAmount, setSelectedPixAmount] = useState<string | number | null>(null);
 
   // Toggle Visibility for passwords
   const [showPppoePassword, setShowPppoePassword] = useState(false);
@@ -399,6 +406,8 @@ export default function LoginScreen() {
     setSelectedContract(null);
     setContracts([]);
     setAllTitulos([]);
+    setSelectedPixCode(null);
+    setSelectedPixAmount(null);
     setShowPppoePassword(false);
     setShowWifiPassword(false);
   };
@@ -733,17 +742,31 @@ export default function LoginScreen() {
                               {/* ACTIONS BUTTONS ROW */}
                               <View style={styles.billActionsContainer}>
                                 {bill.codigoPix ? (
-                                  <TouchableOpacity
-                                    style={styles.actionPillBtn}
-                                    onPress={() => {
-                                      Clipboard.setString(bill.codigoPix);
-                                      alert('Chave Pix Copia e Cola copiada com sucesso!');
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Copy size={12} color="#FFFFFF" />
-                                    <Text style={styles.actionPillText}>Copiar PIX</Text>
-                                  </TouchableOpacity>
+                                  <>
+                                    <TouchableOpacity
+                                      style={styles.actionPillBtn}
+                                      onPress={() => {
+                                        Clipboard.setString(bill.codigoPix);
+                                        alert('Chave Pix Copia e Cola copiada com sucesso!');
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Copy size={12} color="#FFFFFF" />
+                                      <Text style={styles.actionPillText}>Copiar PIX</Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                      style={[styles.actionPillBtn, { backgroundColor: '#2563EB' }]}
+                                      onPress={() => {
+                                        setSelectedPixCode(bill.codigoPix);
+                                        setSelectedPixAmount(bill.valorCorrigido || bill.valor);
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <QrCode size={12} color="#FFFFFF" />
+                                      <Text style={styles.actionPillText}>QR Code</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 ) : null}
 
                                 {bill.linhaDigitavel ? (
@@ -927,6 +950,67 @@ export default function LoginScreen() {
                       </TouchableOpacity>
                     </View>
                   </View>
+
+                  {/* PIX QR CODE POPUP MODAL */}
+                  <Modal
+                    visible={selectedPixCode !== null}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setSelectedPixCode(null)}
+                  >
+                    <View style={styles.modalOverlay}>
+                      <View style={styles.modalContainer}>
+                        <QrCode size={36} color="#2563EB" style={{ marginBottom: 12 }} />
+                        <Text style={styles.modalTitle}>QR Code PIX</Text>
+                        
+                        <Text style={styles.modalInstructions}>
+                          Aponte a câmera do aplicativo do seu banco para o código abaixo para pagar:
+                        </Text>
+
+                        {selectedPixCode ? (
+                          <View style={styles.qrContainer}>
+                            <Image
+                              source={{
+                                uri: `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(selectedPixCode)}`,
+                              }}
+                              style={styles.qrImage}
+                              resizeMode="contain"
+                            />
+                          </View>
+                        ) : null}
+
+                        {selectedPixAmount ? (
+                          <Text style={styles.modalPrice}>
+                            Valor: {formatCurrency(selectedPixAmount)}
+                          </Text>
+                        ) : null}
+
+                        <View style={styles.modalActionsRow}>
+                          <TouchableOpacity
+                            style={styles.modalCopyBtn}
+                            onPress={() => {
+                              if (selectedPixCode) {
+                                Clipboard.setString(selectedPixCode);
+                                alert('Código Pix Copia e Cola copiado!');
+                              }
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Copy size={14} color="#FFFFFF" />
+                            <Text style={styles.modalCopyBtnText}>Copiar Código</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={styles.modalCloseBtn}
+                            onPress={() => setSelectedPixCode(null)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.modalCloseBtnText}>Fechar</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    </View>
+                  </Modal>
 
                 </View>
               );
@@ -1975,5 +2059,91 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-});
 
+  /* MODAL STYLES */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(8, 11, 17, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: '#111625',
+    borderWidth: 1.5,
+    borderColor: '#28354E',
+    borderRadius: 24,
+    padding: 24,
+    width: '90%',
+    maxWidth: 360,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  modalInstructions: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 20,
+  },
+  qrContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+  },
+  qrImage: {
+    width: 200,
+    height: 200,
+  },
+  modalPrice: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginBottom: 20,
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  modalCopyBtn: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#2563EB',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  modalCopyBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalCloseBtn: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1.5,
+    borderColor: '#28354E',
+    backgroundColor: '#161F30',
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+});
