@@ -680,7 +680,6 @@ export default function LoginScreen() {
                           const openBills = contractTitulos
                             .filter(t => t.status !== 'pago' && t.status !== 'cancelado')
                             .map(t => {
-                              // Use 12:00:00 to avoid timezone offset shifts on parse
                               const dueDate = new Date(t.dataVencimento + 'T12:00:00');
                               const isOverdue = dueDate.getTime() < today.getTime();
                               return { ...t, isOverdue };
@@ -711,7 +710,7 @@ export default function LoginScreen() {
                               key={bill.id} 
                               style={[
                                 styles.billCard, 
-                                { borderColor: bill.isOverdue ? '#EF4444' : '#28354E' }
+                                { borderLeftColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
                               ]}
                             >
                               <View style={styles.billHeader}>
@@ -721,8 +720,12 @@ export default function LoginScreen() {
                                 </View>
                                 <View style={[
                                   styles.billStatusBadge,
-                                  { backgroundColor: bill.isOverdue ? '#EF444420' : '#2563EB20' }
+                                  { backgroundColor: bill.isOverdue ? '#EF444415' : '#2563EB15' }
                                 ]}>
+                                  <View style={[
+                                    styles.statusDot,
+                                    { backgroundColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
+                                  ]} />
                                   <Text style={[
                                     styles.billStatusText,
                                     { color: bill.isOverdue ? '#EF4444' : '#2563EB' }
@@ -733,7 +736,7 @@ export default function LoginScreen() {
                               </View>
 
                               <View style={styles.billPriceRow}>
-                                <Text style={styles.billPriceLabel}>Valor do Boleto:</Text>
+                                <Text style={styles.billPriceLabel}>VALOR COBRADO</Text>
                                 <Text style={styles.billPriceValue}>
                                   {formatCurrency(bill.valorCorrigido || bill.valor)}
                                 </Text>
@@ -756,41 +759,41 @@ export default function LoginScreen() {
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
-                                      style={[styles.actionPillBtn, { backgroundColor: '#2563EB' }]}
+                                      style={styles.actionPillSecondaryBtn}
                                       onPress={() => {
                                         setSelectedPixCode(bill.codigoPix);
                                         setSelectedPixAmount(bill.valorCorrigido || bill.valor);
                                       }}
                                       activeOpacity={0.7}
                                     >
-                                      <QrCode size={12} color="#FFFFFF" />
-                                      <Text style={styles.actionPillText}>QR Code</Text>
+                                      <QrCode size={12} color="#94A3B8" />
+                                      <Text style={styles.actionPillSecondaryText}>QR Code</Text>
                                     </TouchableOpacity>
                                   </>
                                 ) : null}
 
                                 {bill.linhaDigitavel ? (
                                   <TouchableOpacity
-                                    style={styles.actionPillBtn}
+                                    style={styles.actionPillSecondaryBtn}
                                     onPress={() => {
                                       Clipboard.setString(bill.linhaDigitavel);
                                       alert('Código de barras copiado com sucesso!');
                                     }}
                                     activeOpacity={0.7}
                                   >
-                                    <Copy size={12} color="#FFFFFF" />
-                                    <Text style={styles.actionPillText}>Código Barras</Text>
+                                    <Copy size={12} color="#94A3B8" />
+                                    <Text style={styles.actionPillSecondaryText}>Barras</Text>
                                   </TouchableOpacity>
                                 ) : null}
 
                                 {bill.link ? (
                                   <TouchableOpacity
-                                    style={[styles.actionPillBtn, { backgroundColor: '#1E293B' }]}
+                                    style={styles.actionPillSecondaryBtn}
                                     onPress={() => Linking.openURL(bill.link)}
                                     activeOpacity={0.7}
                                   >
-                                    <ExternalLink size={12} color="#FFFFFF" />
-                                    <Text style={styles.actionPillText}>PDF</Text>
+                                    <ExternalLink size={12} color="#94A3B8" />
+                                    <Text style={styles.actionPillSecondaryText}>PDF</Text>
                                   </TouchableOpacity>
                                 ) : null}
                               </View>
@@ -824,8 +827,8 @@ export default function LoginScreen() {
 
                           return displayPaidBills.map((bill) => (
                             <View key={bill.id} style={styles.paidBillCard}>
-                              <View style={styles.paidBillInfo}>
-                                <View>
+                              <View style={styles.paidBillMain}>
+                                <View style={styles.paidBillInfo}>
                                   <Text style={styles.paidBillTitle}>
                                     {formatCurrency(bill.valorPago || bill.valor)}
                                   </Text>
@@ -838,21 +841,22 @@ export default function LoginScreen() {
                                     </Text>
                                   ) : null}
                                 </View>
-                                <View style={styles.paidBadge}>
-                                  <Text style={styles.paidBadgeText}>PAGO</Text>
+
+                                <View style={styles.paidRightActions}>
+                                  <View style={styles.paidBadge}>
+                                    <Text style={styles.paidBadgeText}>PAGO</Text>
+                                  </View>
+                                  {bill.link ? (
+                                    <TouchableOpacity
+                                      style={styles.paidPdfCircleBtn}
+                                      onPress={() => Linking.openURL(bill.link)}
+                                      activeOpacity={0.7}
+                                    >
+                                      <ExternalLink size={13} color="#94A3B8" />
+                                    </TouchableOpacity>
+                                  ) : null}
                                 </View>
                               </View>
-                              
-                              {bill.link ? (
-                                <TouchableOpacity
-                                  style={styles.paidPdfBtn}
-                                  onPress={() => Linking.openURL(bill.link)}
-                                  activeOpacity={0.7}
-                                >
-                                  <ExternalLink size={13} color="#2563EB" />
-                                  <Text style={styles.paidPdfBtnText}>Visualizar PDF</Text>
-                                </TouchableOpacity>
-                              ) : null}
                             </View>
                           ));
                         })()}
@@ -1911,14 +1915,16 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     backgroundColor: '#111625',
-    borderWidth: 1.5,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderLeftWidth: 4, // Left accent line
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 2,
   },
   billHeader: {
@@ -1945,29 +1951,36 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   billStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 6,
+    borderRadius: 8,
+  },
+  statusDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginRight: 5,
   },
   billStatusText: {
     fontSize: 10,
     fontWeight: '800',
   },
   billPriceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   billPriceLabel: {
-    fontSize: 13,
-    color: '#94A3B8',
-    fontWeight: '600',
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
   },
   billPriceValue: {
-    fontSize: 18,
+    fontSize: 22,
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '900',
   },
   billActionsContainer: {
     flexDirection: 'row',
@@ -1988,6 +2001,22 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
   },
+  actionPillSecondaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  actionPillSecondaryText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   noBillsTitle: {
     fontSize: 15,
     fontWeight: '800',
@@ -2004,20 +2033,21 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     backgroundColor: '#111625',
-    borderWidth: 1.5,
-    borderColor: '#28354E',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981', // Green left accent
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     marginBottom: 10,
   },
-  paidBillInfo: {
+  paidBillMain: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: '#161F30',
-    paddingBottom: 10,
-    marginBottom: 10,
+    alignItems: 'center',
+  },
+  paidBillInfo: {
+    justifyContent: 'center',
   },
   paidBillTitle: {
     fontSize: 16,
@@ -2025,7 +2055,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   paidBillSub: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
     marginTop: 2,
     fontWeight: '600',
@@ -2035,6 +2065,11 @@ const styles = StyleSheet.create({
     color: '#10B981',
     marginTop: 2,
     fontWeight: '700',
+  },
+  paidRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   paidBadge: {
     backgroundColor: '#10B98115',
@@ -2047,17 +2082,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
   },
-  paidPdfBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  paidPdfCircleBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
     justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 4,
-  },
-  paidPdfBtnText: {
-    color: '#2563EB',
-    fontSize: 12,
-    fontWeight: '700',
+    alignItems: 'center',
   },
 
   /* MODAL STYLES */
