@@ -447,7 +447,7 @@ export default function LoginScreen() {
                   {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
                   <View style={styles.badgesRow}>
                     <View style={styles.badgeItem}>
-                      <Wifi size={12} color="#0052FF" style={{ marginRight: 5 }} />
+                      <Wifi size={12} color="#2563EB" style={{ marginRight: 5 }} />
                       <Text style={styles.badgeText} numberOfLines={1}>
                         {selectedContract.planName.toUpperCase()}
                       </Text>
@@ -477,7 +477,7 @@ export default function LoginScreen() {
                   >
                     {activeTab === 'HOME' && (
                       <View style={styles.tabContentCard}>
-                        <Home size={32} color="#0052FF" style={styles.tabContentIcon} />
+                        <Home size={32} color="#2563EB" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Início</Text>
                         <Text style={styles.tabContentDesc}>
                           Bem-vindo à Central do Cliente WebConnect. Use o menu abaixo para navegar pelo seu aplicativo.
@@ -491,7 +491,7 @@ export default function LoginScreen() {
                         {/* 1. PLAN DETAILED CARD */}
                         <View style={styles.infoCard}>
                           <View style={styles.infoCardHeader}>
-                            <Globe size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <Globe size={18} color="#2563EB" style={{ marginRight: 8 }} />
                             <Text style={styles.infoCardHeaderTitle}>Plano Contratado</Text>
                           </View>
                           <Text style={styles.planoMainTitle}>{selectedContract.planName}</Text>
@@ -516,7 +516,7 @@ export default function LoginScreen() {
                         {(selectedContract.wifiSsid || selectedContract.wifiSsid5) ? (
                           <View style={styles.infoCard}>
                             <View style={styles.infoCardHeader}>
-                              <Wifi size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                              <Wifi size={18} color="#2563EB" style={{ marginRight: 8 }} />
                               <Text style={styles.infoCardHeaderTitle}>Dados do Roteador Wi-Fi</Text>
                             </View>
 
@@ -593,7 +593,7 @@ export default function LoginScreen() {
                         {/* 4. BILLING/CONTRACT INFO CARD */}
                         <View style={styles.infoCard}>
                           <View style={styles.infoCardHeader}>
-                            <CreditCard size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <CreditCard size={18} color="#2563EB" style={{ marginRight: 8 }} />
                             <Text style={styles.infoCardHeaderTitle}>Contrato e Faturamento</Text>
                           </View>
 
@@ -618,7 +618,7 @@ export default function LoginScreen() {
                         {/* 5. ADDRESS CARD */}
                         <View style={styles.infoCard}>
                           <View style={styles.infoCardHeader}>
-                            <MapPin size={18} color="#0052FF" style={{ marginRight: 8 }} />
+                            <MapPin size={18} color="#2563EB" style={{ marginRight: 8 }} />
                             <Text style={styles.infoCardHeaderTitle}>Endereço de Instalação</Text>
                           </View>
 
@@ -712,11 +712,11 @@ export default function LoginScreen() {
                                 </View>
                                 <View style={[
                                   styles.billStatusBadge,
-                                  { backgroundColor: bill.isOverdue ? '#EF444420' : '#0052FF20' }
+                                  { backgroundColor: bill.isOverdue ? '#EF444420' : '#2563EB20' }
                                 ]}>
                                   <Text style={[
                                     styles.billStatusText,
-                                    { color: bill.isOverdue ? '#EF4444' : '#0052FF' }
+                                    { color: bill.isOverdue ? '#EF4444' : '#2563EB' }
                                   ]}>
                                     {bill.isOverdue ? 'VENCIDO' : 'A VENCER'}
                                   </Text>
@@ -826,7 +826,7 @@ export default function LoginScreen() {
                                   onPress={() => Linking.openURL(bill.link)}
                                   activeOpacity={0.7}
                                 >
-                                  <ExternalLink size={13} color="#0052FF" />
+                                  <ExternalLink size={13} color="#2563EB" />
                                   <Text style={styles.paidPdfBtnText}>Visualizar PDF</Text>
                                 </TouchableOpacity>
                               ) : null}
@@ -839,7 +839,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'SUPORTE' && (
                       <View style={styles.tabContentCard}>
-                        <MessageSquare size={32} color="#0052FF" style={styles.tabContentIcon} />
+                        <MessageSquare size={32} color="#2563EB" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Suporte Técnico</Text>
                         <Text style={styles.tabContentDesc}>
                           Abra chamados para suporte de conexão lenta, queda de sinal ou solicitações de visitas técnicas.
@@ -849,7 +849,7 @@ export default function LoginScreen() {
 
                     {activeTab === 'TESTE' && (
                       <View style={styles.tabContentCard}>
-                        <Activity size={32} color="#0052FF" style={styles.tabContentIcon} />
+                        <Activity size={32} color="#2563EB" style={styles.tabContentIcon} />
                         <Text style={styles.tabContentTitle}>Teste de Velocidade</Text>
                         <Text style={styles.tabContentDesc}>
                           Inicie o diagnóstico em tempo real da latência (ping), velocidade de download e integridade de sua conexão.
@@ -867,8 +867,8 @@ export default function LoginScreen() {
                         onPress={() => setActiveTab('PLANO')}
                         activeOpacity={0.7}
                       >
-                        <FileText size={18} color={activeTab === 'PLANO' ? '#0052FF' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#0052FF' : '#64748B' }]}>
+                        <FileText size={18} color={activeTab === 'PLANO' ? '#2563EB' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#2563EB' : '#64748B' }]}>
                           Plano
                         </Text>
                       </TouchableOpacity>
@@ -879,8 +879,8 @@ export default function LoginScreen() {
                         onPress={() => setActiveTab('FINANCEIRO')}
                         activeOpacity={0.7}
                       >
-                        <CreditCard size={18} color={activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#0052FF' : '#64748B' }]}>
+                        <CreditCard size={18} color={activeTab === 'FINANCEIRO' ? '#2563EB' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#2563EB' : '#64748B' }]}>
                           Financeiro
                         </Text>
                       </TouchableOpacity>
@@ -890,14 +890,14 @@ export default function LoginScreen() {
                         <TouchableOpacity
                           style={[
                             styles.floatingHomeButton,
-                            { backgroundColor: activeTab === 'HOME' ? '#0052FF' : '#1E293B' }
+                            { backgroundColor: activeTab === 'HOME' ? '#2563EB' : '#1E293B' }
                           ]}
                           onPress={() => setActiveTab('HOME')}
                           activeOpacity={0.8}
                         >
                           <Home size={20} color="#FFFFFF" />
                         </TouchableOpacity>
-                        <Text style={[styles.tabLabel, { marginTop: 2, color: activeTab === 'HOME' ? '#0052FF' : '#64748B' }]}>
+                        <Text style={[styles.tabLabel, { marginTop: 2, color: activeTab === 'HOME' ? '#2563EB' : '#64748B' }]}>
                           Home
                         </Text>
                       </View>
@@ -908,8 +908,8 @@ export default function LoginScreen() {
                         onPress={() => setActiveTab('SUPORTE')}
                         activeOpacity={0.7}
                       >
-                        <MessageSquare size={18} color={activeTab === 'SUPORTE' ? '#0052FF' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#0052FF' : '#64748B' }]}>
+                        <MessageSquare size={18} color={activeTab === 'SUPORTE' ? '#2563EB' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#2563EB' : '#64748B' }]}>
                           Suporte
                         </Text>
                       </TouchableOpacity>
@@ -920,8 +920,8 @@ export default function LoginScreen() {
                         onPress={() => setActiveTab('TESTE')}
                         activeOpacity={0.7}
                       >
-                        <Activity size={18} color={activeTab === 'TESTE' ? '#0052FF' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#0052FF' : '#64748B' }]}>
+                        <Activity size={18} color={activeTab === 'TESTE' ? '#2563EB' : '#64748B'} />
+                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#2563EB' : '#64748B' }]}>
                           Conexão
                         </Text>
                       </TouchableOpacity>
@@ -1005,7 +1005,7 @@ export default function LoginScreen() {
                             borderColor: errorMsg
                               ? '#EF4444'
                               : isFocused
-                              ? '#0052FF'
+                              ? '#2563EB'
                               : '#28354E',
                           },
                         ]}
@@ -1044,7 +1044,7 @@ export default function LoginScreen() {
                       style={[
                         styles.submitButton,
                         {
-                          backgroundColor: '#0052FF',
+                          backgroundColor: '#2563EB',
                           opacity: isValid && !loading ? 1 : 0.5,
                         },
                       ]}
@@ -1104,7 +1104,7 @@ export default function LoginScreen() {
                       >
                         <View style={styles.contractCardHeader}>
                           <View style={styles.contractIconBackground}>
-                            <Wifi size={20} color="#0052FF" />
+                            <Wifi size={20} color="#2563EB" />
                           </View>
                           <View style={styles.contractMainInfo}>
                             <Text style={styles.contractPlanTitle}>{String(item.planName || '').toUpperCase()}</Text>
@@ -1275,7 +1275,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0052FF',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -1316,7 +1316,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#0052FF15',
+    backgroundColor: '#2563EB15',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -1548,11 +1548,11 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#0052FF',
+    backgroundColor: '#2563EB',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
-    shadowColor: '#0052FF',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1724,7 +1724,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: -32, // Floating height offset
-    shadowColor: '#0052FF',
+    shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
@@ -1894,7 +1894,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0052FF',
+    backgroundColor: '#2563EB',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -1971,8 +1971,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   paidPdfBtnText: {
-    color: '#0052FF',
+    color: '#2563EB',
     fontSize: 12,
     fontWeight: '700',
   },
 });
+
