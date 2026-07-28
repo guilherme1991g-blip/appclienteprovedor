@@ -809,7 +809,6 @@ export default function LoginScreen() {
                     </View>
 
                     <TouchableOpacity
-                      style.whatsappButton
                       style={styles.whatsappButton}
                       onPress={() => {
                         Linking.openURL('https://wa.me/5581982568282?text=Olá!%20Meu%20contrato%20consta%20como%20cancelado%20no%20app%20da%20WebConnect.');
