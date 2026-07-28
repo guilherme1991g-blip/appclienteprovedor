@@ -38,6 +38,7 @@ import {
   Clock,
   CircleDot,
 } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
 import BrandLogo from '@/components/BrandLogo';
 
 // Helper function to validate CPF (Brazilian Taxpayer Registry for Individuals)
@@ -226,13 +227,6 @@ export default function LoginScreen() {
   const [conexaoOnline, setConexaoOnline] = useState<boolean | null>(null);
   const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
 
-  // Live Speedtest States
-  const [testPhase, setTestPhase] = useState<'IDLE' | 'PING' | 'DOWNLOAD' | 'UPLOAD' | 'FINISHED'>('IDLE');
-  const [liveSpeed, setLiveSpeed] = useState(0);
-  const [pingResult, setPingResult] = useState<number | null>(null);
-  const [downloadResult, setDownloadResult] = useState<number | null>(null);
-  const [uploadResult, setUploadResult] = useState<number | null>(null);
-
   // Pix Modal States
   const [selectedPixCode, setSelectedPixCode] = useState<string | null>(null);
   const [selectedPixAmount, setSelectedPixAmount] = useState<string | number | null>(null);
@@ -283,155 +277,6 @@ export default function LoginScreen() {
         });
     }
   }, [activeTab, screenState, selectedContract]);
-
-  const runPingTest = (): Promise<number> => {
-    return new Promise((resolve) => {
-      let pings: number[] = [];
-      let count = 0;
-
-      const nextPing = () => {
-        if (count >= 4) {
-          const avg = pings.reduce((a, b) => a + b, 0) / pings.length;
-          resolve(Math.round(avg));
-          return;
-        }
-
-        const start = Date.now();
-        fetch('https://speed.cloudflare.com/cdn-cgi/trace', { method: 'GET', cache: 'no-store' })
-          .then(() => {
-            const duration = Date.now() - start;
-            pings.push(duration);
-            setLiveSpeed(Math.round(duration));
-            count++;
-            setTimeout(nextPing, 100);
-          })
-          .catch(() => {
-            pings.push(35 + Math.floor(Math.random() * 15)); // default fallback ping
-            count++;
-            setTimeout(nextPing, 100);
-          });
-      };
-
-      nextPing();
-    });
-  };
-
-  const runDownloadTest = async (): Promise<number> => {
-    const chunkSizeBytes = 4000000; // 4 MB chunks
-    const testDurationMs = 6000; // 6 seconds duration
-    const startTime = Date.now();
-    let totalBytesDownloaded = 0;
-
-    // Smooth dial updates while loading chunks
-    let currentLiveSpeed = 10;
-    const intervalId = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      let calculatedSpeed = currentLiveSpeed;
-      if (elapsed > 0.1 && totalBytesDownloaded > 0) {
-        calculatedSpeed = (totalBytesDownloaded * 8) / (elapsed * 1024 * 1024);
-      }
-      const step = (calculatedSpeed - currentLiveSpeed) * 0.15 + (Math.random() - 0.5) * 4;
-      currentLiveSpeed = Math.max(currentLiveSpeed + step, 1);
-      setLiveSpeed(parseFloat(currentLiveSpeed.toFixed(1)));
-    }, 100);
-
-    try {
-      while (Date.now() - startTime < testDurationMs) {
-        const res = await fetch(`https://speed.cloudflare.com/__down?bytes=${chunkSizeBytes}`, { cache: 'no-store' });
-        if (!res.ok) throw new Error('Download failed');
-        await res.text(); // fully download chunk data
-        totalBytesDownloaded += chunkSizeBytes;
-      }
-    } catch (e) {
-      console.error('Download loop error:', e);
-    } finally {
-      clearInterval(intervalId);
-    }
-
-    const elapsed = (Date.now() - startTime) / 1000;
-    if (elapsed > 0.1 && totalBytesDownloaded > 0) {
-      const finalSpeed = (totalBytesDownloaded * 8) / (elapsed * 1024 * 1024);
-      return parseFloat(finalSpeed.toFixed(1));
-    }
-    return 0;
-  };
-
-  const runUploadTest = async (): Promise<number> => {
-    const chunkSizeBytes = 1200000; // 1.2 MB chunks (fast upload allocation)
-    const testDurationMs = 5000; // 5 seconds duration
-    const startTime = Date.now();
-    let totalBytesUploaded = 0;
-    const payload = 'U'.repeat(chunkSizeBytes);
-
-    let currentLiveSpeed = downloadResult ? downloadResult * 0.4 : 15;
-    const intervalId = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      let calculatedSpeed = currentLiveSpeed;
-      if (elapsed > 0.1 && totalBytesUploaded > 0) {
-        calculatedSpeed = (totalBytesUploaded * 8) / (elapsed * 1024 * 1024);
-      }
-      const step = (calculatedSpeed - currentLiveSpeed) * 0.15 + (Math.random() - 0.5) * 3;
-      currentLiveSpeed = Math.max(currentLiveSpeed + step, 1);
-      setLiveSpeed(parseFloat(currentLiveSpeed.toFixed(1)));
-    }, 100);
-
-    try {
-      while (Date.now() - startTime < testDurationMs) {
-        const res = await fetch('https://speed.cloudflare.com/__up', {
-          method: 'POST',
-          body: payload,
-          headers: {
-            'Content-Type': 'text/plain',
-          },
-        });
-        if (!res.ok) throw new Error('Upload failed');
-        await res.text();
-        totalBytesUploaded += chunkSizeBytes;
-      }
-    } catch (e) {
-      console.error('Upload loop error:', e);
-    } finally {
-      clearInterval(intervalId);
-    }
-
-    const elapsed = (Date.now() - startTime) / 1000;
-    if (elapsed > 0.1 && totalBytesUploaded > 0) {
-      const finalSpeed = (totalBytesUploaded * 8) / (elapsed * 1024 * 1024);
-      return parseFloat(finalSpeed.toFixed(1));
-    }
-    return 0;
-  };
-
-  const startSpeedTest = () => {
-    setTestPhase('PING');
-    setLiveSpeed(0);
-    setPingResult(null);
-    setDownloadResult(null);
-    setUploadResult(null);
-
-    runPingTest()
-      .then((ping) => {
-        setPingResult(ping);
-        setTestPhase('DOWNLOAD');
-        return runDownloadTest();
-      })
-      .then((downloadSpeed) => {
-        setDownloadResult(downloadSpeed);
-        setTestPhase('UPLOAD');
-        return runUploadTest();
-      })
-      .then((uploadSpeed) => {
-        setUploadResult(uploadSpeed);
-        setTestPhase('FINISHED');
-        setLiveSpeed(0);
-      })
-      .catch((err) => {
-        console.error('Speedtest error:', err);
-        setTestPhase('IDLE');
-        setLiveSpeed(0);
-        alert('Ocorreu um erro durante o teste de velocidade. Tente novamente.');
-      });
-  };
 
   const handleInputChange = (text: string) => {
     const formatted = formatAutoDocument(text);
@@ -1228,81 +1073,59 @@ export default function LoginScreen() {
                                   </View>
                                 </View>
 
-                                {/* C. SPEED TEST CARD */}
-                                <View style={styles.infoCard}>
+                                {/* C. SPEED TEST WEBVIEW CARD */}
+                                <View style={styles.speedtestWebviewCard}>
                                   <View style={styles.infoCardHeader}>
                                     <Activity size={18} color="#2563EB" style={{ marginRight: 8 }} />
-                                    <Text style={styles.infoCardHeaderTitle}>Medidor de Velocidade</Text>
+                                    <Text style={styles.infoCardHeaderTitle}>Teste de Velocidade (OpenSpeedTest)</Text>
                                   </View>
 
-                                  {/* Speedometer Circle Dial */}
-                                  <View style={[
-                                    styles.speedDialOuter,
-                                    { borderColor: (testPhase !== 'IDLE' && testPhase !== 'FINISHED') ? '#2563EB' : '#2563EB30' }
-                                  ]}>
-                                    <View style={styles.speedDialInner}>
-                                      <Text style={styles.speedDialValue}>
-                                        {testPhase === 'PING' && pingResult ? pingResult : liveSpeed}
-                                      </Text>
-                                      <Text style={styles.speedDialUnit}>
-                                        {testPhase === 'PING' ? 'ms' : 'Mbps'}
-                                      </Text>
-                                      <Text style={styles.speedDialPhase}>
-                                        {testPhase === 'IDLE' && 'PRONTO'}
-                                        {testPhase === 'PING' && 'LATÊNCIA'}
-                                        {testPhase === 'DOWNLOAD' && 'DOWNLOAD'}
-                                        {testPhase === 'UPLOAD' && 'UPLOAD'}
-                                        {testPhase === 'FINISHED' && 'CONCLUÍDO'}
-                                      </Text>
-                                    </View>
+                                  <View style={styles.webviewWrapper}>
+                                    <WebView
+                                      source={{
+                                        html: `
+                                          <!DOCTYPE html>
+                                          <html>
+                                          <head>
+                                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+                                            <style>
+                                              body {
+                                                margin: 0;
+                                                padding: 0;
+                                                background-color: #111625;
+                                                overflow: hidden;
+                                                display: flex;
+                                                justify-content: center;
+                                                align-items: center;
+                                                height: 100vh;
+                                              }
+                                              iframe {
+                                                width: 100%;
+                                                height: 100%;
+                                                min-height: 360px;
+                                                border: none;
+                                              }
+                                            </style>
+                                          </head>
+                                          <body>
+                                            <iframe src="https://openspeedtest.com/speedtest" allow="geolocation"></iframe>
+                                          </body>
+                                          </html>
+                                        `
+                                      }}
+                                      style={styles.webview}
+                                      javaScriptEnabled={true}
+                                      domStorageEnabled={true}
+                                      startInLoadingState={true}
+                                      renderLoading={() => (
+                                        <View style={styles.webviewLoading}>
+                                          <ActivityIndicator size="large" color="#2563EB" />
+                                        </View>
+                                      )}
+                                      originWhitelist={['*']}
+                                      mixedContentMode="always"
+                                    />
                                   </View>
-
-                                  {/* Live stats row */}
-                                  <View style={styles.speedTestRow}>
-                                    <View style={styles.speedTestCol}>
-                                      <Text style={styles.speedTestColLabel}>PING</Text>
-                                      <Text style={[styles.speedTestColValue, { color: pingResult ? '#10B981' : '#FFFFFF' }]}>
-                                        {pingResult !== null ? `${pingResult} ms` : '-'}
-                                      </Text>
-                                    </View>
-                                    <View style={[styles.speedTestCol, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#161F30' }]}>
-                                      <Text style={styles.speedTestColLabel}>DOWNLOAD</Text>
-                                      <Text style={[styles.speedTestColValue, { color: downloadResult ? '#2563EB' : '#FFFFFF' }]}>
-                                        {downloadResult !== null ? `${downloadResult} Mbps` : '-'}
-                                      </Text>
-                                    </View>
-                                    <View style={styles.speedTestCol}>
-                                      <Text style={styles.speedTestColLabel}>UPLOAD</Text>
-                                      <Text style={[styles.speedTestColValue, { color: uploadResult ? '#A855F7' : '#FFFFFF' }]}>
-                                        {uploadResult !== null ? `${uploadResult} Mbps` : '-'}
-                                      </Text>
-                                    </View>
-                                  </View>
-
-                                  {/* Start Test Trigger Button */}
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.speedTestBtn,
-                                      {
-                                        backgroundColor: (testPhase !== 'IDLE' && testPhase !== 'FINISHED') ? '#1E293B' : '#2563EB',
-                                        shadowOpacity: (testPhase !== 'IDLE' && testPhase !== 'FINISHED') ? 0 : 0.25,
-                                      }
-                                    ]}
-                                    onPress={startSpeedTest}
-                                    disabled={testPhase !== 'IDLE' && testPhase !== 'FINISHED'}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={[
-                                      styles.speedTestBtnText,
-                                      { color: (testPhase !== 'IDLE' && testPhase !== 'FINISHED') ? '#94A3B8' : '#FFFFFF' }
-                                    ]}>
-                                      {testPhase === 'IDLE' && 'Iniciar Teste'}
-                                      {testPhase === 'PING' && 'Medindo Latência...'}
-                                      {testPhase === 'DOWNLOAD' && 'Testando Download...'}
-                                      {testPhase === 'UPLOAD' && 'Testando Upload...'}
-                                      {testPhase === 'FINISHED' && 'Testar Novamente'}
-                                    </Text>
-                                  </TouchableOpacity>
                                 </View>
                               </>
                             );
@@ -2549,96 +2372,46 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
-  /* SPEEDTEST STYLES */
-  speedDialOuter: {
-    width: 170,
-    height: 170,
-    borderRadius: 85,
-    borderWidth: 6,
-    borderColor: '#2563EB30',
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginVertical: 18,
-    position: 'relative',
-  },
-  speedDialInner: {
-    width: 146,
-    height: 146,
-    borderRadius: 73,
-    backgroundColor: '#161F30',
+  /* SPEEDTEST WEBVIEW STYLES */
+  speedtestWebviewCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
     borderWidth: 1.5,
     borderColor: '#28354E',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  speedDialValue: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  speedDialUnit: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#2563EB',
-    textTransform: 'uppercase',
-    marginTop: 2,
-    letterSpacing: 0.5,
-  },
-  speedDialPhase: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    marginTop: 8,
-    letterSpacing: 0.8,
-  },
-  speedTestRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginVertical: 14,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#161F30',
-    paddingVertical: 12,
-  },
-  speedTestCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  speedTestColLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  speedTestColValue: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  speedTestBtn: {
-    height: 44,
-    backgroundColor: '#2563EB',
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    shadowColor: '#2563EB',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 3,
-    marginTop: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  speedTestBtnText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
+  webviewWrapper: {
+    height: 380,
+    width: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#111625',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    position: 'relative',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#111625',
+  },
+  webviewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#111625',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
   },
 
   /* MODAL STYLES */
