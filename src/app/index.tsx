@@ -35,6 +35,8 @@ import {
   AlertTriangle,
   ExternalLink,
   QrCode,
+  Clock,
+  CircleDot,
 } from 'lucide-react-native';
 import BrandLogo from '@/components/BrandLogo';
 
@@ -137,6 +139,36 @@ function formatCurrency(val: number | string): string {
   return `R$ ${num.toFixed(2).replace('.', ',')}`;
 }
 
+// Helper to format bytes
+function formatBytes(bytes: number): string {
+  if (!bytes || bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+// Helper to format session duration
+function formatSessionDuration(start: string, stop: string | null): string {
+  const startTime = new Date(start).getTime();
+  const stopTime = stop ? new Date(stop).getTime() : new Date().getTime();
+  const diffMs = stopTime - startTime;
+  if (diffMs <= 0) return 'Alguns segundos';
+  
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  
+  if (diffHrs > 24) {
+    const days = Math.floor(diffHrs / 24);
+    const hours = diffHrs % 24;
+    return `${days}d e ${hours}h`;
+  }
+  if (diffHrs > 0) {
+    return `${diffHrs}h e ${diffMins}min`;
+  }
+  return `${diffMins} min`;
+}
+
 interface ContractDisplay {
   id: number;
   planName: string;
@@ -189,6 +221,11 @@ export default function LoginScreen() {
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
 
+  // Live Connection Status States
+  const [loadingConexao, setLoadingConexao] = useState(false);
+  const [conexaoOnline, setConexaoOnline] = useState<boolean | null>(null);
+  const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
+
   // Pix Modal States
   const [selectedPixCode, setSelectedPixCode] = useState<string | null>(null);
   const [selectedPixAmount, setSelectedPixAmount] = useState<string | number | null>(null);
@@ -196,6 +233,49 @@ export default function LoginScreen() {
   // Toggle Visibility for passwords
   const [showPppoePassword, setShowPppoePassword] = useState(false);
   const [showWifiPassword, setShowWifiPassword] = useState(false);
+
+  // Fetch connection status and history dynamically
+  React.useEffect(() => {
+    if (screenState === 'DASHBOARD' && activeTab === 'TESTE' && selectedContract && selectedContract.pppoeLogin) {
+      setLoadingConexao(true);
+      
+      const bodyData = {
+        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+        app: 'App',
+        username: selectedContract.pppoeLogin,
+      };
+      
+      const postData = Object.keys(bodyData)
+        .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
+        .join('&');
+
+      fetch('https://webcnnect.sgp.tsmx.com.br/ws/radius/radacct/list/all/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: postData,
+      })
+        .then(async (res) => {
+          const data = await res.json();
+          setLoadingConexao(false);
+          if (res.ok && data && data.result && data.result.length > 0) {
+            const clientData = data.result[0];
+            setConexaoOnline(clientData.online === true);
+            setConexaoSessions(clientData.radacct || []);
+          } else {
+            setConexaoOnline(false);
+            setConexaoSessions([]);
+          }
+        })
+        .catch((err) => {
+          setLoadingConexao(false);
+          console.error('Radius fetch error:', err);
+          setConexaoOnline(false);
+          setConexaoSessions([]);
+        });
+    }
+  }, [activeTab, screenState, selectedContract]);
 
   const handleInputChange = (text: string) => {
     const formatted = formatAutoDocument(text);
@@ -406,6 +486,8 @@ export default function LoginScreen() {
     setSelectedContract(null);
     setContracts([]);
     setAllTitulos([]);
+    setConexaoOnline(null);
+    setConexaoSessions([]);
     setSelectedPixCode(null);
     setSelectedPixAmount(null);
     setShowPppoePassword(false);
@@ -875,12 +957,254 @@ export default function LoginScreen() {
                     )}
 
                     {activeTab === 'TESTE' && (
-                      <View style={styles.tabContentCard}>
-                        <Activity size={32} color="#2563EB" style={styles.tabContentIcon} />
-                        <Text style={styles.tabContentTitle}>Teste de Velocidade</Text>
-                        <Text style={styles.tabContentDesc}>
-                          Inicie o diagnóstico em tempo real da latência (ping), velocidade de download e integridade de sua conexão.
-                        </Text>
+                      <View style={styles.planoTabWrapper}>
+                        {loadingConexao ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                            <Text style={[styles.noBillsTitle, { marginTop: 16 }]}>Consultando status da conexão...</Text>
+                            <Text style={styles.noBillsDesc}>Aguarde enquanto carregamos seus dados de tráfego.</Text>
+                          </View>
+                        ) : (
+                          (() => {
+                            // 1. Connection Status Details
+                            const currentSession = conexaoSessions[0] || null;
+                            const ipAddress = currentSession?.framedipaddress || selectedContract.ip || 'Dinâmico';
+                            
+                            // 2. Calculations for last 30 days consumption
+                            const limit30 = new Date();
+                            limit30.setDate(limit30.getDate() - 30);
+                            limit30.setHours(0,0,0,0);
+
+                            let totalDownloadBytes = 0;
+                            let totalUploadBytes = 0;
+
+                            conexaoSessions.forEach(s => {
+                              if (s.acctstarttime) {
+                                const sDate = new Date(s.acctstarttime);
+                                if (sDate.getTime() >= limit30.getTime()) {
+                                  totalDownloadBytes += s.acctoutputoctets || 0;
+                                  totalUploadBytes += s.acctinputoctets || 0;
+                                }
+                              }
+                            });
+
+                            // 3. Last 7 days download consumption grouping
+                            const last7Days = [];
+                            for (let i = 6; i >= 0; i--) {
+                              const d = new Date();
+                              d.setDate(d.getDate() - i);
+                              d.setHours(0,0,0,0);
+                              last7Days.push({
+                                dateStr: d.toISOString().split('T')[0],
+                                label: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase(),
+                                downloadBytes: 0,
+                              });
+                            }
+
+                            conexaoSessions.forEach(s => {
+                              if (s.acctstarttime) {
+                                const startDay = s.acctstarttime.split('T')[0];
+                                const dayObj = last7Days.find(d => d.dateStr === startDay);
+                                if (dayObj) {
+                                  dayObj.downloadBytes += s.acctoutputoctets || 0;
+                                }
+                              }
+                            });
+
+                            const maxBytes = Math.max(...last7Days.map(d => d.downloadBytes), 1024 * 1024 * 1024); // min 1GB
+
+                            const formatBytesShort = (bytes: number) => {
+                              if (!bytes || bytes === 0) return '0';
+                              if (bytes >= 1024 * 1024 * 1024 * 1024) {
+                                return (bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1) + 'T';
+                              }
+                              if (bytes >= 1024 * 1024 * 1024) {
+                                return (bytes / (1024 * 1024 * 1024)).toFixed(0) + 'G';
+                              }
+                              if (bytes >= 1024 * 1024) {
+                                return (bytes / (1024 * 1024)).toFixed(0) + 'M';
+                              }
+                              return (bytes / 1024).toFixed(0) + 'K';
+                            };
+
+                            return (
+                              <>
+                                {/* A. STATUS CARD */}
+                                <View style={[styles.infoCard, { borderLeftWidth: 4, borderLeftColor: conexaoOnline ? '#10B981' : '#EF4444' }]}>
+                                  <View style={styles.infoCardHeader}>
+                                    <Activity size={18} color="#2563EB" style={{ marginRight: 8 }} />
+                                    <Text style={styles.infoCardHeaderTitle}>Status da Conexão</Text>
+                                  </View>
+
+                                  <View style={styles.connectionStatusContainer}>
+                                    <View style={[
+                                      styles.billStatusBadge,
+                                      { 
+                                        backgroundColor: conexaoOnline ? '#10B98115' : '#EF444415',
+                                        alignSelf: 'flex-start',
+                                        marginBottom: 16 
+                                      }
+                                    ]}>
+                                      <View style={[
+                                        styles.statusDot,
+                                        { backgroundColor: conexaoOnline ? '#10B981' : '#EF4444' }
+                                      ]} />
+                                      <Text style={[
+                                        styles.billStatusText,
+                                        { color: conexaoOnline ? '#10B981' : '#EF4444' }
+                                      ]}>
+                                        {conexaoOnline ? 'ONLINE' : 'OFFLINE'}
+                                      </Text>
+                                    </View>
+                                    
+                                    {conexaoOnline ? (
+                                      <>
+                                        <View style={styles.infoRow}>
+                                          <Text style={styles.infoLabel}>Endereço IP</Text>
+                                          <Text style={styles.infoValue}>{ipAddress}</Text>
+                                        </View>
+                                        {currentSession?.acctstarttime ? (
+                                          <View style={styles.infoRow}>
+                                            <Text style={styles.infoLabel}>Conectado desde</Text>
+                                            <Text style={styles.infoValue}>
+                                              {formatDateBR(currentSession.acctstarttime.split('T')[0])} às {currentSession.acctstarttime.split('T')[1].substring(0, 5)}
+                                            </Text>
+                                          </View>
+                                        ) : null}
+                                        {currentSession?.acctstarttime ? (
+                                          <View style={styles.infoRow}>
+                                            <Text style={styles.infoLabel}>Tempo Ativo</Text>
+                                            <Text style={styles.infoValue}>
+                                              {formatSessionDuration(currentSession.acctstarttime, null)}
+                                            </Text>
+                                          </View>
+                                        ) : null}
+                                      </>
+                                    ) : (
+                                      <Text style={styles.noBillsDesc}>
+                                        Seu roteador encontra-se desconectado no momento. Caso precise de ajuda, entre em contato com nosso suporte técnico.
+                                      </Text>
+                                    )}
+                                  </View>
+                                </View>
+
+                                {/* B. TOTAL CONSUMPTION CARD (LAST 30 DAYS) */}
+                                <View style={styles.infoCard}>
+                                  <View style={styles.infoCardHeader}>
+                                    <Globe size={18} color="#2563EB" style={{ marginRight: 8 }} />
+                                    <Text style={styles.infoCardHeaderTitle}>Consumo dos Últimos 30 Dias</Text>
+                                  </View>
+
+                                  <View style={styles.totalConsumptionRow}>
+                                    <View style={styles.consumptionBox}>
+                                      <Text style={styles.consumptionBoxLabel}>DOWNLOAD</Text>
+                                      <Text style={[styles.consumptionBoxValue, { color: '#2563EB' }]}>
+                                        {formatBytes(totalDownloadBytes)}
+                                      </Text>
+                                    </View>
+                                    <View style={styles.consumptionBox}>
+                                      <Text style={styles.consumptionBoxLabel}>UPLOAD</Text>
+                                      <Text style={styles.consumptionBoxValue}>
+                                        {formatBytes(totalUploadBytes)}
+                                      </Text>
+                                    </View>
+                                  </View>
+                                </View>
+
+                                {/* C. DAILY DOWNLOAD CHART (LAST 7 DAYS) */}
+                                <View style={styles.infoCard}>
+                                  <View style={styles.infoCardHeader}>
+                                    <Wifi size={18} color="#2563EB" style={{ marginRight: 8 }} />
+                                    <Text style={styles.infoCardHeaderTitle}>Download nos Últimos 7 Dias</Text>
+                                  </View>
+
+                                  {/* Custom CSS Bar Chart */}
+                                  <View style={styles.chartContainer}>
+                                    {last7Days.map((day, idx) => {
+                                      const heightPercentage = Math.max((day.downloadBytes / maxBytes) * 100, 3); // minimum 3% for visibility
+                                      return (
+                                        <View key={idx} style={styles.chartBarCol}>
+                                          <Text style={styles.chartBarTooltip}>
+                                            {day.downloadBytes > 0 ? formatBytesShort(day.downloadBytes) : '0'}
+                                          </Text>
+                                          <View style={styles.chartBarTrack}>
+                                            <View style={[styles.chartBarFill, { height: `${heightPercentage}%` }]} />
+                                          </View>
+                                          <Text style={styles.chartBarLabel}>{day.label}</Text>
+                                        </View>
+                                      );
+                                    })}
+                                  </View>
+                                </View>
+
+                                {/* D. CONNECTION HISTORY (LAST 5 SESSIONS) */}
+                                <View style={styles.sectionHeaderRow}>
+                                  <Clock size={16} color="#94A3B8" style={{ marginRight: 6 }} />
+                                  <Text style={styles.sectionTitle}>Histórico de Conexões</Text>
+                                </View>
+
+                                {(() => {
+                                  const displaySessions = conexaoSessions.slice(0, 5);
+                                  if (displaySessions.length === 0) {
+                                    return (
+                                      <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 20 }]}>
+                                        <Text style={styles.noBillsTitle}>Nenhuma sessão registrada.</Text>
+                                      </View>
+                                    );
+                                  }
+
+                                  return displaySessions.map((session, index) => {
+                                    const sessionOnline = session.acctstoptime === null;
+                                    const cause = session.acctterminatecause || 'Ativa';
+                                    
+                                    // Translate typical RADIUS terminate causes to Portuguese
+                                    let causeFriendly = cause;
+                                    if (cause === 'Lost-Carrier') causeFriendly = 'Queda de Sinal / Cabo';
+                                    else if (cause === 'User-Request') causeFriendly = 'Desconexão do Roteador';
+                                    else if (cause === 'Lost-Service') causeFriendly = 'Queda do Servidor';
+                                    else if (cause === 'Session-Timeout') causeFriendly = 'Tempo Limite';
+                                    else if (cause === 'Admin-Reset') causeFriendly = 'Reiniciado pelo Provedor';
+
+                                    return (
+                                      <View 
+                                        key={index} 
+                                        style={[
+                                          styles.paidBillCard, 
+                                          { borderLeftColor: sessionOnline ? '#10B981' : '#F59E0B' }
+                                        ]}
+                                      >
+                                        <View style={styles.paidBillMain}>
+                                          <View style={styles.paidBillInfo}>
+                                            <Text style={styles.sessionHistoryTitle}>
+                                              {formatDateBR(session.acctstarttime.split('T')[0])} às {session.acctstarttime.split('T')[1].substring(0, 5)}
+                                            </Text>
+                                            <Text style={styles.paidBillSub}>
+                                              Duração: {formatSessionDuration(session.acctstarttime, session.acctstoptime)}
+                                            </Text>
+                                            <Text style={[styles.paidBillSub, { color: sessionOnline ? '#10B981' : '#64748B' }]}>
+                                              Causa: {causeFriendly}
+                                            </Text>
+                                          </View>
+
+                                          <View style={styles.paidRightActions}>
+                                            <View style={{ alignItems: 'flex-end' }}>
+                                              <Text style={styles.sessionHistoryVolume}>
+                                                ↓ {formatBytes(session.acctoutputoctets || 0)}
+                                              </Text>
+                                              <Text style={[styles.paidBillSub, { marginTop: 0 }]}>
+                                                ↑ {formatBytes(session.acctinputoctets || 0)}
+                                              </Text>
+                                            </View>
+                                          </View>
+                                        </View>
+                                      </View>
+                                    );
+                                  });
+                                })()}
+                              </>
+                            );
+                          })()
+                        )}
                       </View>
                     )}
                   </ScrollView>
@@ -2091,6 +2415,85 @@ const styles = StyleSheet.create({
     borderColor: '#28354E',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  /* CONEXAO DETAILS STYLES */
+  connectionStatusContainer: {
+    width: '100%',
+  },
+  totalConsumptionRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  consumptionBox: {
+    flex: 1,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    borderRadius: 12,
+    padding: 12,
+  },
+  consumptionBoxLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  consumptionBoxValue: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    height: 150,
+    paddingTop: 10,
+    paddingBottom: 6,
+    width: '100%',
+  },
+  chartBarCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  chartBarTooltip: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  chartBarTrack: {
+    width: 14,
+    height: 90,
+    backgroundColor: '#161F30',
+    borderRadius: 7,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  chartBarFill: {
+    width: '100%',
+    backgroundColor: '#2563EB',
+    borderRadius: 7,
+  },
+  chartBarLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#64748B',
+    marginTop: 8,
+    textTransform: 'uppercase',
+  },
+  sessionHistoryTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  sessionHistoryVolume: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#2563EB',
   },
 
   /* MODAL STYLES */
