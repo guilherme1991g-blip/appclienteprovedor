@@ -133,6 +133,25 @@ function formatDateBR(dateStr: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+// Parses DD/MM/AAAA HH:MM:SS format to timestamp for mathematical sorting
+function parseOcorrenciaDate(dateStr: string): number {
+  if (!dateStr) return 0;
+  const parts = dateStr.split(' ');
+  if (parts.length < 2) return 0;
+  const dateParts = parts[0].split('/');
+  const timeParts = parts[1].split(':');
+  if (dateParts.length < 3 || timeParts.length < 2) return 0;
+
+  const day = parseInt(dateParts[0], 10);
+  const month = parseInt(dateParts[1], 10) - 1; // Months are 0-indexed in JS
+  const year = parseInt(dateParts[2], 10);
+  const hour = parseInt(timeParts[0], 10);
+  const minute = parseInt(timeParts[1], 10);
+  const second = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+
+  return new Date(year, month, day, hour, minute, second).getTime();
+}
+
 // Helper to format currency
 function formatCurrency(val: number | string): string {
   const num = typeof val === 'string' ? parseFloat(val) : val;
@@ -1244,7 +1263,7 @@ export default function LoginScreen() {
                           </View>
                         ) : (
                           suporteTickets
-                            .sort((a, b) => (b.oc_protocolo || '').localeCompare(a.oc_protocolo || ''))
+                            .sort((a, b) => parseOcorrenciaDate(b.oc_data_cadastro) - parseOcorrenciaDate(a.oc_data_cadastro))
                             .slice(0, 5)
                             .map((ticket, index) => {
                             const isClosed = (ticket.oc_status_descricao || '').toLowerCase().includes('encerra');
