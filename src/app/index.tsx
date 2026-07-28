@@ -1092,7 +1092,7 @@ export default function LoginScreen() {
                                               body {
                                                 margin: 0;
                                                 padding: 0;
-                                                background-color: #111625;
+                                                background-color: #FFFFFF;
                                                 overflow: hidden;
                                                 display: flex;
                                                 justify-content: center;
@@ -2393,14 +2393,14 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#111625',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#28354E',
     position: 'relative',
   },
   webview: {
     flex: 1,
-    backgroundColor: '#111625',
+    backgroundColor: '#FFFFFF',
   },
   webviewLoading: {
     position: 'absolute',
@@ -2408,7 +2408,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#111625',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,
