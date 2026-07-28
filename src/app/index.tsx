@@ -1283,7 +1283,7 @@ export default function LoginScreen() {
                             <Text style={styles.noBillsDesc}>Qualquer chamado aberto aparecerá listado aqui.</Text>
                           </View>
                         ) : (
-                          suporteTickets
+                          [...suporteTickets]
                             .sort((a, b) => parseOcorrenciaDate(b.oc_data_cadastro) - parseOcorrenciaDate(a.oc_data_cadastro))
                             .slice(0, 5)
                             .map((ticket, index) => {
