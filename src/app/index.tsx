@@ -221,6 +221,7 @@ export default function LoginScreen() {
 
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
+  const [loadingFinanceiro, setLoadingFinanceiro] = useState(false);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -366,6 +367,49 @@ export default function LoginScreen() {
       if (!supportContact) {
         setSupportContact(selectedContract.clientName || '');
       }
+    }
+  }, [activeTab, screenState, selectedContract]);
+
+  const fetchFinanceData = () => {
+    if (!selectedContract) return;
+    setLoadingFinanceiro(true);
+
+    const rawDoc = documentInput.replace(/\D/g, '');
+
+    fetch('https://webcnnect.sgp.tsmx.com.br/api/ura/clientes/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app: 'App',
+        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+        cpfcnpj: rawDoc,
+      }),
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        setLoadingFinanceiro(false);
+        if (response.ok && data) {
+          let rawTitulos: any[] = [];
+          const clientsList = data.clientes || [];
+          clientsList.forEach((client: any) => {
+            if (client.titulos && Array.isArray(client.titulos)) {
+              rawTitulos = rawTitulos.concat(client.titulos);
+            }
+          });
+          setAllTitulos(rawTitulos);
+        }
+      })
+      .catch((err) => {
+        setLoadingFinanceiro(false);
+        console.error('Fetch finance data error:', err);
+      });
+  };
+
+  React.useEffect(() => {
+    if (screenState === 'DASHBOARD' && activeTab === 'FINANCEIRO' && selectedContract) {
+      fetchFinanceData();
     }
   }, [activeTab, screenState, selectedContract]);
 
@@ -879,205 +923,213 @@ export default function LoginScreen() {
 
                     {activeTab === 'FINANCEIRO' && (
                       <View style={styles.financeiroTabWrapper}>
-                        
-                        {/* SECTION 1: OPEN / OVERDUE INVOICES */}
-                        <View style={styles.sectionHeaderRow}>
-                          <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 6 }} />
-                          <Text style={styles.sectionTitle}>Boletos em Aberto / A Vencer</Text>
-                        </View>
-
-                        {(() => {
-                          // Filter titles for current contract
-                          const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
-                          
-                          const today = new Date();
-                          today.setHours(0,0,0,0);
-
-                          // Select and mark overdue vs pending open bills
-                          const openBills = contractTitulos
-                            .filter(t => t.status !== 'pago' && t.status !== 'cancelado')
-                            .map(t => {
-                              const dueDate = new Date(t.dataVencimento + 'T12:00:00');
-                              const isOverdue = dueDate.getTime() < today.getTime();
-                              return { ...t, isOverdue };
-                            })
-                            .sort((a, b) => {
-                              // Overdue (Vencidos) always first
-                              if (a.isOverdue && !b.isOverdue) return -1;
-                              if (!a.isOverdue && b.isOverdue) return 1;
-                              // Closest due date next
-                              return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
-                            });
-
-                          // Pick top 3 open invoices
-                          const displayOpenBills = openBills.slice(0, 3);
-
-                          if (displayOpenBills.length === 0) {
-                            return (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 24 }]}>
-                                <CheckCircle size={36} color="#10B981" style={{ marginBottom: 10 }} />
-                                <Text style={styles.noBillsTitle}>Nenhum boleto em aberto!</Text>
-                                <Text style={styles.noBillsDesc}>Seu faturamento está em dia. Parabéns! 🎉</Text>
-                              </View>
-                            );
-                          }
-
-                          return displayOpenBills.map((bill) => (
-                            <View 
-                              key={bill.id} 
-                              style={[
-                                styles.billCard, 
-                                { borderLeftColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
-                              ]}
-                            >
-                              <View style={styles.billHeader}>
-                                <View style={styles.billMeta}>
-                                  <Text style={styles.billDueLabel}>VENCIMENTO</Text>
-                                  <Text style={styles.billDueDate}>{formatDateBR(bill.dataVencimento)}</Text>
-                                </View>
-                                <View style={[
-                                  styles.billStatusBadge,
-                                  { backgroundColor: bill.isOverdue ? '#EF444415' : '#2563EB15' }
-                                ]}>
-                                  <View style={[
-                                    styles.statusDot,
-                                    { backgroundColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
-                                  ]} />
-                                  <Text style={[
-                                    styles.billStatusText,
-                                    { color: bill.isOverdue ? '#EF4444' : '#2563EB' }
-                                  ]}>
-                                    {bill.isOverdue ? 'VENCIDO' : 'A VENCER'}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View style={styles.billPriceRow}>
-                                <Text style={styles.billPriceLabel}>VALOR COBRADO</Text>
-                                <Text style={styles.billPriceValue}>
-                                  {formatCurrency(bill.valorCorrigido || bill.valor)}
-                                </Text>
-                              </View>
-
-                              {/* ACTIONS BUTTONS ROW */}
-                              <View style={styles.billActionsContainer}>
-                                {bill.codigoPix ? (
-                                  <>
-                                    <TouchableOpacity
-                                      style={styles.actionPillBtn}
-                                      onPress={() => {
-                                        Clipboard.setString(bill.codigoPix);
-                                        alert('Chave Pix Copia e Cola copiada com sucesso!');
-                                      }}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Copy size={12} color="#FFFFFF" />
-                                      <Text style={styles.actionPillText}>Copiar PIX</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                      style={styles.actionPillSecondaryBtn}
-                                      onPress={() => {
-                                        setSelectedPixCode(bill.codigoPix);
-                                        setSelectedPixAmount(bill.valorCorrigido || bill.valor);
-                                      }}
-                                      activeOpacity={0.7}
-                                    >
-                                      <QrCode size={12} color="#94A3B8" />
-                                      <Text style={styles.actionPillSecondaryText}>QR Code</Text>
-                                    </TouchableOpacity>
-                                  </>
-                                ) : null}
-
-                                {bill.linhaDigitavel ? (
-                                  <TouchableOpacity
-                                    style={styles.actionPillSecondaryBtn}
-                                    onPress={() => {
-                                      Clipboard.setString(bill.linhaDigitavel);
-                                      alert('Código de barras copiado com sucesso!');
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Copy size={12} color="#94A3B8" />
-                                    <Text style={styles.actionPillSecondaryText}>Barras</Text>
-                                  </TouchableOpacity>
-                                ) : null}
-
-                                {bill.link ? (
-                                  <TouchableOpacity
-                                    style={styles.actionPillSecondaryBtn}
-                                    onPress={() => Linking.openURL(bill.link)}
-                                    activeOpacity={0.7}
-                                  >
-                                    <ExternalLink size={12} color="#94A3B8" />
-                                    <Text style={styles.actionPillSecondaryText}>PDF</Text>
-                                  </TouchableOpacity>
-                                ) : null}
-                              </View>
+                        {loadingFinanceiro ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                            <Text style={[styles.noBillsTitle, { marginTop: 16 }]}>Atualizando faturas...</Text>
+                            <Text style={styles.noBillsDesc}>Buscando dados financeiros mais recentes no SGP.</Text>
+                          </View>
+                        ) : (
+                          <>
+                            {/* SECTION 1: OPEN / OVERDUE INVOICES */}
+                            <View style={styles.sectionHeaderRow}>
+                              <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 6 }} />
+                              <Text style={styles.sectionTitle}>Boletos em Aberto / A Vencer</Text>
                             </View>
-                          ));
-                        })()}
 
-                        {/* SECTION 2: LAST PAID INVOICES */}
-                        <View style={[styles.sectionHeaderRow, { marginTop: 12 }]}>
-                          <CheckCircle size={16} color="#10B981" style={{ marginRight: 6 }} />
-                          <Text style={styles.sectionTitle}>Últimos Boletos Pagos</Text>
-                        </View>
+                            {(() => {
+                              // Filter titles for current contract
+                              const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
+                              
+                              const today = new Date();
+                              today.setHours(0,0,0,0);
 
-                        {(() => {
-                          const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
-                          
-                          // Get paid invoices sorted by due date descending (latest first)
-                          const paidBills = contractTitulos
-                            .filter(t => t.status === 'pago')
-                            .sort((a, b) => new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime());
+                              // Select and mark overdue vs pending open bills
+                              const openBills = contractTitulos
+                                .filter(t => t.status !== 'pago' && t.status !== 'cancelado')
+                                .map(t => {
+                                  const dueDate = new Date(t.dataVencimento + 'T12:00:00');
+                                  const isOverdue = dueDate.getTime() < today.getTime();
+                                  return { ...t, isOverdue };
+                                })
+                                .sort((a, b) => {
+                                  // Overdue (Vencidos) always first
+                                  if (a.isOverdue && !b.isOverdue) return -1;
+                                  if (!a.isOverdue && b.isOverdue) return 1;
+                                  // Closest due date next
+                                  return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
+                                });
 
-                          const displayPaidBills = paidBills.slice(0, 3);
+                              // Pick top 3 open invoices
+                              const displayOpenBills = openBills.slice(0, 3);
 
-                          if (displayPaidBills.length === 0) {
-                            return (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 20 }]}>
-                                <Text style={styles.noBillsTitle}>Nenhum boleto pago localizado.</Text>
-                              </View>
-                            );
-                          }
-
-                          return displayPaidBills.map((bill) => (
-                            <View key={bill.id} style={styles.paidBillCard}>
-                              <View style={styles.paidBillMain}>
-                                <View style={styles.paidBillInfo}>
-                                  <Text style={styles.paidBillTitle}>
-                                    {formatCurrency(bill.valorPago || bill.valor)}
-                                  </Text>
-                                  <Text style={styles.paidBillSub}>
-                                    Vencimento: {formatDateBR(bill.dataVencimento)}
-                                  </Text>
-                                  {bill.dataPagamento ? (
-                                    <Text style={styles.paidBillDate}>
-                                      Pago em: {formatDateBR(bill.dataPagamento)}
-                                    </Text>
-                                  ) : null}
-                                </View>
-
-                                <View style={styles.paidRightActions}>
-                                  <View style={styles.paidBadge}>
-                                    <Text style={styles.paidBadgeText}>PAGO</Text>
+                              if (displayOpenBills.length === 0) {
+                                return (
+                                  <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 24 }]}>
+                                    <CheckCircle size={36} color="#10B981" style={{ marginBottom: 10 }} />
+                                    <Text style={styles.noBillsTitle}>Nenhum boleto em aberto!</Text>
+                                    <Text style={styles.noBillsDesc}>Seu faturamento está em dia. Parabéns! 🎉</Text>
                                   </View>
-                                  {bill.link ? (
-                                    <TouchableOpacity
-                                      style={styles.paidPdfCircleBtn}
-                                      onPress={() => Linking.openURL(bill.link)}
-                                      activeOpacity={0.7}
-                                    >
-                                      <ExternalLink size={13} color="#94A3B8" />
-                                    </TouchableOpacity>
-                                  ) : null}
-                                </View>
-                              </View>
-                            </View>
-                          ));
-                        })()}
+                                );
+                              }
 
+                              return displayOpenBills.map((bill) => (
+                                <View 
+                                  key={bill.id} 
+                                  style={[
+                                    styles.billCard, 
+                                    { borderLeftColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
+                                  ]}
+                                >
+                                  <View style={styles.billHeader}>
+                                    <View style={styles.billMeta}>
+                                      <Text style={styles.billDueLabel}>VENCIMENTO</Text>
+                                      <Text style={styles.billDueDate}>{formatDateBR(bill.dataVencimento)}</Text>
+                                    </View>
+                                    <View style={[
+                                      styles.billStatusBadge,
+                                      { backgroundColor: bill.isOverdue ? '#EF444415' : '#2563EB15' }
+                                    ]}>
+                                      <View style={[
+                                        styles.statusDot,
+                                        { backgroundColor: bill.isOverdue ? '#EF4444' : '#2563EB' }
+                                      ]} />
+                                      <Text style={[
+                                        styles.billStatusText,
+                                        { color: bill.isOverdue ? '#EF4444' : '#2563EB' }
+                                      ]}>
+                                        {bill.isOverdue ? 'VENCIDO' : 'A VENCER'}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.billPriceRow}>
+                                    <Text style={styles.billPriceLabel}>VALOR COBRADO</Text>
+                                    <Text style={styles.billPriceValue}>
+                                      {formatCurrency(bill.valorCorrigido || bill.valor)}
+                                    </Text>
+                                  </View>
+
+                                  {/* ACTIONS BUTTONS ROW */}
+                                  <View style={styles.billActionsContainer}>
+                                    {bill.codigoPix ? (
+                                      <>
+                                        <TouchableOpacity
+                                          style={styles.actionPillBtn}
+                                          onPress={() => {
+                                            Clipboard.setString(bill.codigoPix);
+                                            alert('Código de pagamento Pix Copia e Cola copiado com sucesso!');
+                                          }}
+                                          activeOpacity={0.8}
+                                        >
+                                          <Copy size={12} color="#FFFFFF" />
+                                          <Text style={styles.actionPillText}>Copiar Pix</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                          style={styles.actionPillSecondaryBtn}
+                                          onPress={() => {
+                                            setSelectedPixCode(bill.codigoPix);
+                                            setSelectedPixAmount(bill.valorCorrigido || bill.valor);
+                                          }}
+                                          activeOpacity={0.7}
+                                        >
+                                          <QrCode size={12} color="#94A3B8" />
+                                          <Text style={styles.actionPillSecondaryText}>QR Code</Text>
+                                        </TouchableOpacity>
+                                      </>
+                                    ) : null}
+
+                                    {bill.linhaDigitavel ? (
+                                      <TouchableOpacity
+                                        style={styles.actionPillSecondaryBtn}
+                                        onPress={() => {
+                                          Clipboard.setString(bill.linhaDigitavel);
+                                          alert('Código de barras copiado com sucesso!');
+                                        }}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Copy size={12} color="#94A3B8" />
+                                        <Text style={styles.actionPillSecondaryText}>Barras</Text>
+                                      </TouchableOpacity>
+                                    ) : null}
+
+                                    {bill.link ? (
+                                      <TouchableOpacity
+                                        style={styles.actionPillSecondaryBtn}
+                                        onPress={() => Linking.openURL(bill.link)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <ExternalLink size={12} color="#94A3B8" />
+                                        <Text style={styles.actionPillSecondaryText}>PDF</Text>
+                                      </TouchableOpacity>
+                                    ) : null}
+                                  </View>
+                                </View>
+                              ));
+                            })()}
+
+                            {/* SECTION 2: LAST PAID INVOICES */}
+                            <View style={[styles.sectionHeaderRow, { marginTop: 12 }]}>
+                              <CheckCircle size={16} color="#10B981" style={{ marginRight: 6 }} />
+                              <Text style={styles.sectionTitle}>Últimos Boletos Pagos</Text>
+                            </View>
+
+                            {(() => {
+                              const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
+                              
+                              // Get paid invoices sorted by due date descending (latest first)
+                              const paidBills = contractTitulos
+                                .filter(t => t.status === 'pago')
+                                .sort((a, b) => new Date(b.dataVencimento).getTime() - new Date(a.dataVencimento).getTime());
+
+                              const displayPaidBills = paidBills.slice(0, 3);
+
+                              if (displayPaidBills.length === 0) {
+                                return (
+                                  <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 20 }]}>
+                                    <Text style={styles.noBillsTitle}>Nenhum boleto pago localizado.</Text>
+                                  </View>
+                                );
+                              }
+
+                              return displayPaidBills.map((bill) => (
+                                <View key={bill.id} style={styles.paidBillCard}>
+                                  <View style={styles.paidBillMain}>
+                                    <View style={styles.paidBillInfo}>
+                                      <Text style={styles.paidBillTitle}>
+                                        {formatCurrency(bill.valorPago || bill.valor)}
+                                      </Text>
+                                      <Text style={styles.paidBillSub}>
+                                        Vencimento: {formatDateBR(bill.dataVencimento)}
+                                      </Text>
+                                      {bill.dataPagamento ? (
+                                        <Text style={styles.paidBillDate}>
+                                          Pago em: {formatDateBR(bill.dataPagamento)}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+
+                                    <View style={styles.paidRightActions}>
+                                      <View style={styles.paidBadge}>
+                                        <Text style={styles.paidBadgeText}>PAGO</Text>
+                                      </View>
+                                      {bill.link ? (
+                                        <TouchableOpacity
+                                          style={styles.paidPdfCircleBtn}
+                                          onPress={() => Linking.openURL(bill.link)}
+                                          activeOpacity={0.7}
+                                        >
+                                          <ExternalLink size={13} color="#94A3B8" />
+                                        </TouchableOpacity>
+                                      ) : null}
+                                    </View>
+                                  </View>
+                                </View>
+                              ));
+                            })()}
+                          </>
+                        )}
                       </View>
                     )}
 
