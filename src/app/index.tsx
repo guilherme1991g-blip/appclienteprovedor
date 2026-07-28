@@ -104,6 +104,20 @@ function validateCNPJ(cnpj: string): boolean {
   return true;
 }
 
+// Returns the nearest business day (Mon-Fri) as 'YYYY-MM-DD HH:MM'
+function getNearestBusinessDayString(): string {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 6=Sat
+  if (day === 0) now.setDate(now.getDate() + 1); // Sunday -> Monday
+  if (day === 6) now.setDate(now.getDate() + 2); // Saturday -> Monday
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const hh = String(now.getHours()).padStart(2, '0');
+  const min = String(now.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+}
+
 // Formats document automatically to CPF or CNPJ mask
 function formatAutoDocument(value: string): string {
   const cleanValue = value.replace(/\D/g, '');
