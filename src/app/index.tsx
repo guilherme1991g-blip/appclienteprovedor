@@ -216,16 +216,29 @@ export default function LoginScreen() {
             });
           });
 
+          const validContracts = parsedContracts.filter(c => {
+            const statusLower = (c.status || '').toLowerCase().trim();
+            return statusLower === 'ativo' || statusLower === 'suspenso';
+          });
+          const invalidContracts = parsedContracts.filter(c => {
+            const statusLower = (c.status || '').toLowerCase().trim();
+            return statusLower !== 'ativo' && statusLower !== 'suspenso';
+          });
+
           if (parsedContracts.length === 0) {
-            setErrorMsg('Nenhum contrato ativo localizado.');
-          } else if (parsedContracts.length === 1) {
-            // If customer has exactly 1 contract, log in immediately
-            setSelectedContract(parsedContracts[0]);
+            setErrorMsg('Nenhum contrato localizado no seu documento.');
+          } else if (validContracts.length === 1) {
+            // If customer has exactly 1 valid contract, log in immediately
+            setSelectedContract(validContracts[0]);
             setScreenState('SUCCESS');
-          } else {
-            // If customer has multiple contracts, show the contract selection screen
-            setContracts(parsedContracts);
+          } else if (validContracts.length > 1) {
+            // If customer has multiple valid contracts, show only the valid ones
+            setContracts(validContracts);
             setScreenState('SELECT_CONTRACT');
+          } else {
+            // If customer has only invalid contracts, select the first one to show the "Contrato Cancelado" screen
+            setSelectedContract(invalidContracts[0]);
+            setScreenState('SUCCESS');
           }
         } else {
           const message = data?.message || data?.error || 'Documento não localizado na base.';
