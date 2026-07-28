@@ -133,23 +133,41 @@ function formatDateBR(dateStr: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Parses DD/MM/AAAA HH:MM:SS format to timestamp for mathematical sorting
+// Parses DD/MM/AAAA HH:MM:SS or ISO 8601 format to timestamp for mathematical sorting
 function parseOcorrenciaDate(dateStr: string): number {
   if (!dateStr) return 0;
-  const parts = dateStr.split(' ');
-  if (parts.length < 2) return 0;
-  const dateParts = parts[0].split('/');
-  const timeParts = parts[1].split(':');
-  if (dateParts.length < 3 || timeParts.length < 2) return 0;
+  
+  // Try direct parsing first for ISO/standard formats
+  const parsed = Date.parse(dateStr);
+  if (!isNaN(parsed) && !dateStr.includes('/')) {
+    return parsed;
+  }
 
-  const day = parseInt(dateParts[0], 10);
-  const month = parseInt(dateParts[1], 10) - 1; // Months are 0-indexed in JS
-  const year = parseInt(dateParts[2], 10);
-  const hour = parseInt(timeParts[0], 10);
-  const minute = parseInt(timeParts[1], 10);
-  const second = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+  try {
+    const parts = dateStr.split(' ');
+    if (parts.length >= 1) {
+      const dateParts = parts[0].split('/');
+      if (dateParts.length === 3) {
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1; // Months are 0-indexed in JS
+        const year = parseInt(dateParts[2], 10);
+        
+        let hour = 0, minute = 0, second = 0;
+        if (parts[1]) {
+          const timeParts = parts[1].split(':');
+          hour = parseInt(timeParts[0], 10) || 0;
+          minute = parseInt(timeParts[1], 10) || 0;
+          second = timeParts[2] ? parseInt(timeParts[2], 10) : 0;
+        }
+        
+        return new Date(year, month, day, hour, minute, second).getTime();
+      }
+    }
+  } catch (e) {
+    console.error('parseOcorrenciaDate error:', e);
+  }
 
-  return new Date(year, month, day, hour, minute, second).getTime();
+  return 0;
 }
 
 // Helper to format currency
@@ -301,6 +319,7 @@ export default function LoginScreen() {
     })
       .then(async (res) => {
         const data = await res.json();
+        console.log('Ocorrências recebidas da API para contrato', selectedContract.id, ':', data);
         setLoadingSuporte(false);
         if (Array.isArray(data)) {
           setSuporteTickets(data);
