@@ -13,6 +13,8 @@ import {
   Clipboard,
   Modal,
   Image,
+  ImageBackground,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -27,6 +29,7 @@ import {
   FileText,
   CreditCard,
   MessageSquare,
+  MessageCircle,
   Activity,
   LogOut,
   Eye,
@@ -37,9 +40,33 @@ import {
   QrCode,
   Clock,
   CircleDot,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Square,
+  CheckSquare,
+  Unlock,
+  Bell,
+  X,
 } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import BrandLogo from '@/components/BrandLogo';
+import { APP_CONFIG } from '@/config/providerConfig';
+import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
+
+// Configure foreground notification behavior
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
 
 // Helper function to validate CPF (Brazilian Taxpayer Registry for Individuals)
 function validateCPF(cpf: string): boolean {
@@ -221,12 +248,64 @@ function formatSessionDuration(start: string, stop: string | null): string {
   return `${diffMins} min`;
 }
 
+// Helper to extract phone number from SGP client/contract response
+function extractClientPhone(client: any, contrato?: any): string {
+  if (!client) return '';
+
+  const searchInObj = (obj: any): string => {
+    if (!obj || typeof obj !== 'object') return '';
+    const keys = Object.keys(obj);
+    for (const key of keys) {
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey.includes('cpf') ||
+        lowerKey.includes('cnpj') ||
+        lowerKey === 'id' ||
+        lowerKey.includes('data') ||
+        lowerKey.includes('vencimento') ||
+        lowerKey.includes('valor')
+      ) {
+        continue;
+      }
+      const val = obj[key];
+      if (typeof val === 'string' || typeof val === 'number') {
+        const cleaned = String(val).replace(/\D/g, '');
+        if (cleaned.length >= 10 && cleaned.length <= 13) {
+          return cleaned;
+        }
+      } else if (typeof val === 'object' && val !== null) {
+        const res = searchInObj(val);
+        if (res) return res;
+      }
+    }
+    return '';
+  };
+
+  let foundPhone = '';
+
+  if (client.contatos) {
+    foundPhone = searchInObj(client.contatos);
+  }
+
+  if (!foundPhone) {
+    foundPhone = searchInObj(client);
+  }
+
+  if (!foundPhone && contrato) {
+    foundPhone = searchInObj(contrato);
+  }
+
+  console.log('Resultado da busca de telefone:', foundPhone);
+  return foundPhone;
+}
+
 interface ContractDisplay {
   id: number;
   planName: string;
   address: string;
   status: string;
   clientName: string;
+  phone?: string;
   // Metadata Details
   popId?: string;
   dataCadastro?: string;
@@ -255,10 +334,251 @@ interface ContractDisplay {
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
-type TabName = 'PLANO' | 'FINANCEIRO' | 'HOME' | 'SUPORTE' | 'TESTE';
+async function registerForPushNotificationsAsync() {
+  let token = null;
+
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Notificações do Provedor',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2563EB',
+    });
+  }
+
+  if (Device.isDevice) {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== 'granted') {
+      console.log('Permissão de notificações não concedida pelo usuário.');
+      return null;
+    }
+    try {
+      const tokenData = await Notifications.getExpoPushTokenAsync();
+      token = tokenData.data;
+    } catch (e) {
+      console.log('Aviso Expo Push Token:', e);
+      try {
+        const deviceToken = await Notifications.getDevicePushTokenAsync();
+        token = deviceToken.data;
+      } catch (err2) {
+        console.log('Aviso Device Push Token:', err2);
+      }
+    }
+  } else {
+    console.log('Para testar push real de servidor, utilize um aparelho celular físico.');
+  }
+
+  return token;
+}
 
 export default function LoginScreen() {
+  const [providerConfig, setProviderConfig] = useState<ProviderConfig>({
+    codigo: APP_CONFIG.PROVIDER_CODE,
+    nome: 'WebConnect Telecom',
+    api_url: 'https://webcnnect.sgp.tsmx.com.br',
+    api_token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+    api_app: 'App',
+    logo_url: undefined,
+    webhook_url: 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp',
+    primary_color: '#2563EB',
+    secondary_color: '#1E40AF',
+    accent_color: '#10B981',
+  });
+
+  const primaryColor = providerConfig.primary_color || '#2563EB';
+  const secondaryColor = providerConfig.secondary_color || '#1E40AF';
+  const accentColor = providerConfig.accent_color || '#10B981';
+
+  const [rememberMe, setRememberMe] = useState(true);
+
+  React.useEffect(() => {
+    getProviderConfig(APP_CONFIG.PROVIDER_CODE).then(config => {
+      if (config) {
+        setProviderConfig(config);
+      }
+    });
+  }, []);
+
   const [documentInput, setDocumentInput] = useState('');
+
+  // Restaura sessão salva caso o cliente tenha optado por "Manter-me conectado"
+  React.useEffect(() => {
+    const restoreSavedSession = async () => {
+      try {
+        const savedDoc = await AsyncStorage.getItem('@isp_app_saved_doc');
+        const savedContractId = await AsyncStorage.getItem('@isp_app_saved_contract_id');
+
+        if (savedDoc) {
+          setDocumentInput(savedDoc);
+          const raw = savedDoc.replace(/\D/g, '');
+          const isCpf = raw.length <= 11;
+          const valid = isCpf ? (raw.length === 11 && validateCPF(raw)) : (raw.length === 14 && validateCNPJ(raw));
+          setDetectedType(isCpf ? 'CPF' : 'CNPJ');
+          setIsValid(valid);
+
+          if (valid) {
+            setLoading(true);
+            const config = await getProviderConfig(APP_CONFIG.PROVIDER_CODE);
+            const apiUrl = config?.api_url || providerConfig.api_url;
+            const apiToken = config?.api_token || providerConfig.api_token;
+            const apiApp = config?.api_app || providerConfig.api_app;
+
+            const res = await fetch(`${apiUrl}/api/ura/clientes/`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                app: apiApp,
+                token: apiToken,
+                cpfcnpj: raw,
+              }),
+            });
+            const data = await res.json();
+            setLoading(false);
+
+            if (res.ok && data) {
+              const parsedContracts: ContractDisplay[] = [];
+              let rawTitulos: any[] = [];
+              const clientsList = data.clientes || [];
+              clientsList.forEach((client: any) => {
+                if (client.titulos && Array.isArray(client.titulos)) {
+                  rawTitulos = rawTitulos.concat(client.titulos);
+                }
+                const contractsList = client.contratos || [];
+                contractsList.forEach((contrato: any) => {
+                  let planName = 'Plano de Internet';
+                  let pppoeLogin = '';
+                  let pppoeSenha = '';
+                  let ip = '';
+                  let mac = '';
+                  let grupo = '';
+                  let wifiSsid = '';
+                  let wifiPassword = '';
+                  let wifiSsid5 = '';
+                  let wifiPassword5 = '';
+
+                  if (contrato.servicos && Array.isArray(contrato.servicos) && contrato.servicos.length > 0) {
+                    const serv = contrato.servicos[0];
+                    if (serv.plano) {
+                      if (typeof serv.plano === 'object') {
+                        planName = serv.plano.descricao || serv.plano.nome || serv.plano.description || 'Plano de Internet';
+                      } else if (typeof serv.plano === 'string') {
+                        planName = serv.plano;
+                      }
+                    }
+                    pppoeLogin = serv.login || '';
+                    pppoeSenha = serv.senha || '';
+                    ip = serv.ip || '';
+                    mac = serv.mac || '';
+                    grupo = serv.grupo || '';
+                    wifiSsid = serv.wifi_ssid || '';
+                    wifiPassword = serv.wifi_password || '';
+                    wifiSsid5 = serv.wifi_ssid_5 || '';
+                    wifiPassword5 = serv.wifi_password_5 || '';
+                  }
+
+                  let addressStr = '';
+                  let street = '';
+                  let num = '';
+                  let neighborhood = '';
+                  let city = '';
+                  let state = '';
+                  let cep = '';
+
+                  const addr = contrato.endereco || client.endereco;
+                  if (addr) {
+                    if (typeof addr === 'object') {
+                      street = addr.logradouro || '';
+                      num = addr.numero || '';
+                      neighborhood = addr.bairro || '';
+                      city = addr.cidade || '';
+                      state = addr.uf || '';
+                      cep = addr.cep || '';
+
+                      const parts = [];
+                      if (addr.logradouro) parts.push(addr.logradouro);
+                      if (addr.numero) parts.push(addr.numero);
+                      if (addr.bairro) parts.push(addr.bairro);
+                      if (addr.cidade) parts.push(addr.cidade);
+                      if (addr.uf) parts.push(addr.uf);
+                      addressStr = parts.join(', ');
+                    } else if (typeof addr === 'string') {
+                      addressStr = addr;
+                    }
+                  }
+
+                  parsedContracts.push({
+                    id: contrato.id,
+                    planName,
+                    address: addressStr || 'Endereço não cadastrado',
+                    status: contrato.status || 'Ativo',
+                    clientName: client.nome || 'Cliente',
+                    phone: extractClientPhone(client, contrato),
+                    popId: contrato.pop_id || '',
+                    dataCadastro: contrato.dataCadastro || '',
+                    vencimento: contrato.vencimento || '',
+                    formaCobranca: contrato.formaCobranca || '',
+                    centralLogin: contrato.contratoCentralLogin || '',
+                    centralSenha: contrato.contratoCentralSenha || '',
+                    pppoeLogin,
+                    pppoeSenha,
+                    ip,
+                    mac,
+                    grupo,
+                    wifiSsid,
+                    wifiPassword,
+                    wifiSsid5,
+                    wifiPassword5,
+                    street,
+                    number: num,
+                    neighborhood,
+                    city,
+                    state,
+                    cep,
+                  });
+                });
+              });
+
+              setAllTitulos(rawTitulos);
+
+              const validContracts = parsedContracts.filter(c => {
+                const statusLower = (c.status || '').toLowerCase().trim();
+                return statusLower === 'ativo' || statusLower === 'suspenso';
+              });
+
+              if (validContracts.length === 1) {
+                setSelectedContract(validContracts[0]);
+                setActiveTab('HOME');
+                setScreenState('DASHBOARD');
+              } else if (validContracts.length > 1) {
+                setContracts(validContracts);
+                if (savedContractId) {
+                  const matched = validContracts.find(c => c.id.toString() === savedContractId);
+                  if (matched) {
+                    setSelectedContract(matched);
+                    setActiveTab('HOME');
+                    setScreenState('DASHBOARD');
+                  } else {
+                    setScreenState('SELECT_CONTRACT');
+                  }
+                } else {
+                  setScreenState('SELECT_CONTRACT');
+                }
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Session restore error:', e);
+      }
+    };
+
+    restoreSavedSession();
+  }, []);
   const [detectedType, setDetectedType] = useState<'CPF' | 'CNPJ'>('CPF');
   const [isFocused, setIsFocused] = useState(false);
   const [isValid, setIsValid] = useState(false);
@@ -283,6 +603,106 @@ export default function LoginScreen() {
   const [selectedPixCode, setSelectedPixCode] = useState<string | null>(null);
   const [selectedPixAmount, setSelectedPixAmount] = useState<string | number | null>(null);
 
+  // Push Notifications State
+  const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
+  const [receivedNotification, setReceivedNotification] = useState<Notifications.Notification | null>(null);
+
+  React.useEffect(() => {
+    registerForPushNotificationsAsync().then(token => {
+      if (token) {
+        setExpoPushToken(token);
+        console.log('Expo Push Token obtido:', token);
+      }
+    });
+
+    const notificationListener = Notifications.addNotificationReceivedListener(noti => {
+      setReceivedNotification(noti);
+      console.log('Notificação recebida no app:', noti);
+    });
+
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notificação tocada pelo usuário:', response);
+    });
+
+    return () => {
+      try {
+        notificationListener?.remove?.();
+        responseListener?.remove?.();
+      } catch (e) {}
+    };
+  }, []);
+
+  const syncPushTokenToSupabase = async (contractObj?: ContractDisplay | null, docNumber?: string) => {
+    if (!expoPushToken) return;
+    try {
+      const rawPhone = (contractObj?.phone || '').replace(/\D/g, '');
+      const cleanCpf = (docNumber || documentInput || '').replace(/\D/g, '');
+
+      let phoneWithout55 = rawPhone;
+      let phoneWith55 = rawPhone;
+
+      if (rawPhone) {
+        phoneWithout55 = rawPhone.startsWith('55') && rawPhone.length >= 12 ? rawPhone.substring(2) : rawPhone;
+        phoneWith55 = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+      }
+
+      const primaryPhoneKey = phoneWithout55 || cleanCpf || (contractObj ? `contract_${contractObj.id}` : '');
+      if (!primaryPhoneKey) return;
+
+      console.log('Sincronizando Push Token no Supabase:', {
+        telefone: primaryPhoneKey,
+        telefone_completo: phoneWith55 || cleanCpf,
+        contrato_id: contractObj?.id || null,
+        cpf: cleanCpf,
+      });
+
+      const { error } = await supabase.from('push_tokens').upsert({
+        telefone: primaryPhoneKey,
+        telefone_completo: phoneWith55 || cleanCpf,
+        contrato_id: contractObj?.id || null,
+        cpf: cleanCpf,
+        push_token: expoPushToken,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'telefone' });
+
+      if (error) {
+        console.log('Aviso ao sincronizar token no Supabase:', error.message);
+      } else {
+        console.log('Push token sincronizado no Supabase com sucesso:', primaryPhoneKey);
+      }
+    } catch (e) {
+      console.log('Exceção syncPushTokenToSupabase:', e);
+    }
+  };
+
+  React.useEffect(() => {
+    if (selectedContract && expoPushToken) {
+      syncPushTokenToSupabase(selectedContract, documentInput);
+    }
+  }, [selectedContract, expoPushToken]);
+
+  const sendTestPushNotification = async () => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: '🔔 Teste de Notificação',
+          body: 'Seu aplicativo está pronto para receber avisos de faturas e comunicados!',
+          data: { modulo: 'teste' },
+          sound: true,
+        },
+        trigger: null,
+      });
+      Alert.alert(
+        '🔔 Central de Notificações',
+        `Seu aplicativo está ativo para receber notificações!\n\nPush Token:\n${expoPushToken ? expoPushToken.substring(0, 25) + '...' : 'Registrando...'}\n\nEnviamos uma notificação de teste para o seu celular.`,
+        [{ text: 'OK' }]
+      );
+    } catch (e) {
+      console.error('Erro ao agendar notificação:', e);
+      Alert.alert('Erro', 'Não foi possível disparar a notificação de teste.');
+    }
+  };
+
   // Toggle Visibility for passwords
   const [showPppoePassword, setShowPppoePassword] = useState(false);
   const [showWifiPassword, setShowWifiPassword] = useState(false);
@@ -293,8 +713,105 @@ export default function LoginScreen() {
   const [supportContact, setSupportContact] = useState('');
   const [supportPhone, setSupportPhone] = useState('');
   const [supportMotive, setSupportMotive] = useState('2'); // default to '2' (Suporte - Sem Acesso)
+  const [isMotiveDropdownOpen, setIsMotiveDropdownOpen] = useState(false);
   const [supportContent, setSupportContent] = useState('');
   const [submittingSupport, setSubmittingSupport] = useState(false);
+
+  // Notifications Center Modal State & Realtime Unread Badge
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const lastSeenIdRef = React.useRef<string | null>(null);
+
+  const fetchNotificationHistory = async (showLoading = false): Promise<any[]> => {
+    if (showLoading) setLoadingNotifications(true);
+    try {
+      const rawPhone = (selectedContract?.phone || '').replace(/\D/g, '');
+      const cleanCpf = (documentInput || '').replace(/\D/g, '');
+      const phoneWithout55 = rawPhone.startsWith('55') && rawPhone.length >= 12 ? rawPhone.substring(2) : rawPhone;
+
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      let query = supabase.from('notificacoes_historico').select('*').gte('created_at', sevenDaysAgo);
+      
+      const filterConditions = [];
+      if (phoneWithout55) filterConditions.push(`telefone.eq.${phoneWithout55}`);
+      if (rawPhone) filterConditions.push(`telefone_completo.eq.${rawPhone}`);
+      if (cleanCpf) filterConditions.push(`telefone.eq.${cleanCpf}`);
+
+      if (filterConditions.length > 0) {
+        query = query.or(filterConditions.join(','));
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
+
+      if (error) {
+        console.log('Aviso ao carregar histórico de notificações:', error.message);
+        return [];
+      } else {
+        setNotificationHistory(data || []);
+        return data || [];
+      }
+    } catch (err) {
+      console.log('Exceção ao buscar notificações:', err);
+      return [];
+    } finally {
+      if (showLoading) setLoadingNotifications(false);
+    }
+  };
+
+  // Active polling & Supabase Realtime Listener for new incoming notifications
+  React.useEffect(() => {
+    if (!selectedContract) return;
+
+    const checkNewNotifications = async () => {
+      const data = await fetchNotificationHistory();
+      if (data && data.length > 0) {
+        const newest = data[0];
+        if (newest && newest.id) {
+          if (lastSeenIdRef.current !== null && newest.id !== lastSeenIdRef.current) {
+            setUnreadCount(prev => prev + 1);
+          }
+          lastSeenIdRef.current = newest.id;
+        }
+      }
+    };
+
+    checkNewNotifications();
+    const interval = setInterval(checkNewNotifications, 10000);
+
+    const channelName = `realtime_notif_${Date.now()}`;
+    const channel = supabase
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notificacoes_historico' },
+        (payload) => {
+          console.log('Nova notificação recebida em tempo real via Supabase:', payload.new);
+          if (payload.new && payload.new.id) {
+            if (lastSeenIdRef.current === payload.new.id) return;
+            lastSeenIdRef.current = payload.new.id;
+          }
+
+          setUnreadCount(prev => prev + 1);
+          setNotificationHistory(prev => [payload.new, ...prev]);
+        }
+      )
+      .subscribe((status) => {
+        console.log(`Status Conexão Realtime (${channelName}):`, status);
+      });
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [selectedContract]);
+
+  const handleOpenNotificationCenter = () => {
+    setIsNotificationModalOpen(true);
+    setUnreadCount(0); // Clears unread badge when opening notification center
+    fetchNotificationHistory(true);
+  };
 
   const formatPhone = (text: string) => {
     const raw = text.replace(/\D/g, '').substring(0, 11);
@@ -313,32 +830,27 @@ export default function LoginScreen() {
     if (!selectedContract) return;
     setLoadingSuporte(true);
 
-    const bodyData = {
-      token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
-      app: 'App',
-      cpfcnpj: documentInput.replace(/\D/g, '')
-    };
+    const contratoId = parseInt(selectedContract.id.toString(), 10) || selectedContract.id;
 
-    const postData = Object.keys(bodyData)
-      .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
-      .join('&');
-
-    fetch('https://webcnnect.sgp.tsmx.com.br/api/central/chamado/list/', {
+    fetch(`${providerConfig.api_url}/api/ura/ocorrencia/list/`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Type': 'application/json',
       },
-      body: postData
+      body: JSON.stringify({
+        app: providerConfig.api_app,
+        token: providerConfig.api_token,
+        contrato: contratoId,
+      })
     })
       .then(async (res) => {
         const data = await res.json();
-        console.log('Ocorrências recebidas da API para contrato', selectedContract.id, ':', data);
+        console.log('Ocorrências recebidas da URA API para contrato', contratoId, ':', data);
         setLoadingSuporte(false);
-        if (Array.isArray(data)) {
-          setSuporteTickets(data);
-        } else {
-          setSuporteTickets([]);
-        }
+        const list = Array.isArray(data)
+          ? data
+          : (data && Array.isArray(data.ocorrencias) ? data.ocorrencias : []);
+        setSuporteTickets(list);
       })
       .catch((err) => {
         setLoadingSuporte(false);
@@ -373,8 +885,8 @@ export default function LoginScreen() {
     }
 
     const bodyData = {
-      token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
-      app: 'App',
+      token: providerConfig.api_token,
+      app: providerConfig.api_app,
       cpfcnpj: documentInput.replace(/\D/g, ''),
       contrato: selectedContract!.id.toString(),
       conteudo: supportContent.trim(),
@@ -393,7 +905,7 @@ export default function LoginScreen() {
       .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
       .join('&');
 
-    fetch('https://webcnnect.sgp.tsmx.com.br/api/central/chamado/', {
+    fetch(`${providerConfig.api_url}/api/central/chamado/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -413,6 +925,34 @@ export default function LoginScreen() {
             alert(`Erro ao abrir chamado: ${data.msg}`);
           } else {
             alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
+            
+            // Dispara dados para o Webhook do n8n
+            const protocoloStr = data.protocolo || 'N/A';
+            const clienteStr = selectedContract?.clientName || 'Cliente';
+            const descricaoStr = supportContent.trim();
+            const localStr = selectedContract?.neighborhood || selectedContract?.city || 'Não informado';
+            const obsStr = 'Aberto pelo app do cliente';
+
+            const webhookMessage = `🚨 *OS Aberta!!*\n📋 *Protocolo:* ${protocoloStr}\n👤 *Cliente:* ${clienteStr}\n📝 *Descrição:* ${descricaoStr}\n📍 *Local:* ${localStr}\n📝 *Obs:* ${obsStr}`;
+
+            const targetWebhook = providerConfig.webhook_url || 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp';
+
+            fetch(targetWebhook, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                mensagem: webhookMessage,
+                text: webhookMessage,
+                protocolo: protocoloStr,
+                cliente: clienteStr,
+                descricao: descricaoStr,
+                local: localStr,
+                obs: obsStr,
+              }),
+            }).catch((wErr) => console.error('Erro ao enviar ocorrência para o webhook:', wErr));
+
             setSupportContent('');
             setSupportMotive('5');
             fetchSupportTickets();
@@ -440,14 +980,14 @@ export default function LoginScreen() {
 
     const rawDoc = documentInput.replace(/\D/g, '');
 
-    fetch('https://webcnnect.sgp.tsmx.com.br/api/ura/clientes/', {
+    fetch(`${providerConfig.api_url}/api/ura/clientes/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        app: 'App',
-        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+        app: providerConfig.api_app,
+        token: providerConfig.api_token,
         cpfcnpj: rawDoc,
       }),
     })
@@ -472,10 +1012,10 @@ export default function LoginScreen() {
   };
 
   React.useEffect(() => {
-    if (screenState === 'DASHBOARD' && activeTab === 'FINANCEIRO' && selectedContract) {
+    if (screenState === 'DASHBOARD' && selectedContract) {
       fetchFinanceData();
     }
-  }, [activeTab, screenState, selectedContract]);
+  }, [screenState, selectedContract]);
 
   // Fetch connection status and history dynamically
   React.useEffect(() => {
@@ -483,8 +1023,8 @@ export default function LoginScreen() {
       setLoadingConexao(true);
       
       const bodyData = {
-        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
-        app: 'App',
+        token: providerConfig.api_token,
+        app: providerConfig.api_app,
         username: selectedContract.pppoeLogin,
       };
       
@@ -492,7 +1032,7 @@ export default function LoginScreen() {
         .map(key => encodeURIComponent(key) + '=' + encodeURIComponent(bodyData[key as keyof typeof bodyData]))
         .join('&');
 
-      fetch('https://webcnnect.sgp.tsmx.com.br/ws/radius/radacct/list/all/', {
+      fetch(`${providerConfig.api_url}/ws/radius/radacct/list/all/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -552,14 +1092,14 @@ export default function LoginScreen() {
     setErrorMsg('');
 
     // Calls URA clientes API
-    fetch('https://webcnnect.sgp.tsmx.com.br/api/ura/clientes/', {
+    fetch(`${providerConfig.api_url}/api/ura/clientes/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        app: 'App',
-        token: '9720002b-a4f6-4c48-9a20-65f86669f6d6',
+        app: providerConfig.api_app,
+        token: providerConfig.api_token,
         cpfcnpj: raw,
       }),
     })
@@ -652,6 +1192,7 @@ export default function LoginScreen() {
                 address: addressStr || 'Endereço não cadastrado',
                 status: contrato.status || 'Ativo',
                 clientName: client.nome || 'Cliente',
+                phone: extractClientPhone(client, contrato),
                 popId: contrato.pop_id || '',
                 dataCadastro: contrato.dataCadastro || '',
                 vencimento: contrato.vencimento || '',
@@ -690,19 +1231,27 @@ export default function LoginScreen() {
 
           if (parsedContracts.length === 0) {
             setErrorMsg('Nenhum contrato localizado no seu documento.');
-          } else if (validContracts.length === 1) {
-            // If customer has exactly 1 valid contract, log in immediately
-            setSelectedContract(validContracts[0]);
-            setActiveTab('HOME');
-            setScreenState('DASHBOARD');
-          } else if (validContracts.length > 1) {
-            // If customer has multiple valid contracts, show only the valid ones
-            setContracts(validContracts);
-            setScreenState('SELECT_CONTRACT');
           } else {
-            // If customer has only invalid contracts, select the first one to show the "Contrato Cancelado" screen
-            setSelectedContract(invalidContracts[0]);
-            setScreenState('DASHBOARD');
+            if (rememberMe) {
+              AsyncStorage.setItem('@isp_app_saved_doc', documentInput).catch(() => {});
+            } else {
+              AsyncStorage.removeItem('@isp_app_saved_doc').catch(() => {});
+              AsyncStorage.removeItem('@isp_app_saved_contract_id').catch(() => {});
+            }
+
+            if (validContracts.length === 1) {
+              if (rememberMe) {
+                AsyncStorage.setItem('@isp_app_saved_contract_id', validContracts[0].id.toString()).catch(() => {});
+              }
+              setSelectedContract(validContracts[0]);
+              setActiveTab('HOME');
+              setScreenState('DASHBOARD');
+            } else if (validContracts.length > 1) {
+              setContracts(validContracts);
+              setScreenState('SELECT_CONTRACT');
+            } else {
+              setErrorMsg('Não foi localizado nenhum contrato Ativo ou Suspenso vinculado a este documento.');
+            }
           }
         } else {
           const message = data?.message || data?.error || 'Documento não localizado na base.';
@@ -717,12 +1266,21 @@ export default function LoginScreen() {
   };
 
   const handleContractSelect = (contract: ContractDisplay) => {
+    if (rememberMe) {
+      AsyncStorage.setItem('@isp_app_saved_contract_id', contract.id.toString()).catch(() => {});
+    }
     setSelectedContract(contract);
     setActiveTab('HOME');
     setScreenState('DASHBOARD');
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await AsyncStorage.removeItem('@isp_app_saved_doc');
+      await AsyncStorage.removeItem('@isp_app_saved_contract_id');
+    } catch (e) {
+      console.error('Logout remove storage error:', e);
+    }
     setScreenState('LOGIN');
     setDocumentInput('');
     setIsValid(false);
@@ -735,6 +1293,219 @@ export default function LoginScreen() {
     setSelectedPixAmount(null);
     setShowPppoePassword(false);
     setShowWifiPassword(false);
+  };
+
+  const [loadingTrustUnlock, setLoadingTrustUnlock] = useState(false);
+
+  const handleOpenWhatsApp = () => {
+    const num = providerConfig.whatsapp_number;
+    if (!num) {
+      alert('Número de WhatsApp não configurado.');
+      return;
+    }
+    const cleanNumber = num.replace(/\D/g, '');
+    const finalNum = cleanNumber.startsWith('55') ? cleanNumber : `55${cleanNumber}`;
+    const url = `https://wa.me/${finalNum}`;
+    Linking.openURL(url).catch(() => {
+      alert('Não foi possível abrir o WhatsApp.');
+    });
+  };
+
+  const handleTrustUnlock = () => {
+    if (!selectedContract) return;
+
+    // Calculate promise date: Today + 3 days -> YYYY-MM-DD
+    const promiseDate = new Date();
+    promiseDate.setDate(promiseDate.getDate() + 3);
+    const yyyy = promiseDate.getFullYear();
+    const mm = String(promiseDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(promiseDate.getDate()).padStart(2, '0');
+    const formattedDate = `${yyyy}-${mm}-${dd}`;
+
+    setLoadingTrustUnlock(true);
+
+    fetch(`${providerConfig.api_url}/api/ura/liberacaopromessa/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app: providerConfig.api_app,
+        token: providerConfig.api_token,
+        contrato: selectedContract.id,
+        data_promessa: formattedDate,
+      }),
+    })
+      .then(async (res) => {
+        setLoadingTrustUnlock(false);
+        const data = await res.json();
+        console.log('Trust Unlock Response:', data);
+
+        if (res.ok && (data.liberado === true || data.status === 1 || data.sucesso)) {
+          const msg = 'Efetue o pagamento o quanto antes para não ter o serviço suspenso novamente.';
+          Alert.alert('Serviço liberado!', msg);
+          // Update selected contract status locally to 'Ativo'
+          setSelectedContract(prev => prev ? { ...prev, status: 'Ativo' } : null);
+        } else {
+          const errorText = (typeof data.msg === 'string' && data.msg.trim()) 
+            ? data.msg.trim() 
+            : (data.message || data.error || data.erro || 'Não foi possível realizar o desbloqueio em confiança.');
+          Alert.alert('Desbloqueio Indisponível', errorText);
+        }
+      })
+      .catch((err) => {
+        setLoadingTrustUnlock(false);
+        console.error('Trust Unlock Error:', err);
+        Alert.alert('Erro de Conexão', 'Falha ao comunicar com o servidor. Tente novamente.');
+      });
+  };
+
+  const [refreshingHomeStatus, setRefreshingHomeStatus] = useState(false);
+
+  const refreshContractStatus = (docOverride?: string, contractIdOverride?: number) => {
+    const docToUse = (docOverride || documentInput || '').replace(/\D/g, '');
+    const activeContractId = contractIdOverride || selectedContract?.id;
+
+    if (!docToUse) return;
+
+    setRefreshingHomeStatus(true);
+
+    fetch(`${providerConfig.api_url}/api/ura/clientes/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        app: providerConfig.api_app,
+        token: providerConfig.api_token,
+        cpfcnpj: docToUse,
+      }),
+    })
+      .then(async (response) => {
+        setRefreshingHomeStatus(false);
+        const data = await response.json();
+        if (response.ok && data) {
+          let updatedContract: ContractDisplay | null = null;
+          let rawTitulos: any[] = [];
+
+          const clientsList = data.clientes || [];
+          clientsList.forEach((client: any) => {
+            if (client.titulos && Array.isArray(client.titulos)) {
+              rawTitulos = rawTitulos.concat(client.titulos);
+            }
+            const contractsList = client.contratos || [];
+            contractsList.forEach((contrato: any) => {
+              if (activeContractId && contrato.id === activeContractId) {
+                let planName = 'Plano de Internet';
+                let pppoeLogin = '';
+                let pppoeSenha = '';
+                let ip = '';
+                let mac = '';
+                let grupo = '';
+                let wifiSsid = '';
+                let wifiPassword = '';
+                let wifiSsid5 = '';
+                let wifiPassword5 = '';
+
+                if (contrato.servicos && Array.isArray(contrato.servicos) && contrato.servicos.length > 0) {
+                  const serv = contrato.servicos[0];
+                  if (serv.plano) {
+                    if (typeof serv.plano === 'object') {
+                      planName = serv.plano.descricao || serv.plano.nome || serv.plano.description || 'Plano de Internet';
+                    } else if (typeof serv.plano === 'string') {
+                      planName = serv.plano;
+                    }
+                  }
+                  pppoeLogin = serv.login || '';
+                  pppoeSenha = serv.senha || '';
+                  ip = serv.ip || '';
+                  mac = serv.mac || '';
+                  grupo = serv.grupo || '';
+                  wifiSsid = serv.wifi_ssid || '';
+                  wifiPassword = serv.wifi_password || '';
+                  wifiSsid5 = serv.wifi_ssid_5 || '';
+                  wifiPassword5 = serv.wifi_password_5 || '';
+                }
+
+                let addressStr = '';
+                let street = '';
+                let num = '';
+                let neighborhood = '';
+                let city = '';
+                let state = '';
+                let cep = '';
+
+                const addr = contrato.endereco || client.endereco;
+                if (addr) {
+                  if (typeof addr === 'object') {
+                    street = addr.logradouro || '';
+                    num = addr.numero || '';
+                    neighborhood = addr.bairro || '';
+                    city = addr.cidade || '';
+                    state = addr.uf || '';
+                    cep = addr.cep || '';
+
+                    const parts = [];
+                    if (addr.logradouro) parts.push(addr.logradouro);
+                    if (addr.numero) parts.push(addr.numero);
+                    if (addr.bairro) parts.push(addr.bairro);
+                    if (addr.cidade) parts.push(addr.cidade);
+                    if (addr.uf) parts.push(addr.uf);
+                    addressStr = parts.join(', ');
+                  } else if (typeof addr === 'string') {
+                    addressStr = addr;
+                  }
+                }
+
+                updatedContract = {
+                  id: contrato.id,
+                  planName,
+                  address: addressStr || 'Endereço não cadastrado',
+                  status: contrato.status || 'Ativo',
+                  clientName: client.nome || 'Cliente',
+                  popId: contrato.pop_id || '',
+                  dataCadastro: contrato.dataCadastro || '',
+                  vencimento: contrato.vencimento || '',
+                  formaCobranca: contrato.formaCobranca || '',
+                  centralLogin: contrato.contratoCentralLogin || '',
+                  centralSenha: contrato.contratoCentralSenha || '',
+                  pppoeLogin,
+                  pppoeSenha,
+                  ip,
+                  mac,
+                  grupo,
+                  wifiSsid,
+                  wifiPassword,
+                  wifiSsid5,
+                  wifiPassword5,
+                  street,
+                  number: num,
+                  neighborhood,
+                  city,
+                  state,
+                  cep,
+                };
+              }
+            });
+          });
+
+          if (updatedContract) {
+            setSelectedContract(updatedContract);
+          }
+          if (rawTitulos.length > 0) {
+            setAllTitulos(rawTitulos);
+          }
+        }
+      })
+      .catch((err) => {
+        setRefreshingHomeStatus(false);
+        console.error('Refresh status error:', err);
+      });
+  };
+
+  const handleGoHome = () => {
+    setActiveTab('HOME');
+    refreshContractStatus();
   };
 
   return (
@@ -769,13 +1540,29 @@ export default function LoginScreen() {
                         </View>
                       </View>
                     </View>
-                    <TouchableOpacity
-                      style={styles.logoutButton}
-                      onPress={handleLogout}
-                      activeOpacity={0.7}
-                    >
-                      <LogOut size={16} color="#EF4444" />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={handleOpenNotificationCenter}
+                        activeOpacity={0.7}
+                      >
+                        <Bell size={16} color={unreadCount > 0 ? "#EF4444" : "#2563EB"} />
+                        {unreadCount > 0 && (
+                          <View style={styles.unreadBadgeDot}>
+                            <Text style={styles.unreadBadgeText}>
+                              {unreadCount > 9 ? '9+' : unreadCount}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.logoutButton}
+                        onPress={handleLogout}
+                        activeOpacity={0.7}
+                      >
+                        <LogOut size={16} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
@@ -810,12 +1597,119 @@ export default function LoginScreen() {
                     keyboardShouldPersistTaps="handled"
                   >
                     {activeTab === 'HOME' && (
-                      <View style={styles.tabContentCard}>
-                        <Home size={32} color="#2563EB" style={styles.tabContentIcon} />
-                        <Text style={styles.tabContentTitle}>Início</Text>
-                        <Text style={styles.tabContentDesc}>
-                          Bem-vindo à Central do Cliente WebConnect. Use o menu abaixo para navegar pelo seu aplicativo.
-                        </Text>
+                      <View style={styles.planoTabWrapper}>
+                        {/* SUSPENDED SERVICE WARNING CARD WITH TRUST UNLOCK */}
+                        {statusLower === 'suspenso' || statusLower === 'bloqueado' ? (
+                          <View style={styles.suspendedWarningCard}>
+                            <View style={styles.suspendedCardHeader}>
+                              <View style={styles.suspendedIconBadge}>
+                                <AlertTriangle size={24} color="#EF4444" />
+                              </View>
+                              <View style={styles.suspendedHeaderCol}>
+                                <Text style={styles.suspendedTitle}>Serviço Bloqueado</Text>
+                                <Text style={styles.suspendedSubtitle}>Seu contrato encontra-se suspenso</Text>
+                              </View>
+                            </View>
+
+                            <Text style={styles.suspendedDesc}>
+                              Identificamos pendências no pagamento da sua assinatura. Você pode realizar o <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>Desbloqueio em Confiança</Text> para liberar seu sinal imediatamente por 3 dias.
+                            </Text>
+
+                            <TouchableOpacity
+                              style={styles.trustUnlockBtn}
+                              onPress={handleTrustUnlock}
+                              disabled={loadingTrustUnlock}
+                              activeOpacity={0.8}
+                            >
+                              {loadingTrustUnlock ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <View style={styles.trustUnlockBtnContent}>
+                                  <Unlock size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                  <Text style={styles.trustUnlockBtnText}>Desbloqueio em Confiança (3 Dias)</Text>
+                                </View>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        ) : null}
+
+                        {/* 1. NEXT BILL / OVERDUE CARD */}
+                        {(() => {
+                          const contractTitulos = allTitulos.filter(t => t.clientecontrato_id === selectedContract.id);
+                          const today = new Date();
+                          today.setHours(0,0,0,0);
+
+                          const openBills = contractTitulos
+                            .filter(t => t.status !== 'pago' && t.status !== 'cancelado')
+                            .map(t => {
+                              const dueDate = new Date(t.dataVencimento + 'T12:00:00');
+                              const isOverdue = dueDate.getTime() < today.getTime();
+                              return { ...t, isOverdue };
+                            })
+                            .sort((a, b) => {
+                              if (a.isOverdue && !b.isOverdue) return -1;
+                              if (!a.isOverdue && b.isOverdue) return 1;
+                              return new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime();
+                            });
+
+                          const nextBill = openBills[0] || null;
+
+                          if (!nextBill) {
+                            return (
+                              <View style={[styles.infoCard, { borderLeftWidth: 4, borderLeftColor: '#10B981', paddingVertical: 20 }]}>
+                                <View style={styles.infoCardHeader}>
+                                  <CheckCircle size={20} color="#10B981" style={{ marginRight: 8 }} />
+                                  <Text style={styles.infoCardHeaderTitle}>Faturamento em Dia</Text>
+                                </View>
+                                <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 6 }}>
+                                  Você não possui nenhuma parcela em aberto no momento. Parabéns! 🎉
+                                </Text>
+                              </View>
+                            );
+                          }
+
+                          const isOverdue = nextBill.isOverdue;
+                          const borderColor = isOverdue ? '#EF4444' : '#2563EB';
+                          const statusBg = isOverdue ? '#EF444415' : '#2563EB15';
+                          const statusText = isOverdue ? 'PARCELA VENCIDA' : 'A VENCER';
+                          const statusColor = isOverdue ? '#EF4444' : '#2563EB';
+
+                          return (
+                            <View style={[styles.infoCard, { borderLeftWidth: 4, borderLeftColor: borderColor }]}>
+                              <View style={styles.infoCardHeader}>
+                                <CreditCard size={18} color={borderColor} style={{ marginRight: 8 }} />
+                                <Text style={styles.infoCardHeaderTitle}>Próxima Parcela</Text>
+                                <View style={[styles.billStatusBadge, { backgroundColor: statusBg, marginLeft: 'auto' }]}>
+                                  <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                                  <Text style={[styles.billStatusText, { color: statusColor, fontWeight: '700' }]}>
+                                    {statusText}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={{ marginTop: 10 }}>
+                                <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                                  Vencimento: {formatDateBR(nextBill.dataVencimento)}
+                                </Text>
+                                <Text style={{ color: isOverdue ? '#EF4444' : '#FFFFFF', fontSize: 24, fontWeight: '800', marginTop: 4 }}>
+                                  {formatCurrency(nextBill.valorCorrigido || nextBill.valor)}
+                                </Text>
+                              </View>
+
+                              <TouchableOpacity
+                                style={[
+                                  styles.supportSubmitBtn,
+                                  { backgroundColor: isOverdue ? '#DC2626' : '#2563EB', marginTop: 14 }
+                                ]}
+                                onPress={() => setActiveTab('FINANCEIRO')}
+                                activeOpacity={0.8}
+                              >
+                                <CreditCard size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                <Text style={styles.supportSubmitBtnText}>Pagar</Text>
+                              </TouchableOpacity>
+                            </View>
+                          );
+                        })()}
                       </View>
                     )}
 
@@ -1207,32 +2101,61 @@ export default function LoginScreen() {
                           </View>
 
                           <View style={styles.formGroup}>
-                            <Text style={styles.formLabel}>Motivo do Chamado</Text>
-                            <View style={styles.motiveChipsRow}>
-                              {[
-                                { label: 'Acesso Lento', value: '1' },
-                                { label: 'Sem Conexão', value: '2' },
-                                { label: 'Mudança de Endereço', value: '4' },
-                                { label: 'Outros Assuntos', value: '5' }
-                              ].map((item) => (
-                                <TouchableOpacity
-                                  key={item.value}
-                                  style={[
-                                    styles.motiveChip,
-                                    supportMotive === item.value && styles.motiveChipActive
-                                  ]}
-                                  onPress={() => setSupportMotive(item.value)}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={[
-                                    styles.motiveChipText,
-                                    supportMotive === item.value && styles.motiveChipTextActive
-                                  ]}>
-                                    {item.label}
-                                  </Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
+                            <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
+                            <TouchableOpacity
+                              style={styles.dropdownSelector}
+                              onPress={() => setIsMotiveDropdownOpen(!isMotiveDropdownOpen)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.dropdownSelectorText}>
+                                {[
+                                  { label: 'Acesso Lento', value: '1' },
+                                  { label: 'Sem Conexão', value: '2' },
+                                  { label: 'Mudança de Endereço', value: '4' },
+                                  { label: 'Outros Assuntos', value: '5' }
+                                ].find(item => item.value === supportMotive)?.label || 'Selecione o motivo'}
+                              </Text>
+                              {isMotiveDropdownOpen ? (
+                                <ChevronUp size={20} color="#64748B" />
+                              ) : (
+                                <ChevronDown size={20} color="#64748B" />
+                              )}
+                            </TouchableOpacity>
+
+                            {isMotiveDropdownOpen && (
+                              <View style={styles.dropdownMenu}>
+                                {[
+                                  { label: 'Acesso Lento', value: '1' },
+                                  { label: 'Sem Conexão', value: '2' },
+                                  { label: 'Mudança de Endereço', value: '4' },
+                                  { label: 'Outros Assuntos', value: '5' }
+                                ].map((item) => {
+                                  const isSelected = supportMotive === item.value;
+                                  return (
+                                    <TouchableOpacity
+                                      key={item.value}
+                                      style={[
+                                        styles.dropdownItem,
+                                        isSelected && styles.dropdownItemActive
+                                      ]}
+                                      onPress={() => {
+                                        setSupportMotive(item.value);
+                                        setIsMotiveDropdownOpen(false);
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Text style={[
+                                        styles.dropdownItemText,
+                                        isSelected && styles.dropdownItemTextActive
+                                      ]}>
+                                        {item.label}
+                                      </Text>
+                                      {isSelected && <Check size={16} color="#2563EB" />}
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            )}
                           </View>
 
                           <View style={styles.formGroup}>
@@ -1283,61 +2206,89 @@ export default function LoginScreen() {
                           </View>
                         ) : (
                           [...suporteTickets]
-                            .sort((a, b) => parseOcorrenciaDate(b.oc_data_cadastro) - parseOcorrenciaDate(a.oc_data_cadastro))
-                            .slice(0, 5)
+                            .sort((a, b) => {
+                              const dateA = parseOcorrenciaDate(a.data_cadastro || a.oc_data_cadastro || '');
+                              const dateB = parseOcorrenciaDate(b.data_cadastro || b.oc_data_cadastro || '');
+                              return dateB - dateA;
+                            })
+                            .slice(0, 10)
                             .map((ticket, index) => {
-                            const isClosed = (ticket.oc_status_descricao || '').toLowerCase().includes('encerra');
-                            return (
-                              <View key={index} style={styles.ticketCard}>
-                                <View style={styles.ticketHeader}>
-                                  <View style={styles.ticketTypeRow}>
+                              const statusStr = (ticket.status || ticket.oc_status_descricao || 'Aberta').toString();
+                              const isClosed = statusStr.toLowerCase().includes('encerra');
+                              const protocol = ticket.numero || ticket.oc_protocolo || ticket.id;
+                              const dataCad = ticket.data_cadastro
+                                ? (ticket.data_cadastro.includes('-') ? formatDateBR(ticket.data_cadastro) : ticket.data_cadastro)
+                                : ticket.oc_data_cadastro;
+                              const tipo = ticket.tipo || ticket.oc_tipo_descricao || 'Suporte';
+                              const conteudo = (ticket.conteudo || ticket.oc_conteudo || '').toString().trim();
+                              const ordensServico = ticket.ordens_servicos || [];
+
+                              return (
+                                <View key={ticket.id || index} style={styles.ticketCard}>
+                                  <View style={styles.ticketHeader}>
+                                    <View style={styles.ticketTypeRow}>
+                                      <View style={[
+                                        styles.ticketStatusDot,
+                                        { backgroundColor: isClosed ? '#10B981' : '#F59E0B' }
+                                      ]} />
+                                      <Text style={styles.ticketTypeTitle}>{tipo}</Text>
+                                    </View>
                                     <View style={[
-                                      styles.ticketStatusDot,
-                                      { backgroundColor: isClosed ? '#10B981' : '#F59E0B' }
-                                    ]} />
-                                    <Text style={styles.ticketTypeTitle}>{ticket.oc_tipo_descricao || 'Suporte'}</Text>
-                                  </View>
-                                  <View style={[
-                                    styles.billStatusBadge,
-                                    { backgroundColor: isClosed ? '#10B98115' : '#F59E0B15' }
-                                  ]}>
-                                    <Text style={[
-                                      styles.billStatusText,
-                                      { color: isClosed ? '#10B981' : '#F59E0B', fontSize: 9 }
+                                      styles.billStatusBadge,
+                                      { backgroundColor: isClosed ? '#10B98115' : '#F59E0B15' }
                                     ]}>
-                                      {(ticket.oc_status_descricao || 'Aberta').toUpperCase()}
-                                    </Text>
+                                      <Text style={[
+                                        styles.billStatusText,
+                                        { color: isClosed ? '#10B981' : '#F59E0B', fontSize: 9 }
+                                      ]}>
+                                        {statusStr.toUpperCase()}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={styles.ticketBody}>
+                                    {protocol ? <Text style={styles.ticketProtocolText}>Protocolo / Nº: {protocol}</Text> : null}
+                                    {dataCad ? <Text style={styles.ticketDateText}>Aberto em: {dataCad}</Text> : null}
+                                    
+                                    {conteudo ? (
+                                      <View style={styles.ticketContentBox}>
+                                        <Text style={styles.ticketContentText}>{conteudo}</Text>
+                                      </View>
+                                    ) : null}
+
+                                    {ordensServico.length > 0 ? (
+                                      ordensServico.map((osItem: any, osIdx: number) => (
+                                        <View key={osItem.id || osIdx} style={styles.osDetailsContainer}>
+                                          <Text style={styles.osDetailsTitle}>Ordem de Serviço Vinculada</Text>
+                                          <View style={styles.osDetailsRow}>
+                                            <Text style={styles.osDetailsLabel}>OS nº {osItem.id} ({osItem.motivo || osItem.tipo || 'OS'})</Text>
+                                            <Text style={[
+                                              styles.osDetailsStatus,
+                                              { color: (osItem.status || '').toLowerCase().includes('encerra') ? '#10B981' : '#3B82F6' }
+                                            ]}>
+                                              {osItem.status || 'Pendente'}
+                                            </Text>
+                                          </View>
+                                        </View>
+                                      ))
+                                    ) : ticket.os_id ? (
+                                      <View style={styles.osDetailsContainer}>
+                                        <Text style={styles.osDetailsTitle}>Ordem de Serviço Vinculada</Text>
+                                        <View style={styles.osDetailsRow}>
+                                          <Text style={styles.osDetailsLabel}>OS nº {ticket.os_id}</Text>
+                                          <Text style={[
+                                            styles.osDetailsStatus,
+                                            { color: (ticket.os_status_descricao || '').toLowerCase().includes('encerra') ? '#10B981' : '#3B82F6' }
+                                          ]}>
+                                            {ticket.os_status_descricao || 'Pendente'}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                    ) : null}
                                   </View>
                                 </View>
-
-                                <View style={styles.ticketBody}>
-                                  <Text style={styles.ticketProtocolText}>Protocolo: {ticket.oc_protocolo}</Text>
-                                  <Text style={styles.ticketDateText}>Aberto em: {ticket.oc_data_cadastro}</Text>
-                                  
-                                  {ticket.oc_conteudo ? (
-                                    <View style={styles.ticketContentBox}>
-                                      <Text style={styles.ticketContentText}>{ticket.oc_conteudo.trim()}</Text>
-                                    </View>
-                                  ) : null}
-
-                                  {ticket.os_id ? (
-                                    <View style={styles.osDetailsContainer}>
-                                      <Text style={styles.osDetailsTitle}>Ordem de Serviço Vinculada</Text>
-                                      <View style={styles.osDetailsRow}>
-                                        <Text style={styles.osDetailsLabel}>OS nº {ticket.os_id}</Text>
-                                        <Text style={[
-                                          styles.osDetailsStatus,
-                                          { color: (ticket.os_status_descricao || '').toLowerCase().includes('encerra') ? '#10B981' : '#3B82F6' }
-                                        ]}>
-                                          {ticket.os_status_descricao || 'Pendente'}
-                                        </Text>
-                                      </View>
-                                    </View>
-                                  ) : null}
-                                </View>
-                              </View>
-                            );
-                          })
+                              );
+                            })
                         )}
                       </View>
                     )}
@@ -1520,18 +2471,42 @@ export default function LoginScreen() {
                     )}
                   </ScrollView>
 
-                  {/* BOTTOM NAVIGATION TAB BAR (Floating capsule with shadows) */}
+                  {/* FLOATING WHATSAPP BANNER (Fixed right above bottom tab bar on HOME) */}
+                  {activeTab === 'HOME' && (
+                    <View style={styles.whatsappFloatingContainer}>
+                      <TouchableOpacity
+                        style={styles.whatsappBanner}
+                        onPress={handleOpenWhatsApp}
+                        activeOpacity={0.85}
+                      >
+                        <View style={styles.whatsappIconCircle}>
+                          <MessageCircle size={20} color="#FFFFFF" />
+                        </View>
+                        <View style={styles.whatsappInfoCol}>
+                          <Text style={styles.whatsappBannerTitle}>Falar com Atendimento</Text>
+                          <Text style={styles.whatsappBannerSubtitle}>Suporte direto via WhatsApp</Text>
+                        </View>
+                        <View style={styles.whatsappPillBtn}>
+                          <Text style={styles.whatsappPillText}>Conversar</Text>
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* BOTTOM NAVIGATION TAB BAR WITH DYNAMIC ACTIVE ELEVATION */}
                   <View style={styles.bottomTabBarContainer}>
                     <View style={styles.bottomTabBar}>
-                      {/* Tab 1: Plano */}
+                      {/* Tab 1: Contrato */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('PLANO')}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
-                        <FileText size={18} color={activeTab === 'PLANO' ? '#2563EB' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? '#2563EB' : '#64748B' }]}>
-                          Plano
+                        <View style={[styles.tabIconWrapper, activeTab === 'PLANO' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <FileText size={20} color={activeTab === 'PLANO' ? '#FFFFFF' : '#64748B'} />
+                        </View>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'PLANO' ? primaryColor : '#64748B', fontWeight: activeTab === 'PLANO' ? '800' : '600' }]}>
+                          Contrato
                         </Text>
                       </TouchableOpacity>
 
@@ -1539,51 +2514,54 @@ export default function LoginScreen() {
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('FINANCEIRO')}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
-                        <CreditCard size={18} color={activeTab === 'FINANCEIRO' ? '#2563EB' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? '#2563EB' : '#64748B' }]}>
+                        <View style={[styles.tabIconWrapper, activeTab === 'FINANCEIRO' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <CreditCard size={20} color={activeTab === 'FINANCEIRO' ? '#FFFFFF' : '#64748B'} />
+                        </View>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? primaryColor : '#64748B', fontWeight: activeTab === 'FINANCEIRO' ? '800' : '600' }]}>
                           Financeiro
                         </Text>
                       </TouchableOpacity>
 
-                      {/* Tab 3: Home (Floating central button, raised layout) */}
-                      <View style={styles.floatingHomeButtonContainer}>
-                        <TouchableOpacity
-                          style={[
-                            styles.floatingHomeButton,
-                            { backgroundColor: activeTab === 'HOME' ? '#2563EB' : '#1E293B' }
-                          ]}
-                          onPress={() => setActiveTab('HOME')}
-                          activeOpacity={0.8}
-                        >
-                          <Home size={20} color="#FFFFFF" />
-                        </TouchableOpacity>
-                        <Text style={[styles.tabLabel, { marginTop: 2, color: activeTab === 'HOME' ? '#2563EB' : '#64748B' }]}>
-                          Home
+                      {/* Tab 3: Início (Home in the Middle) */}
+                      <TouchableOpacity
+                        style={styles.tabButton}
+                        onPress={handleGoHome}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.tabIconWrapper, activeTab === 'HOME' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <Home size={20} color={activeTab === 'HOME' ? '#FFFFFF' : '#64748B'} />
+                        </View>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'HOME' ? primaryColor : '#64748B', fontWeight: activeTab === 'HOME' ? '800' : '600' }]}>
+                          Início
                         </Text>
-                      </View>
+                      </TouchableOpacity>
 
                       {/* Tab 4: Suporte */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('SUPORTE')}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
-                        <MessageSquare size={18} color={activeTab === 'SUPORTE' ? '#2563EB' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? '#2563EB' : '#64748B' }]}>
+                        <View style={[styles.tabIconWrapper, activeTab === 'SUPORTE' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <MessageSquare size={20} color={activeTab === 'SUPORTE' ? '#FFFFFF' : '#64748B'} />
+                        </View>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'SUPORTE' ? '800' : '600' }]}>
                           Suporte
                         </Text>
                       </TouchableOpacity>
 
-                      {/* Tab 5: Teste de Conexão */}
+                      {/* Tab 5: Conexão */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('TESTE')}
-                        activeOpacity={0.7}
+                        activeOpacity={0.8}
                       >
-                        <Activity size={18} color={activeTab === 'TESTE' ? '#2563EB' : '#64748B'} />
-                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? '#2563EB' : '#64748B' }]}>
+                        <View style={[styles.tabIconWrapper, activeTab === 'TESTE' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <Activity size={20} color={activeTab === 'TESTE' ? '#FFFFFF' : '#64748B'} />
+                        </View>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'TESTE' ? '800' : '600' }]}>
                           Conexão
                         </Text>
                       </TouchableOpacity>
@@ -1651,6 +2629,65 @@ export default function LoginScreen() {
                     </View>
                   </Modal>
 
+                  {/* CENTRAL DE NOTIFICAÇÕES POPUP MODAL */}
+                  <Modal
+                    visible={isNotificationModalOpen}
+                    transparent={true}
+                    animationType="fade"
+                    onRequestClose={() => setIsNotificationModalOpen(false)}
+                  >
+                    <View style={styles.modalOverlay}>
+                      <View style={[styles.modalContainer, { maxHeight: '80%', width: '90%', maxWidth: 420 }]}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <Bell size={24} color="#2563EB" />
+                            <Text style={styles.modalTitle}>Avisos & Notificações</Text>
+                          </View>
+                          <TouchableOpacity onPress={() => setIsNotificationModalOpen(false)} style={{ padding: 4 }}>
+                            <X size={20} color="#94A3B8" />
+                          </TouchableOpacity>
+                        </View>
+
+                        {loadingNotifications ? (
+                          <View style={{ padding: 30, alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                            <Text style={{ color: '#94A3B8', marginTop: 12, fontSize: 13 }}>Buscando mensagens...</Text>
+                          </View>
+                        ) : notificationHistory.length === 0 ? (
+                          <View style={{ padding: 30, alignItems: 'center' }}>
+                            <Bell size={48} color="#28354E" style={{ marginBottom: 12 }} />
+                            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>Nenhum aviso no momento</Text>
+                            <Text style={{ color: '#94A3B8', fontSize: 12, textAlign: 'center', marginTop: 6 }}>
+                              As notificações de faturas e comunicados enviados pelo seu provedor aparecerão aqui!
+                            </Text>
+                          </View>
+                        ) : (
+                          <ScrollView style={{ width: '100%', maxHeight: 350 }} showsVerticalScrollIndicator={false}>
+                            {notificationHistory.map((item, idx) => (
+                              <View key={item.id || idx} style={{ backgroundColor: '#182235', padding: 14, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#28354E' }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                                  <Text style={{ color: '#60A5FA', fontWeight: '800', fontSize: 13 }}>{item.titulo || 'Aviso do Provedor 📡'}</Text>
+                                  <Text style={{ color: '#64748B', fontSize: 10 }}>
+                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : ''}
+                                  </Text>
+                                </View>
+                                <Text style={{ color: '#E2E8F0', fontSize: 13, lineHeight: 18 }}>{item.mensagem}</Text>
+                              </View>
+                            ))}
+                          </ScrollView>
+                        )}
+
+                        <TouchableOpacity
+                          style={[styles.modalCloseBtn, { width: '100%', marginTop: 16 }]}
+                          onPress={() => setIsNotificationModalOpen(false)}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.modalCloseBtnText}>Fechar</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </Modal>
+
                 </View>
               );
             } else {
@@ -1700,12 +2737,11 @@ export default function LoginScreen() {
         ) : (
           /* LOGIN and SELECT_CONTRACT States inside ScrollView container */
           <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
-            
             {screenState === 'LOGIN' && (
               <View style={styles.mainWrapper}>
                 {/* TOP CONTAINER - Logo */}
                 <View style={styles.topContainer}>
-                  <BrandLogo />
+                  <BrandLogo logoUrl={providerConfig.logo_url} />
                 </View>
 
                 {/* CENTER CONTAINER - Form */}
@@ -1728,7 +2764,7 @@ export default function LoginScreen() {
                             borderColor: errorMsg
                               ? '#EF4444'
                               : isFocused
-                              ? '#2563EB'
+                              ? primaryColor
                               : '#28354E',
                           },
                         ]}
@@ -1762,12 +2798,26 @@ export default function LoginScreen() {
                       )}
                     </View>
 
+                    {/* Manter-me conectado Checkbox */}
+                    <TouchableOpacity
+                      style={styles.rememberMeContainer}
+                      onPress={() => setRememberMe(!rememberMe)}
+                      activeOpacity={0.7}
+                    >
+                      {rememberMe ? (
+                        <CheckSquare size={18} color={primaryColor} />
+                      ) : (
+                        <Square size={18} color="#64748B" />
+                      )}
+                      <Text style={styles.rememberMeText}>Manter-me conectado</Text>
+                    </TouchableOpacity>
+
                     {/* Submit Button */}
                     <TouchableOpacity
                       style={[
                         styles.submitButton,
                         {
-                          backgroundColor: '#2563EB',
+                          backgroundColor: primaryColor,
                           opacity: isValid && !loading ? 1 : 0.5,
                         },
                       ]}
@@ -1804,7 +2854,7 @@ export default function LoginScreen() {
                 
                 {/* TOP CONTAINER - Logo */}
                 <View style={styles.topContainer}>
-                  <BrandLogo />
+                  <BrandLogo logoUrl={providerConfig.logo_url} />
                 </View>
 
                 {/* CENTER CONTAINER - Selection Card list */}
@@ -1992,6 +3042,207 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 6,
     color: '#10B981',
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    marginTop: 4,
+    paddingHorizontal: 2,
+  },
+  rememberMeText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  suspendedWarningCard: {
+    width: '100%',
+    backgroundColor: '#1E1015',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  suspendedCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  suspendedIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#EF444420',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: '#EF444440',
+  },
+  suspendedHeaderCol: {
+    flex: 1,
+  },
+  suspendedTitle: {
+    color: '#EF4444',
+    fontSize: 17,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  suspendedSubtitle: {
+    color: '#F87171',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  suspendedDesc: {
+    color: '#CBD5E1',
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  trustUnlockBtn: {
+    backgroundColor: '#F59E0B',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#F59E0B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  trustUnlockBtnContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trustUnlockBtnText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  whatsappFloatingContainer: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 102 : 92,
+    left: 16,
+    right: 16,
+    zIndex: 99,
+  },
+
+  bottomTabBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    backgroundColor: '#0F172A', // Dark navbar background
+    borderTopWidth: 1.5,
+    borderTopColor: '#1E293B',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 6,
+  },
+  bottomTabBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    height: 58,
+    width: '100%',
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+  },
+  tabIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTabElevatedIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#2563EB',
+    marginTop: -22, // Elevates the active button dynamically!
+    borderWidth: 3,
+    borderColor: '#0F172A',
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  tabLabel: {
+    fontSize: 10,
+    marginTop: 2,
+    letterSpacing: 0.1,
+  },
+  whatsappBanner: {
+    backgroundColor: '#111625',
+    borderWidth: 1.5,
+    borderColor: '#25D36640',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  whatsappIconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#25D366',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    shadowColor: '#25D366',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  whatsappInfoCol: {
+    flex: 1,
+  },
+  whatsappBannerTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  whatsappBannerSubtitle: {
+    color: '#94A3B8',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  whatsappPillBtn: {
+    backgroundColor: '#25D36615',
+    borderWidth: 1,
+    borderColor: '#25D366',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+  },
+  whatsappPillText: {
+    color: '#25D366',
+    fontSize: 12,
+    fontWeight: '700',
   },
   submitButton: {
     height: 46,
@@ -2311,6 +3562,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#111625',
   },
+  unreadBadgeDot: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    backgroundColor: '#EF4444',
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#111625',
+  },
+  unreadBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '900',
+  },
   badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2364,7 +3634,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 120, // Give extra bottom space to prevent items hidden behind floating bar
+    paddingBottom: 200, // Extra bottom padding for floating WhatsApp banner & elevated menu bar
     justifyContent: 'flex-start',
     alignItems: 'center',
   },
@@ -2398,63 +3668,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-  bottomTabBarContainer: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 24 : 16, // floating offsets
-    left: 16,
-    right: 16,
-    zIndex: 100,
-  },
-  bottomTabBar: {
-    backgroundColor: '#111625', // Floating Slate obsidian capsule
-    borderWidth: 1.5,
-    borderColor: '#28354E',
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    height: 64,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.35,
-    shadowRadius: 15,
-    elevation: 8,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: '100%',
-    paddingTop: 4,
-  },
-  tabLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    marginTop: 3,
-    textTransform: 'uppercase',
-    letterSpacing: 0.2,
-  },
-  floatingHomeButtonContainer: {
-    width: 66,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  floatingHomeButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: -32, // Floating height offset
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 3,
-    borderColor: '#080B11', // Outer border to blend floating effect
-  },
+
 
   /* PLAN TAB STYLES */
   planoTabWrapper: {
@@ -2828,6 +4042,59 @@ const styles = StyleSheet.create({
     height: 80,
     paddingVertical: 10,
     textAlignVertical: 'top',
+  },
+  dropdownSelector: {
+    width: '100%',
+    height: 44,
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  dropdownSelectorText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  dropdownMenu: {
+    width: '100%',
+    backgroundColor: '#161F30',
+    borderWidth: 1,
+    borderColor: '#28354E',
+    borderRadius: 8,
+    marginTop: 4,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  dropdownItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#202B3E',
+  },
+  dropdownItemActive: {
+    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+  },
+  dropdownItemText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+  dropdownItemTextActive: {
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   motiveChipsRow: {
     flexDirection: 'row',
