@@ -637,6 +637,13 @@ export default function LoginScreen() {
       routerToProvider: 'ok' | 'warning' | 'error';
       providerToInternet: 'ok' | 'warning' | 'error';
     };
+    metrics: {
+      gateway: { avg: number; min: number; max: number; jitter: number; loss: number };
+      provider: { avg: number; min: number; max: number; jitter: number; loss: number };
+      google: { avg: number; min: number; max: number; jitter: number; loss: number };
+      cloudflare: { avg: number; min: number; max: number; jitter: number; loss: number };
+      quad9: { avg: number; min: number; max: number; jitter: number; loss: number };
+    };
     recommendations: string[];
   } | null>(null);
 
@@ -1318,6 +1325,50 @@ export default function LoginScreen() {
     }
   };
 
+  // Multi-packet ping statistical engine for real-world average and jitter calculation
+  const multiPing = async (
+    url: string,
+    count: number = 6,
+    intervalMs: number = 220,
+    onProgress?: (current: number, total: number, lastLatency: number) => void
+  ): Promise<{ avg: number; min: number; max: number; jitter: number; loss: number; ok: boolean }> => {
+    const samples: number[] = [];
+    let lost = 0;
+
+    for (let i = 1; i <= count; i++) {
+      const probe = await probeEndpoint(url, 2000);
+      if (probe.ok && probe.latencyMs < 2000) {
+        samples.push(probe.latencyMs);
+        if (onProgress) onProgress(i, count, probe.latencyMs);
+      } else {
+        lost++;
+        if (onProgress) onProgress(i, count, 0);
+      }
+      if (i < count) {
+        await new Promise(r => setTimeout(r, intervalMs));
+      }
+    }
+
+    if (samples.length === 0) {
+      return { avg: 999, min: 999, max: 999, jitter: 0, loss: 100, ok: false };
+    }
+
+    const min = Math.min(...samples);
+    const max = Math.max(...samples);
+    const sum = samples.reduce((a, b) => a + b, 0);
+    const avg = Math.max(1, Math.round(sum / samples.length));
+
+    // Jitter: average difference between consecutive latency measurements
+    let jitterSum = 0;
+    for (let j = 1; j < samples.length; j++) {
+      jitterSum += Math.abs(samples[j] - samples[j - 1]);
+    }
+    const jitter = samples.length > 1 ? Math.round(jitterSum / (samples.length - 1)) : 0;
+    const loss = Math.round((lost / count) * 100);
+
+    return { avg, min, max, jitter, loss, ok: loss < 50 };
+  };
+
   const runNetworkDiagnostic = async () => {
     if (diagnosticRunning) return;
     setDiagnosticRunning(true);
@@ -1337,8 +1388,8 @@ export default function LoginScreen() {
 
     try {
       // 1. Check Wi-Fi & Network State
-      setDiagnosticCurrentStep('Passo 1/6: Analisando frequência e sinal do Wi-Fi...');
-      setDiagnosticProgress(15);
+      setDiagnosticCurrentStep('Passo 1/6: Identificando rede e interface Wi-Fi...');
+      setDiagnosticProgress(12);
       await new Promise(r => setTimeout(r, 450));
 
       let netState: any = null;
@@ -1360,24 +1411,25 @@ export default function LoginScreen() {
         }
       }
 
-      // Probe router gateway with 3 samples
-      setDiagnosticProgress(28);
-      const gwP1 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
-      const gwP2 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
-      const gwP3 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
-      const validGwSamples = [gwP1.latencyMs, gwP2.latencyMs, gwP3.latencyMs].filter(v => v < 1200);
-      const gatewayLatency = validGwSamples.length > 0
-        ? Math.max(1, Math.round(validGwSamples.reduce((a, b) => a + b, 0) / validGwSamples.length))
-        : (gwP1.ok ? gwP1.latencyMs : 28);
+      // Multi-packet sampling for Router Gateway (6 packets)
+      setDiagnosticCurrentStep(`Passo 2/6: Enviando rajada de pings para o Roteador (${gatewayIp})...`);
+      setDiagnosticProgress(20);
 
-      // Frequency Estimation: 5.8 GHz has jitter < 3ms and latency < 6ms. 2.4 GHz has typical latency >= 8-20ms
+      const gwResult = await multiPing(`http://${gatewayIp}:80`, 6, 220, (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 2/6: Testando Roteador Local (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'enviando...'}`);
+        setDiagnosticProgress(20 + Math.round((curr / total) * 15));
+      });
+
+      const gatewayLatency = gwResult.avg;
+
+      // Frequency Estimation: 5.8 GHz has low jitter (< 3ms) and latency (< 6ms). 2.4 GHz has higher dispersion
       let frequencyBand = '5.8 GHz (Alta Performance)';
       let has5gRecommendation = false;
       let isWeakSignal = false;
 
       if (!isWifi && isCellular) {
         frequencyBand = 'Dados Móveis (4G/5G)';
-      } else if (gatewayLatency >= 8 || validGwSamples.length === 0) {
+      } else if (gatewayLatency >= 8 || gwResult.jitter > 4 || !gwResult.ok) {
         frequencyBand = '2.4 GHz (Maior Alcance)';
         has5gRecommendation = true;
       } else {
@@ -1385,7 +1437,7 @@ export default function LoginScreen() {
       }
 
       let signalQuality = 'Excelente (Sinal Forte)';
-      if (gatewayLatency > 25) {
+      if (gatewayLatency > 25 || gwResult.loss > 15) {
         signalQuality = 'Fraco / Distante do Roteador';
         isWeakSignal = true;
       } else if (gatewayLatency > 12) {
@@ -1397,101 +1449,105 @@ export default function LoginScreen() {
         status: isWeakSignal ? 'warning' : has5gRecommendation ? 'warning' : 'success',
         detail: `${frequencyBand} • Sinal: ${signalQuality}`,
         latencyMs: gatewayLatency
-      } : s.id === 'gateway' ? { ...s, status: 'running' } : s));
-
-      // 2. Gateway Local Test
-      setDiagnosticCurrentStep('Passo 2/6: Testando latência com o roteador...');
-      setDiagnosticProgress(45);
-      await new Promise(r => setTimeout(r, 450));
-
-      const phoneToRouterOk = gatewayLatency < 25 && validGwSamples.length > 0;
-      setDiagnosticSteps(prev => prev.map(s => s.id === 'gateway' ? {
+      } : s.id === 'gateway' ? {
         ...s,
-        status: phoneToRouterOk ? 'success' : 'warning',
-        detail: `IP Roteador: ${gatewayIp} (Latência: ${gatewayLatency}ms)`,
-        latencyMs: gatewayLatency
+        status: gwResult.ok ? 'success' : 'warning',
+        detail: `Média: ${gwResult.avg}ms (Mín: ${gwResult.min}ms | Máx: ${gwResult.max}ms | Jitter: ${gwResult.jitter}ms)`,
+        latencyMs: gwResult.avg
       } : s.id === 'provider' ? { ...s, status: 'running' } : s));
 
-      // 3. Provider IP Test (177.221.128.60 & WebConnect SGP)
-      setDiagnosticCurrentStep('Passo 3/6: Testando fibra óptica até a central (177.221.128.60)...');
-      setDiagnosticProgress(60);
-      const provP1 = await probeEndpoint('http://177.221.128.60', 2500);
-      const provP2 = await probeEndpoint(`${providerConfig.api_url}/api/ura/clientes/`, 2500);
-      const providerLatency = Math.max(1, Math.min(provP1.latencyMs, provP2.latencyMs));
-      const routerToProviderOk = providerLatency < 75 && (provP1.ok || provP2.ok);
+      // 3. Provider IP Test (177.221.128.60 & WebConnect SGP) with 6 packets
+      setDiagnosticProgress(38);
+      const provResult = await multiPing('http://177.221.128.60', 6, 220, (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 3/6: Testando Fibra Óptica WebConnect 177.221.128.60 (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
+        setDiagnosticProgress(38 + Math.round((curr / total) * 18));
+      });
+
+      const providerLatency = provResult.avg;
+      const routerToProviderOk = provResult.ok && providerLatency < 75;
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'provider' ? {
         ...s,
         status: routerToProviderOk ? 'success' : 'error',
-        detail: `IP 177.221.128.60 (${providerLatency}ms - Fibra Óptica WebConnect)`,
+        detail: `Média: ${provResult.avg}ms (Mín: ${provResult.min}ms | Máx: ${provResult.max}ms | Jitter: ${provResult.jitter}ms)`,
         latencyMs: providerLatency
       } : s.id === 'google' ? { ...s, status: 'running' } : s));
 
-      // 4. Google DNS (8.8.8.8) Test
-      setDiagnosticCurrentStep('Passo 4/6: Testando tempo de resposta do Google DNS (8.8.8.8)...');
-      setDiagnosticProgress(75);
-      const googleProbe = await probeEndpoint('https://dns.google/resolve?name=google.com', 2500);
-      const googleLatency = Math.max(1, googleProbe.latencyMs);
+      // 4. Google DNS (8.8.8.8) Test with 5 packets
+      setDiagnosticProgress(58);
+      const googleResult = await multiPing('https://dns.google/resolve?name=google.com', 5, 220, (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 4/6: Medindo resposta do Google DNS 8.8.8.8 (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
+        setDiagnosticProgress(58 + Math.round((curr / total) * 14));
+      });
+
+      const googleLatency = googleResult.avg;
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'google' ? {
         ...s,
-        status: googleProbe.ok && googleLatency < 80 ? 'success' : 'warning',
-        detail: `IP 8.8.8.8 (${googleLatency}ms - Google Anycast)`,
+        status: googleResult.ok && googleLatency < 80 ? 'success' : 'warning',
+        detail: `Média: ${googleResult.avg}ms (Mín: ${googleResult.min}ms | Máx: ${googleResult.max}ms | Jitter: ${googleResult.jitter}ms)`,
         latencyMs: googleLatency
       } : s.id === 'cloudflare' ? { ...s, status: 'running' } : s));
 
-      // 5. Cloudflare DNS (1.1.1.1) Test
-      setDiagnosticCurrentStep('Passo 5/6: Testando rota de alta velocidade Cloudflare (1.1.1.1)...');
-      setDiagnosticProgress(88);
-      const cfProbe = await probeEndpoint('https://1.1.1.1', 2500);
-      const cloudflareLatency = Math.max(1, cfProbe.latencyMs);
+      // 5. Cloudflare DNS (1.1.1.1) Test with 5 packets
+      setDiagnosticProgress(74);
+      const cfResult = await multiPing('https://1.1.1.1', 5, 220, (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 5/6: Medindo rota Cloudflare 1.1.1.1 (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
+        setDiagnosticProgress(74 + Math.round((curr / total) * 14));
+      });
+
+      const cloudflareLatency = cfResult.avg;
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'cloudflare' ? {
         ...s,
-        status: cfProbe.ok && cloudflareLatency < 80 ? 'success' : 'warning',
-        detail: `IP 1.1.1.1 (${cloudflareLatency}ms - Cloudflare Edge)`,
+        status: cfResult.ok && cloudflareLatency < 80 ? 'success' : 'warning',
+        detail: `Média: ${cfResult.avg}ms (Mín: ${cfResult.min}ms | Máx: ${cfResult.max}ms | Jitter: ${cfResult.jitter}ms)`,
         latencyMs: cloudflareLatency
       } : s.id === 'quad9' ? { ...s, status: 'running' } : s));
 
-      // 6. Quad9 (9.9.9.9) Test
-      setDiagnosticCurrentStep('Passo 6/6: Concluindo com Quad9 DNS (9.9.9.9)...');
-      const quadProbe = await probeEndpoint('https://dns.quad9.net/dns-query?name=quad9.net', 2500);
-      const quad9Latency = Math.max(1, quadProbe.latencyMs);
+      // 6. Quad9 (9.9.9.9) Test with 5 packets
+      setDiagnosticProgress(88);
+      const quadResult = await multiPing('https://dns.quad9.net/dns-query?name=quad9.net', 5, 220, (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 6/6: Calculando média final com Quad9 9.9.9.9 (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
+        setDiagnosticProgress(88 + Math.round((curr / total) * 12));
+      });
+
+      const quad9Latency = quadResult.avg;
       setDiagnosticProgress(100);
 
-      const providerToInternetOk = (googleProbe.ok && googleLatency < 80) || (cfProbe.ok && cloudflareLatency < 80);
+      const providerToInternetOk = (googleResult.ok && googleLatency < 80) || (cfResult.ok && cloudflareLatency < 80);
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'quad9' ? {
         ...s,
-        status: quadProbe.ok && quad9Latency < 100 ? 'success' : 'warning',
-        detail: `IP 9.9.9.9 (${quad9Latency}ms - Segurança & Resolução)`,
+        status: quadResult.ok && quad9Latency < 100 ? 'success' : 'warning',
+        detail: `Média: ${quadResult.avg}ms (Mín: ${quadResult.min}ms | Máx: ${quadResult.max}ms | Jitter: ${quadResult.jitter}ms)`,
         latencyMs: quad9Latency
       } : s));
 
       // Layer Topology States
       const topology = {
-        phoneToRouter: (isWeakSignal || gatewayLatency > 30 ? 'warning' : phoneToRouterOk ? 'ok' : 'error') as 'ok' | 'warning' | 'error',
+        phoneToRouter: (isWeakSignal || gatewayLatency > 30 || gwResult.loss > 20 ? 'warning' : gwResult.ok ? 'ok' : 'error') as 'ok' | 'warning' | 'error',
         routerToProvider: (routerToProviderOk ? (providerLatency > 45 ? 'warning' : 'ok') : 'error') as 'ok' | 'warning' | 'error',
         providerToInternet: (providerToInternetOk ? (googleLatency > 45 ? 'warning' : 'ok') : 'error') as 'ok' | 'warning' | 'error',
       };
 
       // Root Cause Isolation Engine
-      let rootCause = '✅ Todos os trechos da rede (Wi-Fi, Fibra e Internet) estão 100% operacionais!';
+      let rootCause = '✅ Todos os trechos da rede (Wi-Fi, Fibra e Internet) estão 100% operacionais com baixíssima latência!';
       let score = 10.0;
       const recommendations: string[] = [];
 
       if (topology.phoneToRouter !== 'ok') {
         score -= 2.0;
-        rootCause = '⚠️ Problema detectado entre o seu Smartphone e o Roteador! O sinal Wi-Fi está fraco ou distante.';
-        recommendations.push("📶 Aproxime-se do roteador para verificar se o sinal e a velocidade aumentam.");
+        rootCause = '⚠️ Problema detectado entre o seu Smartphone e o Roteador! O sinal Wi-Fi está fraco ou sofrendo interferência no cômodo atual.';
+        recommendations.push("📶 Aproxime-se do roteador da sua residência para verificar se o sinal e a velocidade aumentam.");
       } else if (topology.routerToProvider !== 'ok') {
         score -= 3.0;
         rootCause = '🔴 Problema detectado na rota da Fibra Óptica com a central do provedor WebConnect!';
-        recommendations.push("🏢 O roteador está bom, mas a conexão externa de fibra está instável. Caso persista, abra um chamado técnico.");
+        recommendations.push("🏢 O roteador local está bom, mas a conexão externa de fibra está instável. Caso persista, abra um chamado técnico.");
       } else if (topology.providerToInternet !== 'ok') {
         score -= 2.0;
         rootCause = '⚠️ Problema detectado na saída externa para os servidores da Internet mundial.';
-        recommendations.push("🌐 Conexão local ativa, porém alguns servidores externos da internet estão lentos.");
+        recommendations.push("🌐 Conexão local ativa, porém alguns servidores externos da internet estão lentos no momento.");
       }
 
       if (has5gRecommendation) {
@@ -1500,7 +1556,7 @@ export default function LoginScreen() {
       }
 
       if (providerLatency <= 30 && topology.routerToProvider === 'ok') {
-        recommendations.push("🚀 Rota de Fibra Óptica WebConnect com ultra-baixa latência e alta estabilidade.");
+        recommendations.push("🚀 Rota de Fibra Óptica WebConnect com ultra-baixa latência (média de " + providerLatency + "ms) e jitter estável (" + provResult.jitter + "ms).");
       }
 
       let verdict = 'Conexão Excelente e Estável';
@@ -1524,6 +1580,13 @@ export default function LoginScreen() {
         isWeakSignal,
         rootCause,
         topology,
+        metrics: {
+          gateway: { avg: gwResult.avg, min: gwResult.min, max: gwResult.max, jitter: gwResult.jitter, loss: gwResult.loss },
+          provider: { avg: provResult.avg, min: provResult.min, max: provResult.max, jitter: provResult.jitter, loss: provResult.loss },
+          google: { avg: googleResult.avg, min: googleResult.min, max: googleResult.max, jitter: googleResult.jitter, loss: googleResult.loss },
+          cloudflare: { avg: cfResult.avg, min: cfResult.min, max: cfResult.max, jitter: cfResult.jitter, loss: cfResult.loss },
+          quad9: { avg: quadResult.avg, min: quadResult.min, max: quadResult.max, jitter: quadResult.jitter, loss: quadResult.loss },
+        },
         recommendations,
       };
 
@@ -3133,30 +3196,50 @@ export default function LoginScreen() {
                                         </View>
                                       )}
 
-                                      {/* Metric Cards Grid */}
+                                      {/* Metric Cards Grid with Statistical Averages */}
                                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 8 }}>
+                                        {/* Router */}
                                         <View style={{ width: '48%', backgroundColor: '#0F172A', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}>
                                           <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>ROTEADOR LOCAL</Text>
-                                          <Text style={{ color: '#10B981', fontSize: 16, fontWeight: '900', marginTop: 4 }}>{diagnosticReport.gatewayLatency} ms</Text>
-                                          <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 2 }}>{diagnosticReport.gatewayIp}</Text>
+                                          <Text style={{ color: '#10B981', fontSize: 16, fontWeight: '900', marginTop: 4 }}>
+                                            {diagnosticReport.metrics?.gateway?.avg ?? diagnosticReport.gatewayLatency} ms <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>méd</Text>
+                                          </Text>
+                                          <Text style={{ color: '#94A3B8', fontSize: 10, marginTop: 2 }}>
+                                            Jitter: {diagnosticReport.metrics?.gateway?.jitter ?? 0}ms • Perda: {diagnosticReport.metrics?.gateway?.loss ?? 0}%
+                                          </Text>
                                         </View>
 
+                                        {/* Provider */}
                                         <View style={{ width: '48%', backgroundColor: '#0F172A', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}>
                                           <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>PROVEDOR FIBRA</Text>
-                                          <Text style={{ color: '#3B82F6', fontSize: 16, fontWeight: '900', marginTop: 4 }}>{diagnosticReport.providerLatency} ms</Text>
-                                          <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 2 }}>177.221.128.60</Text>
+                                          <Text style={{ color: '#3B82F6', fontSize: 16, fontWeight: '900', marginTop: 4 }}>
+                                            {diagnosticReport.metrics?.provider?.avg ?? diagnosticReport.providerLatency} ms <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>méd</Text>
+                                          </Text>
+                                          <Text style={{ color: '#94A3B8', fontSize: 10, marginTop: 2 }}>
+                                            Jitter: {diagnosticReport.metrics?.provider?.jitter ?? 0}ms • Perda: {diagnosticReport.metrics?.provider?.loss ?? 0}%
+                                          </Text>
                                         </View>
 
+                                        {/* Google */}
                                         <View style={{ width: '48%', backgroundColor: '#0F172A', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}>
-                                          <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>GOOGLE DNS</Text>
-                                          <Text style={{ color: '#38BDF8', fontSize: 16, fontWeight: '900', marginTop: 4 }}>{diagnosticReport.googleLatency} ms</Text>
-                                          <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 2 }}>8.8.8.8</Text>
+                                          <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>GOOGLE DNS (8.8.8.8)</Text>
+                                          <Text style={{ color: '#38BDF8', fontSize: 16, fontWeight: '900', marginTop: 4 }}>
+                                            {diagnosticReport.metrics?.google?.avg ?? diagnosticReport.googleLatency} ms <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>méd</Text>
+                                          </Text>
+                                          <Text style={{ color: '#94A3B8', fontSize: 10, marginTop: 2 }}>
+                                            Jitter: {diagnosticReport.metrics?.google?.jitter ?? 0}ms • Perda: {diagnosticReport.metrics?.google?.loss ?? 0}%
+                                          </Text>
                                         </View>
 
+                                        {/* Cloudflare */}
                                         <View style={{ width: '48%', backgroundColor: '#0F172A', borderRadius: 12, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: '#334155' }}>
-                                          <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>CLOUDFLARE</Text>
-                                          <Text style={{ color: '#F97316', fontSize: 16, fontWeight: '900', marginTop: 4 }}>{diagnosticReport.cloudflareLatency} ms</Text>
-                                          <Text style={{ color: '#94A3B8', fontSize: 11, marginTop: 2 }}>1.1.1.1</Text>
+                                          <Text style={{ color: '#64748B', fontSize: 10, fontWeight: '700' }}>CLOUDFLARE (1.1.1.1)</Text>
+                                          <Text style={{ color: '#F97316', fontSize: 16, fontWeight: '900', marginTop: 4 }}>
+                                            {diagnosticReport.metrics?.cloudflare?.avg ?? diagnosticReport.cloudflareLatency} ms <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '500' }}>méd</Text>
+                                          </Text>
+                                          <Text style={{ color: '#94A3B8', fontSize: 10, marginTop: 2 }}>
+                                            Jitter: {diagnosticReport.metrics?.cloudflare?.jitter ?? 0}ms • Perda: {diagnosticReport.metrics?.cloudflare?.loss ?? 0}%
+                                          </Text>
                                         </View>
                                       </View>
 
