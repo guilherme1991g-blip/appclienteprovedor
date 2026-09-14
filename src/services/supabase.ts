@@ -13,6 +13,7 @@ export interface ProviderConfig {
   fundo_url?: string;
   cor_fundo?: string;
   webhook_url?: string;
+  webhook_verificacao_url?: string;
   whatsapp_number?: string;
   primary_color?: string;
   secondary_color?: string;
@@ -42,6 +43,7 @@ const DEFAULT_PROVIDER_CONFIG: ProviderConfig = {
   fundo_url: undefined,
   cor_fundo: '#080B11',
   webhook_url: 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp',
+  webhook_verificacao_url: 'https://n8n.zentos.com.br/webhook-test/enviar-codigo-verificacao',
   whatsapp_number: '5581999999999',
   primary_color: '#2563EB',
   secondary_color: '#1E40AF',
@@ -154,6 +156,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         fundo_url: fetchedFundoUrl || cachedBg?.fundo_url || undefined,
         cor_fundo: fetchedCorFundo,
         webhook_url: data.webhook_url || DEFAULT_PROVIDER_CONFIG.webhook_url,
+        webhook_verificacao_url: data.webhook_verificacao_url || DEFAULT_PROVIDER_CONFIG.webhook_verificacao_url,
         whatsapp_number: data.whatsapp_number || data.whatsapp || data.telefone || DEFAULT_PROVIDER_CONFIG.whatsapp_number,
         primary_color: fetchedPrimary,
         secondary_color: fetchedSecondary,

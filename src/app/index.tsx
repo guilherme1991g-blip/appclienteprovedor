@@ -717,6 +717,16 @@ export default function LoginScreen() {
   const [supportContent, setSupportContent] = useState('');
   const [submittingSupport, setSubmittingSupport] = useState(false);
 
+  // WhatsApp Verification States
+  const [supportVerified, setSupportVerified] = useState(false);
+  const [verificationPhone, setVerificationPhone] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifyingCode, setVerifyingCode] = useState(false);
+  const [codeSent, setCodeSent] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+  const countdownRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+
   // Notifications Center Modal State & Realtime Unread Badge
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
@@ -973,6 +983,173 @@ export default function LoginScreen() {
       fetchSupportTickets();
     }
   }, [activeTab, screenState, selectedContract]);
+
+  // Cleanup countdown timer on unmount
+  React.useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
+  // Format phone number as (XX) XXXXX-XXXX
+  const formatPhoneInput = (text: string) => {
+    const cleaned = text.replace(/\D/g, '').slice(0, 11);
+    if (cleaned.length <= 2) return cleaned;
+    if (cleaned.length <= 7) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+  };
+
+  // Send verification code via WhatsApp
+  const handleSendVerificationCode = async () => {
+    const cleanPhone = verificationPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10 || cleanPhone.length > 11) {
+      Alert.alert('Atenção', 'Informe um número de WhatsApp válido com DDD.');
+      return;
+    }
+
+    setSendingCode(true);
+
+    try {
+      // Generate 6-digit code
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+      // Save code to Supabase verification_codes table
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 min
+      const { error: insertError } = await supabase
+        .from('verification_codes')
+        .insert({
+          phone: fullPhone,
+          code: code,
+          cpf_cnpj: documentInput.replace(/\D/g, ''),
+          provider_code: providerConfig.codigo || 'webconnect',
+          expires_at: expiresAt,
+          used: false,
+        });
+
+      if (insertError) {
+        console.error('Erro ao salvar código:', insertError);
+        Alert.alert('Erro', 'Não foi possível gerar o código. Tente novamente.');
+        setSendingCode(false);
+        return;
+      }
+
+      // Send code via n8n webhook to WhatsApp (supports webhook-test then production)
+      const primaryWebhookUrl = providerConfig.webhook_verificacao_url || 'https://n8n.zentos.com.br/webhook-test/enviar-codigo-verificacao';
+      const message = `🔐 Seu código de verificação WebConnect é: *${code}*\n\nVálido por 5 minutos.\nNão compartilhe este código com ninguém.`;
+
+      const webhookPayload = {
+        phone: fullPhone,
+        code: code,
+        message: message,
+        text: message,
+        cliente: selectedContract?.clientName || 'Cliente',
+        cpf_cnpj: documentInput.replace(/\D/g, ''),
+      };
+
+      try {
+        const response = await fetch(primaryWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        });
+
+        // Se a URL de teste não estiver ouvindo (404) ou se for produção
+        if (!response.ok) {
+          const alternateUrl = primaryWebhookUrl.includes('/webhook-test/')
+            ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
+            : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
+
+          console.log(`Webhook retornou status ${response.status}. Tentando URL alternativa: ${alternateUrl}`);
+          await fetch(alternateUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(webhookPayload),
+          }).catch((err) => console.error('Erro ao enviar webhook alternativo:', err));
+        }
+      } catch (webhookErr) {
+        console.warn('Tentativa primária de webhook falhou, tentando alternativa...', webhookErr);
+        const fallbackUrl = primaryWebhookUrl.includes('/webhook-test/')
+          ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
+          : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
+        await fetch(fallbackUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(webhookPayload),
+        }).catch((err) => console.error('Erro ao enviar webhook fallback:', err));
+      }
+
+      setCodeSent(true);
+      setSendingCode(false);
+
+      // Start countdown for resend (60 seconds)
+      setCodeCountdown(60);
+      if (countdownRef.current) clearInterval(countdownRef.current);
+      countdownRef.current = setInterval(() => {
+        setCodeCountdown((prev) => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      Alert.alert('Código Enviado! ✅', `Um código de 6 dígitos foi enviado para o WhatsApp ${formatPhoneInput(cleanPhone)}. Verifique suas mensagens.`);
+    } catch (err) {
+      console.error('Erro ao enviar código de verificação:', err);
+      Alert.alert('Erro', 'Não foi possível enviar o código. Verifique sua conexão e tente novamente.');
+      setSendingCode(false);
+    }
+  };
+
+  // Verify the code entered by the user
+  const handleVerifyCode = async () => {
+    const cleanCode = verificationCode.replace(/\D/g, '');
+    if (cleanCode.length !== 6) {
+      Alert.alert('Atenção', 'Digite o código de 6 dígitos recebido no WhatsApp.');
+      return;
+    }
+
+    const cleanPhone = verificationPhone.replace(/\D/g, '');
+    const fullPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    setVerifyingCode(true);
+
+    try {
+      const { data, error } = await supabase.rpc('verify_code', {
+        p_phone: fullPhone,
+        p_code: cleanCode,
+      });
+
+      setVerifyingCode(false);
+
+      if (error) {
+        console.error('Erro ao verificar código:', error);
+        Alert.alert('Erro', 'Não foi possível verificar o código. Tente novamente.');
+        return;
+      }
+
+      if (data && data.verified) {
+        setSupportVerified(true);
+        if (countdownRef.current) clearInterval(countdownRef.current);
+        // Auto-submit the support ticket after verification
+        handleSubmitSupport();
+        // Reset verification states for next time
+        setCodeSent(false);
+        setVerificationCode('');
+        setVerificationPhone('');
+      } else {
+        Alert.alert('Código Inválido ❌', data?.message || 'Código inválido ou expirado. Tente novamente.');
+        setVerificationCode('');
+      }
+    } catch (err) {
+      setVerifyingCode(false);
+      console.error('Erro ao verificar código:', err);
+      Alert.alert('Erro', 'Não foi possível verificar o código. Tente novamente.');
+    }
+  };
+
 
   const fetchFinanceData = () => {
     if (!selectedContract) return;
@@ -2093,11 +2270,27 @@ export default function LoginScreen() {
 
                     {activeTab === 'SUPORTE' && (
                       <View style={styles.planoTabWrapper}>
-                        {/* A. NEW TICKET FORM */}
+
+                        {/* A. NEW TICKET FORM (always visible) */}
                         <View style={styles.infoCard}>
                           <View style={styles.infoCardHeader}>
                             <MessageSquare size={18} color="#2563EB" style={{ marginRight: 8 }} />
                             <Text style={styles.infoCardHeaderTitle}>Abrir Ordem de Serviço</Text>
+                          </View>
+
+                          {/* Phone Number Field */}
+                          <View style={styles.formGroup}>
+                            <Text style={styles.formLabel}>📱 Número do WhatsApp</Text>
+                            <TextInput
+                              style={styles.formInput}
+                              placeholder="(81) 99999-9999"
+                              placeholderTextColor="#64748B"
+                              keyboardType="phone-pad"
+                              value={verificationPhone}
+                              onChangeText={(text) => setVerificationPhone(formatPhoneInput(text))}
+                              editable={!codeSent}
+                              maxLength={15}
+                            />
                           </View>
 
                           <View style={styles.formGroup}>
@@ -2171,21 +2364,102 @@ export default function LoginScreen() {
                             />
                           </View>
 
-                          <TouchableOpacity
-                            style={[
-                              styles.supportSubmitBtn,
-                              { backgroundColor: submittingSupport ? '#1E293B' : '#2563EB' }
-                            ]}
-                            onPress={handleSubmitSupport}
-                            disabled={submittingSupport}
-                            activeOpacity={0.8}
-                          >
-                            {submittingSupport ? (
-                              <ActivityIndicator size="small" color="#FFFFFF" />
-                            ) : (
-                              <Text style={styles.supportSubmitBtnText}>Enviar Solicitação</Text>
-                            )}
-                          </TouchableOpacity>
+                          {/* Submit Button (sends verification code) - visible when code NOT yet sent */}
+                          {!codeSent && (
+                            <TouchableOpacity
+                              style={[
+                                styles.supportSubmitBtn,
+                                { backgroundColor: sendingCode ? '#1E293B' : '#2563EB' }
+                              ]}
+                              onPress={handleSendVerificationCode}
+                              disabled={sendingCode}
+                              activeOpacity={0.8}
+                            >
+                              {sendingCode ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <Text style={styles.supportSubmitBtnText}>Abrir Chamado</Text>
+                              )}
+                            </TouchableOpacity>
+                          )}
+
+                          {/* Verification Code Section (appears after clicking Abrir Chamado) */}
+                          {codeSent && (
+                            <>
+                              <View style={{
+                                backgroundColor: '#F59E0B15',
+                                borderRadius: 12,
+                                padding: 14,
+                                marginTop: 8,
+                                borderWidth: 1,
+                                borderColor: '#F59E0B30',
+                              }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                  <ShieldCheck size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+                                  <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '700' }}>
+                                    Código de verificação enviado!
+                                  </Text>
+                                </View>
+                                <Text style={{ color: '#94A3B8', fontSize: 12, lineHeight: 18 }}>
+                                  Enviamos um código de 6 dígitos para o WhatsApp {verificationPhone}. Digite abaixo para confirmar e abrir o chamado.
+                                </Text>
+                              </View>
+
+                              <View style={[styles.formGroup, { marginTop: 12 }]}>
+                                <Text style={styles.formLabel}>🔑 Código de Verificação</Text>
+                                <TextInput
+                                  style={[styles.formInput, { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontWeight: '800' }]}
+                                  placeholder="000000"
+                                  placeholderTextColor="#64748B"
+                                  keyboardType="number-pad"
+                                  value={verificationCode}
+                                  onChangeText={(text) => setVerificationCode(text.replace(/\D/g, '').slice(0, 6))}
+                                  maxLength={6}
+                                />
+                              </View>
+
+                              <TouchableOpacity
+                                style={[
+                                  styles.supportSubmitBtn,
+                                  { backgroundColor: verifyingCode ? '#1E293B' : '#10B981', marginTop: 4 }
+                                ]}
+                                onPress={handleVerifyCode}
+                                disabled={verifyingCode}
+                                activeOpacity={0.8}
+                              >
+                                {verifyingCode ? (
+                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                  <Text style={styles.supportSubmitBtnText}>Confirmar e Abrir Chamado</Text>
+                                )}
+                              </TouchableOpacity>
+
+                              {/* Resend / Change Number */}
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setCodeSent(false);
+                                    setVerificationCode('');
+                                    setVerificationPhone('');
+                                    if (countdownRef.current) clearInterval(countdownRef.current);
+                                    setCodeCountdown(0);
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <Text style={{ color: '#64748B', fontSize: 13 }}>Alterar número</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  onPress={codeCountdown > 0 ? undefined : handleSendVerificationCode}
+                                  activeOpacity={codeCountdown > 0 ? 1 : 0.7}
+                                >
+                                  <Text style={{ color: codeCountdown > 0 ? '#475569' : '#F59E0B', fontSize: 13, fontWeight: '600' }}>
+                                    {codeCountdown > 0 ? `Reenviar em ${codeCountdown}s` : 'Reenviar código'}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </>
+                          )}
                         </View>
 
                         {/* B. TICKETS HISTORY */}
