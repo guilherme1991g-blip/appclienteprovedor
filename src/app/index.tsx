@@ -3736,20 +3736,6 @@ export default function LoginScreen() {
                             <Text style={styles.clubeVipHolderName} numberOfLines={1}>
                               {(selectedContract.clientName || '').toUpperCase()}
                             </Text>
-                            <View style={styles.clubeVipDetailsRow}>
-                              <View>
-                                <Text style={styles.clubeVipDetailSubLabel}>CATEGORIA</Text>
-                                <Text style={[styles.clubeVipDetailCode, { color: '#C084FC' }]}>
-                                  CLIENTE DIAMANTE
-                                </Text>
-                              </View>
-                              <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={styles.clubeVipDetailSubLabel}>STATUS FIDELIDADE</Text>
-                                <Text style={styles.clubeVipDetailPlan} numberOfLines={1}>
-                                  Assinante Ativo
-                                </Text>
-                              </View>
-                            </View>
                           </View>
                         </View>
 
