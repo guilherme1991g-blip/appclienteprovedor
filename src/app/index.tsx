@@ -3008,19 +3008,14 @@ export default function LoginScreen() {
                                   </View>
 
                                   {!diagnosticRunning && !diagnosticReport && (
-                                    <>
-                                      <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 19, marginBottom: 16 }}>
-                                        Execute um teste completo para analisar a frequência do Wi-Fi (2.4 ou 5.8 GHz), qualidade do sinal, latência com o roteador, servidor do provedor e rotas da internet.
-                                      </Text>
-                                      <TouchableOpacity
-                                        style={[styles.supportSubmitBtn, { backgroundColor: primaryColor || '#2563EB', marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
-                                        onPress={runNetworkDiagnostic}
-                                        activeOpacity={0.8}
-                                      >
-                                        <Zap size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                        <Text style={styles.supportSubmitBtnText}>Iniciar Diagnóstico da Rede</Text>
-                                      </TouchableOpacity>
-                                    </>
+                                    <TouchableOpacity
+                                      style={[styles.supportSubmitBtn, { backgroundColor: primaryColor || '#2563EB', marginTop: 4, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }]}
+                                      onPress={runNetworkDiagnostic}
+                                      activeOpacity={0.8}
+                                    >
+                                      <Zap size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                      <Text style={styles.supportSubmitBtnText}>Diagnóstico de Rede</Text>
+                                    </TouchableOpacity>
                                   )}
 
                                   {/* RUNNING DIAGNOSTIC */}
