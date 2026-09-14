@@ -630,6 +630,13 @@ export default function LoginScreen() {
     cloudflareLatency: number;
     quad9Latency: number;
     has5gRecommendation: boolean;
+    isWeakSignal: boolean;
+    rootCause: string;
+    topology: {
+      phoneToRouter: 'ok' | 'warning' | 'error';
+      routerToProvider: 'ok' | 'warning' | 'error';
+      providerToInternet: 'ok' | 'warning' | 'error';
+    };
     recommendations: string[];
   } | null>(null);
 
@@ -1318,19 +1325,19 @@ export default function LoginScreen() {
     setDiagnosticProgress(5);
 
     const initialSteps = [
-      { id: 'wifi', title: 'Interface Wi-Fi & Frequência', description: 'Consultando conexão, banda 2.4/5.8 GHz e qualidade do sinal', status: 'running' as const },
-      { id: 'gateway', title: 'Gateway Local (Roteador)', description: 'Verificando comunicação com o roteador da residência', status: 'pending' as const },
-      { id: 'provider', title: 'Servidor Provedor (177.221.128.60)', description: 'Medindo latência na rota direta de fibra óptica WebConnect', status: 'pending' as const },
-      { id: 'google', title: 'Google DNS (8.8.8.8)', description: 'Testando tempo de resposta do servidor Google', status: 'pending' as const },
-      { id: 'cloudflare', title: 'Cloudflare DNS (1.1.1.1)', description: 'Testando rota de alta velocidade Cloudflare', status: 'pending' as const },
-      { id: 'quad9', title: 'Quad9 DNS (9.9.9.9)', description: 'Testando estabilidade e resolução mundial da internet', status: 'pending' as const },
+      { id: 'wifi', title: '1. Interface Wi-Fi & Frequência', description: 'Consultando conexão, banda 2.4/5.8 GHz e qualidade do sinal', status: 'running' as const },
+      { id: 'gateway', title: '2. Gateway Local (Roteador)', description: 'Verificando comunicação com o roteador da residência', status: 'pending' as const },
+      { id: 'provider', title: '3. Servidor Provedor (177.221.128.60)', description: 'Medindo latência na rota direta de fibra óptica WebConnect', status: 'pending' as const },
+      { id: 'google', title: '4. Google DNS (8.8.8.8)', description: 'Testando tempo de resposta do servidor Google', status: 'pending' as const },
+      { id: 'cloudflare', title: '5. Cloudflare DNS (1.1.1.1)', description: 'Testando rota de alta velocidade Cloudflare', status: 'pending' as const },
+      { id: 'quad9', title: '6. Quad9 DNS (9.9.9.9)', description: 'Testando estabilidade e resolução mundial da internet', status: 'pending' as const },
     ];
 
     setDiagnosticSteps(initialSteps);
 
     try {
       // 1. Check Wi-Fi & Network State
-      setDiagnosticCurrentStep('Analisando conexão Wi-Fi do aparelho...');
+      setDiagnosticCurrentStep('Passo 1/6: Analisando frequência e sinal do Wi-Fi...');
       setDiagnosticProgress(15);
       await new Promise(r => setTimeout(r, 450));
 
@@ -1353,20 +1360,24 @@ export default function LoginScreen() {
         }
       }
 
-      // Probe router gateway to test Wi-Fi jitter & latency
-      setDiagnosticProgress(30);
-      const gatewayProbe1 = await probeEndpoint(`http://${gatewayIp}:80`, 1500);
-      const gatewayProbe2 = await probeEndpoint(`http://${gatewayIp}:80`, 1500);
-      const gatewayLatency = Math.max(1, Math.round((gatewayProbe1.latencyMs + gatewayProbe2.latencyMs) / 2));
+      // Probe router gateway with 3 samples
+      setDiagnosticProgress(28);
+      const gwP1 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
+      const gwP2 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
+      const gwP3 = await probeEndpoint(`http://${gatewayIp}:80`, 1200);
+      const validGwSamples = [gwP1.latencyMs, gwP2.latencyMs, gwP3.latencyMs].filter(v => v < 1200);
+      const gatewayLatency = validGwSamples.length > 0
+        ? Math.max(1, Math.round(validGwSamples.reduce((a, b) => a + b, 0) / validGwSamples.length))
+        : (gwP1.ok ? gwP1.latencyMs : 28);
 
-      // Estimate Wi-Fi Band (2.4 GHz vs 5.8 GHz)
-      // 5.8GHz has very low latency dispersion (< 6ms on local LAN router), 2.4GHz is typically > 8-15ms
+      // Frequency Estimation: 5.8 GHz has jitter < 3ms and latency < 6ms. 2.4 GHz has typical latency >= 8-20ms
       let frequencyBand = '5.8 GHz (Alta Performance)';
       let has5gRecommendation = false;
+      let isWeakSignal = false;
 
       if (!isWifi && isCellular) {
         frequencyBand = 'Dados Móveis (4G/5G)';
-      } else if (gatewayLatency >= 8 || !gatewayProbe1.ok) {
+      } else if (gatewayLatency >= 8 || validGwSamples.length === 0) {
         frequencyBand = '2.4 GHz (Maior Alcance)';
         has5gRecommendation = true;
       } else {
@@ -1374,44 +1385,50 @@ export default function LoginScreen() {
       }
 
       let signalQuality = 'Excelente (Sinal Forte)';
-      if (gatewayLatency > 30) signalQuality = 'Fraco / Distante do Roteador';
-      else if (gatewayLatency > 15) signalQuality = 'Bom / Médio';
+      if (gatewayLatency > 25) {
+        signalQuality = 'Fraco / Distante do Roteador';
+        isWeakSignal = true;
+      } else if (gatewayLatency > 12) {
+        signalQuality = 'Bom / Médio';
+      }
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'wifi' ? {
         ...s,
-        status: has5gRecommendation ? 'warning' : 'success',
-        detail: `${frequencyBand} • Sinal ${signalQuality}`,
+        status: isWeakSignal ? 'warning' : has5gRecommendation ? 'warning' : 'success',
+        detail: `${frequencyBand} • Sinal: ${signalQuality}`,
         latencyMs: gatewayLatency
       } : s.id === 'gateway' ? { ...s, status: 'running' } : s));
 
       // 2. Gateway Local Test
-      setDiagnosticCurrentStep('Testando comunicação com o roteador local...');
+      setDiagnosticCurrentStep('Passo 2/6: Testando latência com o roteador...');
       setDiagnosticProgress(45);
       await new Promise(r => setTimeout(r, 450));
 
+      const phoneToRouterOk = gatewayLatency < 25 && validGwSamples.length > 0;
       setDiagnosticSteps(prev => prev.map(s => s.id === 'gateway' ? {
         ...s,
-        status: gatewayProbe1.ok ? 'success' : 'warning',
-        detail: `IP Gateway: ${gatewayIp} (${gatewayLatency}ms)`,
+        status: phoneToRouterOk ? 'success' : 'warning',
+        detail: `IP Roteador: ${gatewayIp} (Latência: ${gatewayLatency}ms)`,
         latencyMs: gatewayLatency
       } : s.id === 'provider' ? { ...s, status: 'running' } : s));
 
       // 3. Provider IP Test (177.221.128.60 & WebConnect SGP)
-      setDiagnosticCurrentStep('Medindo latência até o servidor do provedor (177.221.128.60)...');
+      setDiagnosticCurrentStep('Passo 3/6: Testando fibra óptica até a central (177.221.128.60)...');
       setDiagnosticProgress(60);
-      const provProbe1 = await probeEndpoint('http://177.221.128.60', 2500);
-      const provProbe2 = await probeEndpoint(`${providerConfig.api_url}/api/ura/clientes/`, 2500);
-      const providerLatency = Math.max(1, Math.min(provProbe1.latencyMs, provProbe2.latencyMs));
+      const provP1 = await probeEndpoint('http://177.221.128.60', 2500);
+      const provP2 = await probeEndpoint(`${providerConfig.api_url}/api/ura/clientes/`, 2500);
+      const providerLatency = Math.max(1, Math.min(provP1.latencyMs, provP2.latencyMs));
+      const routerToProviderOk = providerLatency < 75 && (provP1.ok || provP2.ok);
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'provider' ? {
         ...s,
-        status: providerLatency < 80 ? 'success' : 'warning',
-        detail: `IP 177.221.128.60 (${providerLatency}ms - Rota Fibra Óptica)`,
+        status: routerToProviderOk ? 'success' : 'error',
+        detail: `IP 177.221.128.60 (${providerLatency}ms - Fibra Óptica WebConnect)`,
         latencyMs: providerLatency
       } : s.id === 'google' ? { ...s, status: 'running' } : s));
 
       // 4. Google DNS (8.8.8.8) Test
-      setDiagnosticCurrentStep('Testando rota mundial com o Google DNS (8.8.8.8)...');
+      setDiagnosticCurrentStep('Passo 4/6: Testando tempo de resposta do Google DNS (8.8.8.8)...');
       setDiagnosticProgress(75);
       const googleProbe = await probeEndpoint('https://dns.google/resolve?name=google.com', 2500);
       const googleLatency = Math.max(1, googleProbe.latencyMs);
@@ -1424,8 +1441,8 @@ export default function LoginScreen() {
       } : s.id === 'cloudflare' ? { ...s, status: 'running' } : s));
 
       // 5. Cloudflare DNS (1.1.1.1) Test
-      setDiagnosticCurrentStep('Testando rota Cloudflare (1.1.1.1)...');
-      setDiagnosticProgress(90);
+      setDiagnosticCurrentStep('Passo 5/6: Testando rota de alta velocidade Cloudflare (1.1.1.1)...');
+      setDiagnosticProgress(88);
       const cfProbe = await probeEndpoint('https://1.1.1.1', 2500);
       const cloudflareLatency = Math.max(1, cfProbe.latencyMs);
 
@@ -1437,46 +1454,58 @@ export default function LoginScreen() {
       } : s.id === 'quad9' ? { ...s, status: 'running' } : s));
 
       // 6. Quad9 (9.9.9.9) Test
-      setDiagnosticCurrentStep('Finalizando teste com Quad9 (9.9.9.9)...');
+      setDiagnosticCurrentStep('Passo 6/6: Concluindo com Quad9 DNS (9.9.9.9)...');
       const quadProbe = await probeEndpoint('https://dns.quad9.net/dns-query?name=quad9.net', 2500);
       const quad9Latency = Math.max(1, quadProbe.latencyMs);
       setDiagnosticProgress(100);
 
+      const providerToInternetOk = (googleProbe.ok && googleLatency < 80) || (cfProbe.ok && cloudflareLatency < 80);
+
       setDiagnosticSteps(prev => prev.map(s => s.id === 'quad9' ? {
         ...s,
         status: quadProbe.ok && quad9Latency < 100 ? 'success' : 'warning',
-        detail: `IP 9.9.9.9 (${quad9Latency}ms - Global Security DNS)`,
+        detail: `IP 9.9.9.9 (${quad9Latency}ms - Segurança & Resolução)`,
         latencyMs: quad9Latency
       } : s));
 
-      // Generate Report & Score
-      const recommendations: string[] = [];
+      // Layer Topology States
+      const topology = {
+        phoneToRouter: (isWeakSignal || gatewayLatency > 30 ? 'warning' : phoneToRouterOk ? 'ok' : 'error') as 'ok' | 'warning' | 'error',
+        routerToProvider: (routerToProviderOk ? (providerLatency > 45 ? 'warning' : 'ok') : 'error') as 'ok' | 'warning' | 'error',
+        providerToInternet: (providerToInternetOk ? (googleLatency > 45 ? 'warning' : 'ok') : 'error') as 'ok' | 'warning' | 'error',
+      };
+
+      // Root Cause Isolation Engine
+      let rootCause = '✅ Todos os trechos da rede (Wi-Fi, Fibra e Internet) estão 100% operacionais!';
       let score = 10.0;
+      const recommendations: string[] = [];
+
+      if (topology.phoneToRouter !== 'ok') {
+        score -= 2.0;
+        rootCause = '⚠️ Problema detectado entre o seu Smartphone e o Roteador! O sinal Wi-Fi está fraco ou distante.';
+        recommendations.push("📶 Aproxime-se do roteador para verificar se o sinal e a velocidade aumentam.");
+      } else if (topology.routerToProvider !== 'ok') {
+        score -= 3.0;
+        rootCause = '🔴 Problema detectado na rota da Fibra Óptica com a central do provedor WebConnect!';
+        recommendations.push("🏢 O roteador está bom, mas a conexão externa de fibra está instável. Caso persista, abra um chamado técnico.");
+      } else if (topology.providerToInternet !== 'ok') {
+        score -= 2.0;
+        rootCause = '⚠️ Problema detectado na saída externa para os servidores da Internet mundial.';
+        recommendations.push("🌐 Conexão local ativa, porém alguns servidores externos da internet estão lentos.");
+      }
 
       if (has5gRecommendation) {
         score -= 0.8;
-        recommendations.push("💡 Você está conectado na frequência 2.4 GHz. Procure no seu celular a rede Wi-Fi com o mesmo nome terminada em '_5G' ou '5.8GHz' para atingir 100% da velocidade contratada!");
+        recommendations.push("💡 Você está conectado na frequência 2.4 GHz. Conecte no Wi-Fi com o mesmo nome terminado em '_5G' ou '5.8GHz' para atingir a velocidade máxima do seu plano!");
       }
 
-      if (gatewayLatency > 20) {
-        score -= 0.6;
-        recommendations.push("📡 A latência com o roteador está elevada. Aproxime-se do roteador ou evite obstáculos para melhorar a estabilidade.");
-      }
-
-      if (providerLatency > 50) {
-        score -= 0.6;
-        recommendations.push("🏢 A rota até o servidor do provedor apresentou tempo de resposta acima do ideal.");
-      } else {
-        recommendations.push("✅ Rota de Fibra Óptica até o provedor WebConnect operando com ultra-baixa latência!");
-      }
-
-      if (googleLatency < 30 && cloudflareLatency < 30) {
-        recommendations.push("🚀 Navegação e streaming para servidores da internet operando em velocidade máxima.");
+      if (providerLatency <= 30 && topology.routerToProvider === 'ok') {
+        recommendations.push("🚀 Rota de Fibra Óptica WebConnect com ultra-baixa latência e alta estabilidade.");
       }
 
       let verdict = 'Conexão Excelente e Estável';
       if (score < 8.0) verdict = 'Conexão Boa com Recomendações';
-      if (score < 6.0) verdict = 'Atenção: Rede Instável';
+      if (score < 6.0) verdict = 'Atenção: Instabilidade Detectada';
 
       const finalReport = {
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -1492,6 +1521,9 @@ export default function LoginScreen() {
         cloudflareLatency,
         quad9Latency,
         has5gRecommendation,
+        isWeakSignal,
+        rootCause,
+        topology,
         recommendations,
       };
 
@@ -2966,8 +2998,100 @@ export default function LoginScreen() {
                                         </Text>
                                       </View>
 
-                                      {/* 5G / 2.4G Advice Box */}
-                                      {diagnosticReport.has5gRecommendation ? (
+                                      {/* 📍 NETWORK TOPOLOGY DIAGRAM */}
+                                      <View style={{
+                                        backgroundColor: '#0F172A',
+                                        borderRadius: 14,
+                                        padding: 14,
+                                        marginBottom: 14,
+                                        borderWidth: 1,
+                                        borderColor: '#334155'
+                                      }}>
+                                        <Text style={{ color: '#94A3B8', fontSize: 11, fontWeight: '700', textTransform: 'uppercase', marginBottom: 12, letterSpacing: 0.5 }}>
+                                          Mapa da Conexão & Isolamento de Falhas
+                                        </Text>
+
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                          {/* Smartphone */}
+                                          <View style={{ alignItems: 'center', flex: 1 }}>
+                                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#38BDF8' }}>
+                                              <Radio size={18} color="#38BDF8" />
+                                            </View>
+                                            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700', marginTop: 4 }}>Celular</Text>
+                                          </View>
+
+                                          {/* Link 1: Wi-Fi */}
+                                          <View style={{ alignItems: 'center', paddingHorizontal: 2 }}>
+                                            <Text style={{ color: diagnosticReport.topology.phoneToRouter === 'ok' ? '#10B981' : '#F59E0B', fontSize: 9, fontWeight: '700', marginBottom: 2 }}>
+                                              {diagnosticReport.gatewayLatency}ms
+                                            </Text>
+                                            <View style={{ width: 30, height: 3, backgroundColor: diagnosticReport.topology.phoneToRouter === 'ok' ? '#10B981' : '#F59E0B', borderRadius: 1.5 }} />
+                                            <Text style={{ color: '#64748B', fontSize: 8, marginTop: 2 }}>Wi-Fi</Text>
+                                          </View>
+
+                                          {/* Router */}
+                                          <View style={{ alignItems: 'center', flex: 1 }}>
+                                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: diagnosticReport.topology.phoneToRouter === 'ok' ? '#10B981' : '#F59E0B' }}>
+                                              <Wifi size={18} color={diagnosticReport.topology.phoneToRouter === 'ok' ? '#10B981' : '#F59E0B'} />
+                                            </View>
+                                            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700', marginTop: 4 }}>Roteador</Text>
+                                          </View>
+
+                                          {/* Link 2: Fiber */}
+                                          <View style={{ alignItems: 'center', paddingHorizontal: 2 }}>
+                                            <Text style={{ color: diagnosticReport.topology.routerToProvider === 'ok' ? '#10B981' : '#EF4444', fontSize: 9, fontWeight: '700', marginBottom: 2 }}>
+                                              {diagnosticReport.providerLatency}ms
+                                            </Text>
+                                            <View style={{ width: 30, height: 3, backgroundColor: diagnosticReport.topology.routerToProvider === 'ok' ? '#10B981' : '#EF4444', borderRadius: 1.5 }} />
+                                            <Text style={{ color: '#64748B', fontSize: 8, marginTop: 2 }}>Fibra</Text>
+                                          </View>
+
+                                          {/* Provider Central */}
+                                          <View style={{ alignItems: 'center', flex: 1 }}>
+                                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: diagnosticReport.topology.routerToProvider === 'ok' ? '#10B981' : '#EF4444' }}>
+                                              <Server size={18} color={diagnosticReport.topology.routerToProvider === 'ok' ? '#10B981' : '#EF4444'} />
+                                            </View>
+                                            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700', marginTop: 4 }}>Provedor</Text>
+                                          </View>
+
+                                          {/* Link 3: Internet */}
+                                          <View style={{ alignItems: 'center', paddingHorizontal: 2 }}>
+                                            <Text style={{ color: diagnosticReport.topology.providerToInternet === 'ok' ? '#10B981' : '#F59E0B', fontSize: 9, fontWeight: '700', marginBottom: 2 }}>
+                                              {diagnosticReport.googleLatency}ms
+                                            </Text>
+                                            <View style={{ width: 30, height: 3, backgroundColor: diagnosticReport.topology.providerToInternet === 'ok' ? '#10B981' : '#F59E0B', borderRadius: 1.5 }} />
+                                            <Text style={{ color: '#64748B', fontSize: 8, marginTop: 2 }}>Web</Text>
+                                          </View>
+
+                                          {/* Internet */}
+                                          <View style={{ alignItems: 'center', flex: 1 }}>
+                                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: diagnosticReport.topology.providerToInternet === 'ok' ? '#10B981' : '#F59E0B' }}>
+                                              <Globe size={18} color={diagnosticReport.topology.providerToInternet === 'ok' ? '#10B981' : '#F59E0B'} />
+                                            </View>
+                                            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700', marginTop: 4 }}>Internet</Text>
+                                          </View>
+                                        </View>
+                                      </View>
+
+                                      {/* 🎯 ROOT CAUSE BANNER */}
+                                      <View style={{
+                                        backgroundColor: diagnosticReport.score >= 8.5 ? '#10B98115' : '#F59E0B15',
+                                        borderRadius: 12,
+                                        padding: 12,
+                                        marginBottom: 14,
+                                        borderWidth: 1,
+                                        borderColor: diagnosticReport.score >= 8.5 ? '#10B98135' : '#F59E0B35'
+                                      }}>
+                                        <Text style={{ color: diagnosticReport.score >= 8.5 ? '#10B981' : '#F59E0B', fontSize: 13, fontWeight: '800', marginBottom: 2 }}>
+                                          Diagnóstico Técnico:
+                                        </Text>
+                                        <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 18 }}>
+                                          {diagnosticReport.rootCause}
+                                        </Text>
+                                      </View>
+
+                                      {/* 📡 5.8 GHz & SIGNAL ADVICE BOXES */}
+                                      {diagnosticReport.has5gRecommendation && (
                                         <View style={{
                                           backgroundColor: '#F59E0B15',
                                           borderRadius: 12,
@@ -2979,30 +3103,32 @@ export default function LoginScreen() {
                                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                                             <Radio size={16} color="#F59E0B" style={{ marginRight: 8 }} />
                                             <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>
-                                              💡 Dica de Frequência Wi-Fi
+                                              💡 Sugestão: Conecte no Wi-Fi 5.8 GHz
                                             </Text>
                                           </View>
                                           <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 18 }}>
-                                            Você está na frequência <Text style={{ fontWeight: '700', color: '#F59E0B' }}>2.4 GHz</Text>. Para atingir 100% da velocidade contratada do seu plano de fibra, procure no seu celular a rede Wi-Fi com o mesmo nome terminada em <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>_5G</Text> ou <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>5.8GHz</Text>!
+                                            Seu smartphone está conectado na frequência <Text style={{ fontWeight: '700', color: '#F59E0B' }}>2.4 GHz</Text>. Para atingir 100% da velocidade contratada do seu plano, abra os ajustes de Wi-Fi do celular e conecte na rede com o mesmo nome terminada em <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>_5G</Text> ou <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>5.8GHz</Text>!
                                           </Text>
                                         </View>
-                                      ) : (
+                                      )}
+
+                                      {diagnosticReport.isWeakSignal && (
                                         <View style={{
-                                          backgroundColor: '#10B98115',
+                                          backgroundColor: '#F59E0B15',
                                           borderRadius: 12,
                                           padding: 12,
                                           marginBottom: 14,
                                           borderWidth: 1,
-                                          borderColor: '#10B98140'
+                                          borderColor: '#F59E0B40'
                                         }}>
                                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                                            <Radio size={16} color="#10B981" style={{ marginRight: 8 }} />
-                                            <Text style={{ color: '#10B981', fontSize: 13, fontWeight: '800' }}>
-                                              🚀 Wi-Fi 5.8 GHz Alta Performance
+                                            <MapPin size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+                                            <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>
+                                              📶 Sugestão: Aproxime-se do Roteador
                                             </Text>
                                           </View>
-                                          <Text style={{ color: '#CBD5E1', fontSize: 12 }}>
-                                            Seu dispositivo está conectado na frequência ideal para máxima performance e menor latência.
+                                          <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 18 }}>
+                                            O sinal Wi-Fi está fraco no local onde você está. Aproxime-se do roteador da sua residência e refaça o teste para verificar se o sinal e a velocidade melhoram.
                                           </Text>
                                         </View>
                                       )}
@@ -3038,7 +3164,7 @@ export default function LoginScreen() {
                                       {diagnosticReport.recommendations.length > 0 && (
                                         <View style={{ backgroundColor: '#020617', borderRadius: 12, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: '#1E293B' }}>
                                           <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>
-                                            📋 Análise Técnica da Conexão:
+                                            📋 Recomendações:
                                           </Text>
                                           {diagnosticReport.recommendations.map((rec, i) => (
                                             <Text key={i} style={{ color: '#94A3B8', fontSize: 11, lineHeight: 16, marginBottom: 3 }}>
