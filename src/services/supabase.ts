@@ -43,7 +43,7 @@ const DEFAULT_PROVIDER_CONFIG: ProviderConfig = {
   fundo_url: undefined,
   cor_fundo: '#080B11',
   webhook_url: 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp',
-  webhook_verificacao_url: 'https://n8n.zentos.com.br/webhook-test/enviar-codigo-verificacao',
+  webhook_verificacao_url: 'https://n8n.zentos.com.br/webhook/enviar-codigo-verificacao',
   whatsapp_number: '5581999999999',
   primary_color: '#2563EB',
   secondary_color: '#1E40AF',

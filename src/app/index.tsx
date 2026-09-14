@@ -1034,8 +1034,8 @@ export default function LoginScreen() {
         return;
       }
 
-      // Send code via n8n webhook to WhatsApp (supports webhook-test then production)
-      const primaryWebhookUrl = providerConfig.webhook_verificacao_url || 'https://n8n.zentos.com.br/webhook-test/enviar-codigo-verificacao';
+      // Send code via n8n webhook to WhatsApp (supports production webhook and test fallback)
+      const primaryWebhookUrl = providerConfig.webhook_verificacao_url || 'https://n8n.zentos.com.br/webhook/enviar-codigo-verificacao';
       const message = `🔐 Seu código de verificação WebConnect é: *${code}*\n\nVálido por 5 minutos.\nNão compartilhe este código com ninguém.`;
 
       const webhookPayload = {
