@@ -869,13 +869,24 @@ export default function LoginScreen() {
       });
   };
 
-  const handleSubmitSupport = () => {
+  // Format phone number as (XX) XXXXX-XXXX
+  const formatPhoneInput = (text: string) => {
+    const cleaned = text.replace(/\D/g, '').slice(0, 11);
+    if (cleaned.length <= 2) return cleaned;
+    if (cleaned.length <= 7) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
+    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+  };
+
+  const handleSubmitSupport = (phoneOverride?: string) => {
     if (!supportContent.trim()) {
       alert('Por favor, descreva o problema.');
       return;
     }
 
     setSubmittingSupport(true);
+
+    const effectivePhone = phoneOverride || verificationPhone || '';
+    const formattedContact = effectivePhone ? `Contato: ${formatPhoneInput(effectivePhone)}` : '';
 
     let motivoos = '100';
     let ocorrenciatipo = '5';
@@ -894,12 +905,17 @@ export default function LoginScreen() {
       ocorrenciatipo = '5';
     }
 
-    const bodyData = {
+    // Envia o contato junto na descrição/conteúdo do chamado para o SGP
+    const fullContent = formattedContact
+      ? `${supportContent.trim()}\n\n${formattedContact}`
+      : supportContent.trim();
+
+    const bodyData: any = {
       token: providerConfig.api_token,
       app: providerConfig.api_app,
       cpfcnpj: documentInput.replace(/\D/g, ''),
       contrato: selectedContract!.id.toString(),
-      conteudo: supportContent.trim(),
+      conteudo: fullContent,
       contato: selectedContract!.clientName || 'Cliente',
       os_prioridade: '2',
       motivoos,
@@ -908,6 +924,10 @@ export default function LoginScreen() {
       os_tecnico_responsavel: 'samuel',
       setor: '1'
     };
+
+    if (effectivePhone) {
+      bodyData.telefone_contato = effectivePhone.replace(/\D/g, '');
+    }
 
     console.log('Enviando solicitação de chamado com dados:', bodyData);
 
@@ -936,14 +956,14 @@ export default function LoginScreen() {
           } else {
             alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
             
-            // Dispara dados para o Webhook do n8n
+            // Dispara dados para o Webhook do n8n com o WhatsApp do cliente nas observações
             const protocoloStr = data.protocolo || 'N/A';
             const clienteStr = selectedContract?.clientName || 'Cliente';
             const descricaoStr = supportContent.trim();
             const localStr = selectedContract?.neighborhood || selectedContract?.city || 'Não informado';
-            const obsStr = 'Aberto pelo app do cliente';
+            const obsStr = formattedContact ? `Aberto pelo app do cliente • ${formattedContact}` : 'Aberto pelo app do cliente';
 
-            const webhookMessage = `🚨 *OS Aberta!!*\n📋 *Protocolo:* ${protocoloStr}\n👤 *Cliente:* ${clienteStr}\n📝 *Descrição:* ${descricaoStr}\n📍 *Local:* ${localStr}\n📝 *Obs:* ${obsStr}`;
+            const webhookMessage = `🚨 *OS Aberta!!*\n📋 *Protocolo:* ${protocoloStr}\n👤 *Cliente:* ${clienteStr}${formattedContact ? `\n📱 *${formattedContact}*` : ''}\n📝 *Descrição:* ${descricaoStr}\n📍 *Local:* ${localStr}\n📝 *Obs:* ${obsStr}`;
 
             const targetWebhook = providerConfig.webhook_url || 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp';
 
@@ -957,6 +977,9 @@ export default function LoginScreen() {
                 text: webhookMessage,
                 protocolo: protocoloStr,
                 cliente: clienteStr,
+                whatsapp: formattedContact,
+                contato: formattedContact,
+                telefone: effectivePhone.replace(/\D/g, ''),
                 descricao: descricaoStr,
                 local: localStr,
                 obs: obsStr,
@@ -990,14 +1013,6 @@ export default function LoginScreen() {
       if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, []);
-
-  // Format phone number as (XX) XXXXX-XXXX
-  const formatPhoneInput = (text: string) => {
-    const cleaned = text.replace(/\D/g, '').slice(0, 11);
-    if (cleaned.length <= 2) return cleaned;
-    if (cleaned.length <= 7) return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2)}`;
-    return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
-  };
 
   // Send verification code via WhatsApp
   const handleSendVerificationCode = async () => {
@@ -1133,8 +1148,9 @@ export default function LoginScreen() {
       if (data && data.verified) {
         setSupportVerified(true);
         if (countdownRef.current) clearInterval(countdownRef.current);
-        // Auto-submit the support ticket after verification
-        handleSubmitSupport();
+        // Auto-submit the support ticket after verification with verified phone number
+        const verifiedPhoneNumber = verificationPhone;
+        handleSubmitSupport(verifiedPhoneNumber);
         // Reset verification states for next time
         setCodeSent(false);
         setVerificationCode('');
