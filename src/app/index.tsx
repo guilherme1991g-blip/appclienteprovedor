@@ -61,6 +61,7 @@ import * as Device from 'expo-device';
 import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
+import { getDetailedWifiInfo } from '@/services/wifiDiagnostic';
 
 // Configure foreground notification behavior
 Notifications.setNotificationHandler({
@@ -339,6 +340,7 @@ interface ContractDisplay {
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
+type TabName = 'HOME' | 'FINANCEIRO' | 'CONEXAO' | 'SUPORTE' | 'PERFIL' | 'PLANO' | 'TESTE';
 async function registerForPushNotificationsAsync() {
   let token = null;
 
@@ -1440,18 +1442,16 @@ export default function LoginScreen() {
 
       const gatewayLatency = gwResult.avg;
 
-      // Frequency Estimation: 5.8 GHz has low jitter (< 3ms) and latency (< 5ms). 2.4 GHz has higher dispersion
-      let frequencyBand = '5.8 GHz (Alta Performance)';
-      let has5gRecommendation = false;
+      // Safe Native/Heuristic Wi-Fi Frequency & Band Inspection
+      const wifiDetails = await getDetailedWifiInfo(gatewayLatency, gwResult.jitter);
+
+      let frequencyBand = `${wifiDetails.frequencyBand}${wifiDetails.frequencyMHz ? ` (${wifiDetails.frequencyMHz} MHz)` : ''}`;
+      let has5gRecommendation = wifiDetails.isDualBandHint;
       let isWeakSignal = false;
 
       if (!isWifi && isCellular) {
         frequencyBand = 'Dados Móveis (4G/5G)';
-      } else if (gatewayLatency >= 6 || gwResult.jitter > 3 || !gwResult.ok) {
-        frequencyBand = '2.4 GHz (Maior Alcance)';
-        has5gRecommendation = true;
-      } else {
-        frequencyBand = '5.8 GHz (Alta Performance)';
+        has5gRecommendation = false;
       }
 
       let signalQuality = 'Excelente (Sinal Forte)';
@@ -1465,7 +1465,7 @@ export default function LoginScreen() {
       setDiagnosticSteps(prev => prev.map(s => s.id === 'wifi' ? {
         ...s,
         status: isWeakSignal ? 'warning' : has5gRecommendation ? 'warning' : 'success',
-        detail: `${frequencyBand} • Sinal: ${signalQuality}`,
+        detail: `${frequencyBand} • Sinal: ${signalQuality}${wifiDetails.ssid ? ` (${wifiDetails.ssid})` : ''}`,
         latencyMs: gatewayLatency
       } : s.id === 'gateway' ? {
         ...s,
@@ -1570,7 +1570,11 @@ export default function LoginScreen() {
 
       if (has5gRecommendation) {
         score -= 0.8;
-        recommendations.push("💡 Você está conectado na frequência 2.4 GHz. Conecte no Wi-Fi com o mesmo nome terminado em '_5G' ou '5.8GHz' para atingir a velocidade máxima do seu plano!");
+        if (wifiDetails.recommendation) {
+          recommendations.push(`💡 ${wifiDetails.recommendation}`);
+        } else {
+          recommendations.push("💡 Você está conectado na frequência 2.4 GHz. Conecte no Wi-Fi com o mesmo nome terminado em '_5G' ou '5.8GHz' para atingir a velocidade máxima do seu plano!");
+        }
       }
 
       if (providerLatency <= 30 && topology.routerToProvider === 'ok') {
@@ -2141,7 +2145,7 @@ export default function LoginScreen() {
                         { backgroundColor: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
                       ]} />
                       <Text style={[
-                        styles.statusBadgeText,
+                        styles.dashStatusBadgeText,
                         { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
                       ]}>
                         {selectedContract.status.toUpperCase()}
@@ -2158,7 +2162,7 @@ export default function LoginScreen() {
                     {activeTab === 'HOME' && (
                       <View style={styles.planoTabWrapper}>
                         {/* SUSPENDED SERVICE WARNING CARD WITH TRUST UNLOCK */}
-                        {statusLower === 'suspenso' || statusLower === 'bloqueado' ? (
+                        {statusLower === 'suspenso' ? (
                           <View style={styles.suspendedWarningCard}>
                             <View style={styles.suspendedCardHeader}>
                               <View style={styles.suspendedIconBadge}>
@@ -2661,7 +2665,7 @@ export default function LoginScreen() {
                           </View>
 
                           {/* Phone Number Field */}
-                          <View style={styles.formGroup}>
+                          <View style={styles.supportFormGroup}>
                             <Text style={styles.formLabel}>📱 Número do WhatsApp</Text>
                             <TextInput
                               style={styles.formInput}
@@ -2675,7 +2679,7 @@ export default function LoginScreen() {
                             />
                           </View>
 
-                          <View style={styles.formGroup}>
+                          <View style={styles.supportFormGroup}>
                             <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
                             <TouchableOpacity
                               style={styles.dropdownSelector}
@@ -2733,7 +2737,7 @@ export default function LoginScreen() {
                             )}
                           </View>
 
-                          <View style={styles.formGroup}>
+                          <View style={styles.supportFormGroup}>
                             <Text style={styles.formLabel}>Descrição do Problema</Text>
                             <TextInput
                               style={[styles.formInput, styles.formInputTextArea]}
@@ -2787,7 +2791,7 @@ export default function LoginScreen() {
                                 </Text>
                               </View>
 
-                              <View style={[styles.formGroup, { marginTop: 12 }]}>
+                              <View style={[styles.supportFormGroup, { marginTop: 12 }]}>
                                 <Text style={styles.formLabel}>🔑 Código de Verificação</Text>
                                 <TextInput
                                   style={[styles.formInput, { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontWeight: '800' }]}
@@ -4498,6 +4502,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
+  headerInfoLeft: {
+    flex: 1,
+  },
   headerGreetingCol: {
     justifyContent: 'center',
   },
@@ -4583,7 +4590,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     marginRight: 6,
   },
-  statusBadgeText: {
+  dashStatusBadgeText: {
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -4766,12 +4773,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     paddingHorizontal: 8,
     borderRadius: 8,
-  },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginRight: 5,
   },
   billStatusText: {
     fontSize: 10,
@@ -4975,7 +4976,7 @@ const styles = StyleSheet.create({
   },
 
   /* SUPPORT FORM & TICKETS STYLES */
-  formGroup: {
+  supportFormGroup: {
     width: '100%',
     marginBottom: 12,
   },
