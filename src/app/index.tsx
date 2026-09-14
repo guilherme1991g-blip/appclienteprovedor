@@ -63,6 +63,9 @@ import {
   GraduationCap,
   Utensils,
   Award,
+  Crown,
+  Star,
+  Users,
 } from 'lucide-react-native';
 import * as Network from 'expo-network';
 import { WebView } from 'react-native-webview';
@@ -351,7 +354,7 @@ interface ContractDisplay {
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
-type TabName = 'HOME' | 'FINANCEIRO' | 'CONEXAO' | 'SUPORTE' | 'PERFIL' | 'PLANO' | 'TESTE' | 'CLUBE';
+type TabName = 'HOME' | 'FINANCEIRO' | 'CONEXAO' | 'SUPORTE' | 'PERFIL' | 'PLANO' | 'TESTE' | 'CLUBE' | 'CLUBE_CLIENTE';
 async function registerForPushNotificationsAsync() {
   let token = null;
 
@@ -3443,15 +3446,15 @@ export default function LoginScreen() {
                       </View>
                     )}
 
-                    {/* CLUBE DE VANTAGENS TAB */}
+                    {/* CLUBE DE DESCONTOS TAB */}
                     {activeTab === 'CLUBE' && (
                       <View style={styles.planoTabWrapper}>
                         {/* 1. VIP MEMBERSHIP CARD */}
                         <View style={styles.clubeVipCard}>
                           <View style={styles.clubeVipCardHeader}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Award size={20} color="#F59E0B" />
-                              <Text style={styles.clubeVipCardTitle}>CLUBE WEBCONNECT VIP</Text>
+                              <Percent size={20} color="#F59E0B" />
+                              <Text style={styles.clubeVipCardTitle}>CLUBE DE DESCONTOS WEBCONNECT</Text>
                             </View>
                             <View style={styles.clubeVipBadge}>
                               <Sparkles size={12} color="#10B981" />
@@ -3711,6 +3714,71 @@ export default function LoginScreen() {
                         </View>
                       </View>
                     )}
+
+                    {/* CLUBE DO CLIENTE TAB */}
+                    {activeTab === 'CLUBE_CLIENTE' && (
+                      <View style={styles.planoTabWrapper}>
+                        {/* 1. VIP MEMBERSHIP CARD */}
+                        <View style={[styles.clubeVipCard, { borderColor: '#8B5CF660', shadowColor: '#8B5CF6' }]}>
+                          <View style={styles.clubeVipCardHeader}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Crown size={20} color="#C084FC" />
+                              <Text style={[styles.clubeVipCardTitle, { color: '#C084FC' }]}>CLUBE DO CLIENTE WEBCONNECT</Text>
+                            </View>
+                            <View style={[styles.clubeVipBadge, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF640' }]}>
+                              <Sparkles size={12} color="#C084FC" />
+                              <Text style={[styles.clubeVipBadgeText, { color: '#C084FC' }]}>VIP</Text>
+                            </View>
+                          </View>
+
+                          <View style={styles.clubeVipCardBody}>
+                            <Text style={styles.clubeVipHolderLabel}>TITULAR DO CONTRATO</Text>
+                            <Text style={styles.clubeVipHolderName} numberOfLines={1}>
+                              {(selectedContract.clientName || '').toUpperCase()}
+                            </Text>
+                            <View style={styles.clubeVipDetailsRow}>
+                              <View>
+                                <Text style={styles.clubeVipDetailSubLabel}>CATEGORIA</Text>
+                                <Text style={[styles.clubeVipDetailCode, { color: '#C084FC' }]}>
+                                  CLIENTE DIAMANTE
+                                </Text>
+                              </View>
+                              <View style={{ alignItems: 'flex-end' }}>
+                                <Text style={styles.clubeVipDetailSubLabel}>STATUS FIDELIDADE</Text>
+                                <Text style={styles.clubeVipDetailPlan} numberOfLines={1}>
+                                  Assinante Ativo
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* 2. WELCOME BANNER */}
+                        <View style={[styles.clubePromoBanner, { borderColor: '#8B5CF640' }]}>
+                          <Star size={24} color="#C084FC" style={{ marginRight: 10 }} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.clubePromoTitle}>Bem-vindo ao Clube do Cliente!</Text>
+                            <Text style={styles.clubePromoSubtitle}>
+                              Um espaço exclusivo criado especialmente para você, assinante da nossa rede.
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* 3. PLACEHOLDER / BENEFIT CARDS */}
+                        <View style={styles.infoCard}>
+                          <View style={styles.infoCardHeader}>
+                            <Sparkles size={18} color="#C084FC" style={{ marginRight: 8 }} />
+                            <Text style={styles.infoCardHeaderTitle}>Programa de Vantagens</Text>
+                          </View>
+                          <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700', marginBottom: 6 }}>
+                            Novas vantagens estão sendo preparadas para você!
+                          </Text>
+                          <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 20 }}>
+                            Em breve você terá acesso a sorteios mensais, acúmulo de pontos, atendimento prioritário e eventos exclusivos do provedor diretamente por aqui.
+                          </Text>
+                        </View>
+                      </View>
+                    )}
                   </ScrollView>
 
                   {/* FLOATING WHATSAPP BANNER (Fixed right above bottom tab bar on HOME) */}
@@ -3800,10 +3868,10 @@ export default function LoginScreen() {
                         onPress={() => setIsSideMenuOpen(true)}
                         activeOpacity={0.8}
                       >
-                        <View style={[styles.tabIconWrapper, (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE') && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <Menu size={20} color={(isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE') ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
+                          <Menu size={20} color={(isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? '#FFFFFF' : '#64748B'} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE') ? primaryColor : '#64748B', fontWeight: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE') ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? primaryColor : '#64748B', fontWeight: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? '800' : '600' }]}>
                           Menu
                         </Text>
                       </TouchableOpacity>
@@ -3875,7 +3943,7 @@ export default function LoginScreen() {
                             <ChevronRight size={18} color="#64748B" />
                           </TouchableOpacity>
 
-                          {/* 2. Clube de Vantagens */}
+                          {/* 2. Clube de Descontos */}
                           <TouchableOpacity
                             style={[
                               styles.sideMenuItem,
@@ -3888,21 +3956,48 @@ export default function LoginScreen() {
                             activeOpacity={0.7}
                           >
                             <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#F59E0B20' }]}>
-                              <Gift size={20} color="#F59E0B" />
+                              <Percent size={20} color="#F59E0B" />
                             </View>
                             <View style={{ flex: 1 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.sideMenuItemTitle}>Clube de Vantagens</Text>
+                                <Text style={styles.sideMenuItemTitle}>Clube de Descontos</Text>
                                 <View style={styles.sideMenuTagNew}>
-                                  <Text style={styles.sideMenuTagNewText}>NOVO</Text>
+                                  <Text style={styles.sideMenuTagNewText}>CUPONS</Text>
                                 </View>
                               </View>
-                              <Text style={styles.sideMenuItemSubtitle}>Descontos em farmácias, cinema e lazer</Text>
+                              <Text style={styles.sideMenuItemSubtitle}>Descontos em farmácias, cinema e lojas</Text>
                             </View>
                             <ChevronRight size={18} color="#64748B" />
                           </TouchableOpacity>
 
-                          {/* 3. Trocar Contrato (if multiple) */}
+                          {/* 3. Clube do Cliente */}
+                          <TouchableOpacity
+                            style={[
+                              styles.sideMenuItem,
+                              activeTab === 'CLUBE_CLIENTE' && styles.sideMenuItemActive
+                            ]}
+                            onPress={() => {
+                              setActiveTab('CLUBE_CLIENTE');
+                              setIsSideMenuOpen(false);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#8B5CF620' }]}>
+                              <Crown size={20} color="#8B5CF6" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.sideMenuItemTitle}>Clube do Cliente</Text>
+                                <View style={[styles.sideMenuTagNew, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF660' }]}>
+                                  <Text style={[styles.sideMenuTagNewText, { color: '#C084FC' }]}>VIP</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.sideMenuItemSubtitle}>Vantagens exclusivas e fidelidade do assinante</Text>
+                            </View>
+                            <ChevronRight size={18} color="#64748B" />
+                          </TouchableOpacity>
+
+                          {/* 4. Trocar Contrato (if multiple) */}
                           {contracts.length > 1 && (
                             <TouchableOpacity
                               style={styles.sideMenuItem}
@@ -3923,7 +4018,7 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                           )}
 
-                          {/* 4. Notificações */}
+                          {/* 5. Notificações */}
                           <TouchableOpacity
                             style={styles.sideMenuItem}
                             onPress={() => {
@@ -3947,7 +4042,7 @@ export default function LoginScreen() {
                             <ChevronRight size={18} color="#64748B" />
                           </TouchableOpacity>
 
-                          {/* 5. Sair da Conta */}
+                          {/* 6. Sair da Conta */}
                           <TouchableOpacity
                             style={[styles.sideMenuItem, { borderBottomWidth: 0, marginTop: 4 }]}
                             onPress={() => {
