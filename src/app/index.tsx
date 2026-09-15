@@ -66,6 +66,14 @@ import {
   Crown,
   Star,
   Users,
+  Headphones,
+  Receipt,
+  Ticket,
+  Tag,
+  Gauge,
+  LayoutGrid,
+  ArrowLeftRight,
+  FileCheck,
 } from 'lucide-react-native';
 import * as Network from 'expo-network';
 import { WebView } from 'react-native-webview';
@@ -611,7 +619,6 @@ export default function LoginScreen() {
   const [selectedContract, setSelectedContract] = useState<ContractDisplay | null>(null);
   const [activeTab, setActiveTab] = useState<TabName>('HOME');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  const [copiedCoupon, setCopiedCoupon] = useState<string | null>(null);
 
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
@@ -2241,7 +2248,7 @@ export default function LoginScreen() {
                                   <Text style={styles.infoCardHeaderTitle}>Faturamento em Dia</Text>
                                 </View>
                                 <Text style={{ color: '#94A3B8', fontSize: 13, marginTop: 6 }}>
-                                  Você não possui nenhuma parcela em aberto no momento. Parabéns! 🎉
+                                  Você não possui nenhuma parcela em aberto no momento.
                                 </Text>
                               </View>
                             );
@@ -2504,8 +2511,8 @@ export default function LoginScreen() {
                                 return (
                                   <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 24 }]}>
                                     <CheckCircle size={36} color="#10B981" style={{ marginBottom: 10 }} />
-                                    <Text style={styles.noBillsTitle}>Nenhum boleto em aberto!</Text>
-                                    <Text style={styles.noBillsDesc}>Seu faturamento está em dia. Parabéns! 🎉</Text>
+                                    <Text style={styles.noBillsTitle}>Nenhum boleto em aberto</Text>
+                                    <Text style={styles.noBillsDesc}>Seu faturamento está em dia.</Text>
                                   </View>
                                 );
                               }
@@ -3449,268 +3456,14 @@ export default function LoginScreen() {
                     {/* CLUBE DE DESCONTOS TAB */}
                     {activeTab === 'CLUBE' && (
                       <View style={styles.planoTabWrapper}>
-                        {/* 1. VIP MEMBERSHIP CARD */}
-                        <View style={styles.clubeVipCard}>
-                          <View style={styles.clubeVipCardHeader}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <Percent size={20} color="#F59E0B" />
-                              <Text style={styles.clubeVipCardTitle}>CLUBE DE DESCONTOS WEBCONNECT</Text>
-                            </View>
-                            <View style={styles.clubeVipBadge}>
-                              <Sparkles size={12} color="#10B981" />
-                              <Text style={styles.clubeVipBadgeText}>ATIVO</Text>
-                            </View>
-                          </View>
-
-                          <View style={styles.clubeVipCardBody}>
-                            <Text style={styles.clubeVipHolderLabel}>ASSINANTE BENEFICIÁRIO</Text>
-                            <Text style={styles.clubeVipHolderName} numberOfLines={1}>
-                              {(selectedContract.clientName || '').toUpperCase()}
-                            </Text>
-                            <View style={styles.clubeVipDetailsRow}>
-                              <View>
-                                <Text style={styles.clubeVipDetailSubLabel}>CÓDIGO DE MEMBRO</Text>
-                                <Text style={styles.clubeVipDetailCode}>
-                                  VIP-{selectedContract.id.toString().padStart(6, '0')}
-                                </Text>
-                              </View>
-                              <View style={{ alignItems: 'flex-end' }}>
-                                <Text style={styles.clubeVipDetailSubLabel}>PLANO</Text>
-                                <Text style={styles.clubeVipDetailPlan} numberOfLines={1}>
-                                  {selectedContract.planName}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                        </View>
-
-                        {/* 2. PROMO HIGHLIGHT BANNER */}
-                        <View style={styles.clubePromoBanner}>
-                          <Gift size={24} color="#F59E0B" style={{ marginRight: 10 }} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.clubePromoTitle}>Economize todos os meses!</Text>
-                            <Text style={styles.clubePromoSubtitle}>
-                              Apresente seu código VIP ou use os cupons abaixo nas lojas e parceiros conveniados.
-                            </Text>
-                          </View>
-                        </View>
-
-                        {/* 3. EXCLUSIVE COUPONS LIST */}
-                        <Text style={styles.clubeSectionHeader}>CUPONS E PARCERIAS EXCLUSIVAS</Text>
-
-                        {/* Partner 1: Farmácias */}
-                        <View style={styles.clubePartnerCard}>
-                          <View style={styles.clubePartnerHeader}>
-                            <View style={[styles.clubeCategoryIconCircle, { backgroundColor: '#10B98120' }]}>
-                              <Pill size={20} color="#10B981" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={styles.clubePartnerName}>Farmácias & Saúde</Text>
-                                <View style={styles.clubeDiscountPill}>
-                                  <Text style={styles.clubeDiscountPillText}>Até 45% OFF</Text>
-                                </View>
-                              </View>
-                              <Text style={styles.clubePartnerSub}>Drogasil, Droga Raia, Pague Menos</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.clubePartnerDesc}>
-                            Desconto direto no balcão ou pelo app em todos os medicamentos tarjados e genéricos.
+                        <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40, marginTop: 8 }]}>
+                          <Ticket size={36} color="#64748B" style={{ marginBottom: 12 }} />
+                          <Text style={{ fontSize: 16, fontWeight: '700', color: '#F8FAFC', marginBottom: 6 }}>
+                            Clube de Descontos
                           </Text>
-                          <View style={styles.clubeCouponActionRow}>
-                            <View style={styles.clubeCouponBox}>
-                              <Text style={styles.clubeCouponText}>WEBDROGA45</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={[
-                                styles.clubeCopyCouponBtn,
-                                copiedCoupon === 'WEBDROGA45' && { backgroundColor: '#10B981' }
-                              ]}
-                              onPress={() => {
-                                Clipboard.setString('WEBDROGA45');
-                                setCopiedCoupon('WEBDROGA45');
-                                setTimeout(() => setCopiedCoupon(null), 2500);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color="#FFFFFF" />
-                              <Text style={styles.clubeCopyCouponBtnText}>
-                                {copiedCoupon === 'WEBDROGA45' ? 'Copiado! ✓' : 'Copiar Cupom'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Partner 2: Cinema & Lazer */}
-                        <View style={styles.clubePartnerCard}>
-                          <View style={styles.clubePartnerHeader}>
-                            <View style={[styles.clubeCategoryIconCircle, { backgroundColor: '#8B5CF620' }]}>
-                              <Film size={20} color="#8B5CF6" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={styles.clubePartnerName}>Cinema & Entretenimento</Text>
-                                <View style={[styles.clubeDiscountPill, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF640' }]}>
-                                  <Text style={[styles.clubeDiscountPillText, { color: '#C084FC' }]}>50% OFF</Text>
-                                </View>
-                              </View>
-                              <Text style={styles.clubePartnerSub}>Cinemark, Kinoplex, Cinépolis</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.clubePartnerDesc}>
-                            Pague meia-entrada em qualquer dia da semana apresentando seu código VIP WebConnect.
+                          <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 18 }}>
+                            Em breve novos parceiros e benefícios para assinantes.
                           </Text>
-                          <View style={styles.clubeCouponActionRow}>
-                            <View style={styles.clubeCouponBox}>
-                              <Text style={styles.clubeCouponText}>WEBCINE50</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={[
-                                styles.clubeCopyCouponBtn,
-                                copiedCoupon === 'WEBCINE50' && { backgroundColor: '#10B981' }
-                              ]}
-                              onPress={() => {
-                                Clipboard.setString('WEBCINE50');
-                                setCopiedCoupon('WEBCINE50');
-                                setTimeout(() => setCopiedCoupon(null), 2500);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color="#FFFFFF" />
-                              <Text style={styles.clubeCopyCouponBtnText}>
-                                {copiedCoupon === 'WEBCINE50' ? 'Copiado! ✓' : 'Copiar Cupom'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Partner 3: Educação & Idiomas */}
-                        <View style={styles.clubePartnerCard}>
-                          <View style={styles.clubePartnerHeader}>
-                            <View style={[styles.clubeCategoryIconCircle, { backgroundColor: '#3B82F620' }]}>
-                              <GraduationCap size={20} color="#3B82F6" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={styles.clubePartnerName}>Cursos & Idiomas</Text>
-                                <View style={[styles.clubeDiscountPill, { backgroundColor: '#3B82F620', borderColor: '#3B82F640' }]}>
-                                  <Text style={[styles.clubeDiscountPillText, { color: '#60A5FA' }]}>Até 50% OFF</Text>
-                                </View>
-                              </View>
-                              <Text style={styles.clubePartnerSub}>Alura, Udemy, CNA, Wizard</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.clubePartnerDesc}>
-                            Descontos em cursos profissionalizantes, tecnologia e idiomas online ou presenciais.
-                          </Text>
-                          <View style={styles.clubeCouponActionRow}>
-                            <View style={styles.clubeCouponBox}>
-                              <Text style={styles.clubeCouponText}>WEBEDU50</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={[
-                                styles.clubeCopyCouponBtn,
-                                copiedCoupon === 'WEBEDU50' && { backgroundColor: '#10B981' }
-                              ]}
-                              onPress={() => {
-                                Clipboard.setString('WEBEDU50');
-                                setCopiedCoupon('WEBEDU50');
-                                setTimeout(() => setCopiedCoupon(null), 2500);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color="#FFFFFF" />
-                              <Text style={styles.clubeCopyCouponBtnText}>
-                                {copiedCoupon === 'WEBEDU50' ? 'Copiado! ✓' : 'Copiar Cupom'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Partner 4: Gastronomia & Delivery */}
-                        <View style={styles.clubePartnerCard}>
-                          <View style={styles.clubePartnerHeader}>
-                            <View style={[styles.clubeCategoryIconCircle, { backgroundColor: '#EF444420' }]}>
-                              <Utensils size={20} color="#EF4444" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={styles.clubePartnerName}>Gastronomia & Delivery</Text>
-                                <View style={[styles.clubeDiscountPill, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}>
-                                  <Text style={[styles.clubeDiscountPillText, { color: '#F87171' }]}>R$ 25 OFF</Text>
-                                </View>
-                              </View>
-                              <Text style={styles.clubePartnerSub}>iFood, Burger King, Cacau Show</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.clubePartnerDesc}>
-                            Cupons mensais para pedidos no delivery e restaurantes participantes.
-                          </Text>
-                          <View style={styles.clubeCouponActionRow}>
-                            <View style={styles.clubeCouponBox}>
-                              <Text style={styles.clubeCouponText}>WEBGFOOD25</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={[
-                                styles.clubeCopyCouponBtn,
-                                copiedCoupon === 'WEBGFOOD25' && { backgroundColor: '#10B981' }
-                              ]}
-                              onPress={() => {
-                                Clipboard.setString('WEBGFOOD25');
-                                setCopiedCoupon('WEBGFOOD25');
-                                setTimeout(() => setCopiedCoupon(null), 2500);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color="#FFFFFF" />
-                              <Text style={styles.clubeCopyCouponBtnText}>
-                                {copiedCoupon === 'WEBGFOOD25' ? 'Copiado! ✓' : 'Copiar Cupom'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-
-                        {/* Partner 5: E-commerce & Lojas */}
-                        <View style={styles.clubePartnerCard}>
-                          <View style={styles.clubePartnerHeader}>
-                            <View style={[styles.clubeCategoryIconCircle, { backgroundColor: '#F59E0B20' }]}>
-                              <ShoppingBag size={20} color="#F59E0B" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <Text style={styles.clubePartnerName}>Lojas & Eletrônicos</Text>
-                                <View style={styles.clubeDiscountPill}>
-                                  <Text style={styles.clubeDiscountPillText}>Até 20% OFF</Text>
-                                </View>
-                              </View>
-                              <Text style={styles.clubePartnerSub}>Magalu, Casas Bahia, Samsung</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.clubePartnerDesc}>
-                            Descontos exclusivos em smart TVs, celulares, roteadores e informática.
-                          </Text>
-                          <View style={styles.clubeCouponActionRow}>
-                            <View style={styles.clubeCouponBox}>
-                              <Text style={styles.clubeCouponText}>WEBSHOP20</Text>
-                            </View>
-                            <TouchableOpacity
-                              style={[
-                                styles.clubeCopyCouponBtn,
-                                copiedCoupon === 'WEBSHOP20' && { backgroundColor: '#10B981' }
-                              ]}
-                              onPress={() => {
-                                Clipboard.setString('WEBSHOP20');
-                                setCopiedCoupon('WEBSHOP20');
-                                setTimeout(() => setCopiedCoupon(null), 2500);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color="#FFFFFF" />
-                              <Text style={styles.clubeCopyCouponBtnText}>
-                                {copiedCoupon === 'WEBSHOP20' ? 'Copiado! ✓' : 'Copiar Cupom'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
                         </View>
                       </View>
                     )}
@@ -3789,19 +3542,19 @@ export default function LoginScreen() {
                     </View>
                   )}
 
-                  {/* BOTTOM NAVIGATION TAB BAR WITH DYNAMIC ACTIVE ELEVATION */}
+                  {/* BOTTOM NAVIGATION TAB BAR WITH MODERN NATIVE STYLING */}
                   <View style={styles.bottomTabBarContainer}>
                     <View style={styles.bottomTabBar}>
-                      {/* Tab 1: Conexão (In place of Contrato) */}
+                      {/* Tab 1: Conexão */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('TESTE')}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <View style={[styles.tabIconWrapper, activeTab === 'TESTE' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <Activity size={20} color={activeTab === 'TESTE' ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, activeTab === 'TESTE' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                          <Zap size={20} color={activeTab === 'TESTE' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'TESTE' ? 2.2 : 1.7} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'TESTE' ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'TESTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'TESTE' ? '700' : '500' }]}>
                           Conexão
                         </Text>
                       </TouchableOpacity>
@@ -3810,26 +3563,26 @@ export default function LoginScreen() {
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('FINANCEIRO')}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <View style={[styles.tabIconWrapper, activeTab === 'FINANCEIRO' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <CreditCard size={20} color={activeTab === 'FINANCEIRO' ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, activeTab === 'FINANCEIRO' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                          <Receipt size={20} color={activeTab === 'FINANCEIRO' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'FINANCEIRO' ? 2.2 : 1.7} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? primaryColor : '#64748B', fontWeight: activeTab === 'FINANCEIRO' ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'FINANCEIRO' ? primaryColor : '#64748B', fontWeight: activeTab === 'FINANCEIRO' ? '700' : '500' }]}>
                           Financeiro
                         </Text>
                       </TouchableOpacity>
 
-                      {/* Tab 3: Início (Home in the Middle) */}
+                      {/* Tab 3: Início */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={handleGoHome}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <View style={[styles.tabIconWrapper, activeTab === 'HOME' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <Home size={20} color={activeTab === 'HOME' ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, activeTab === 'HOME' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                          <Home size={20} color={activeTab === 'HOME' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'HOME' ? 2.2 : 1.7} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: activeTab === 'HOME' ? primaryColor : '#64748B', fontWeight: activeTab === 'HOME' ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'HOME' ? primaryColor : '#64748B', fontWeight: activeTab === 'HOME' ? '700' : '500' }]}>
                           Início
                         </Text>
                       </TouchableOpacity>
@@ -3838,26 +3591,26 @@ export default function LoginScreen() {
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setActiveTab('SUPORTE')}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <View style={[styles.tabIconWrapper, activeTab === 'SUPORTE' && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <MessageSquare size={20} color={activeTab === 'SUPORTE' ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, activeTab === 'SUPORTE' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                          <Headphones size={20} color={activeTab === 'SUPORTE' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'SUPORTE' ? 2.2 : 1.7} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'SUPORTE' ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'SUPORTE' ? '700' : '500' }]}>
                           Suporte
                         </Text>
                       </TouchableOpacity>
 
-                      {/* Tab 5: Menu Sanduíche (In place of Conexao) */}
+                      {/* Tab 5: Menu Sanduíche */}
                       <TouchableOpacity
                         style={styles.tabButton}
                         onPress={() => setIsSideMenuOpen(true)}
-                        activeOpacity={0.8}
+                        activeOpacity={0.7}
                       >
-                        <View style={[styles.tabIconWrapper, (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') && [styles.activeTabElevatedIcon, { backgroundColor: primaryColor }]]}>
-                          <Menu size={20} color={(isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? '#FFFFFF' : '#64748B'} />
+                        <View style={[styles.tabIconWrapper, (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                          <LayoutGrid size={20} color={(isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? primaryColor : '#64748B'} strokeWidth={(isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? 2.2 : 1.7} />
                         </View>
-                        <Text style={[styles.tabLabel, { color: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? primaryColor : '#64748B', fontWeight: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? '800' : '600' }]}>
+                        <Text style={[styles.tabLabel, { color: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? primaryColor : '#64748B', fontWeight: (isSideMenuOpen || activeTab === 'PLANO' || activeTab === 'CLUBE' || activeTab === 'CLUBE_CLIENTE') ? '700' : '500' }]}>
                           Menu
                         </Text>
                       </TouchableOpacity>
@@ -3881,17 +3634,19 @@ export default function LoginScreen() {
                         {/* Drag Handle */}
                         <View style={styles.sideMenuHandle} />
 
-                        {/* User Header */}
-                        <View style={styles.sideMenuHeader}>
-                          <View style={styles.sideMenuUserRow}>
-                            <View style={styles.avatarCircle}>
-                              <Text style={styles.avatarText}>
-                                {firstName.substring(0, 1).toUpperCase()}
-                              </Text>
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.sideMenuUserName}>{selectedContract.clientName}</Text>
-                              <Text style={styles.sideMenuUserContract}>
+                        {/* User Profile Header Card */}
+                        <View style={styles.sideMenuProfileCard}>
+                          <View style={styles.sideMenuAvatar}>
+                            <Text style={styles.sideMenuAvatarText}>
+                              {firstName.substring(0, 1).toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.sideMenuUserName} numberOfLines={1}>
+                              {selectedContract.clientName}
+                            </Text>
+                            <View style={styles.sideMenuContractPill}>
+                              <Text style={styles.sideMenuContractPillText}>
                                 Contrato #{selectedContract.id} • {selectedContract.planName}
                               </Text>
                             </View>
@@ -3901,152 +3656,134 @@ export default function LoginScreen() {
                             onPress={() => setIsSideMenuOpen(false)}
                             activeOpacity={0.7}
                           >
-                            <X size={20} color="#94A3B8" />
+                            <X size={18} color="#94A3B8" />
                           </TouchableOpacity>
                         </View>
 
-                        {/* Menu Options */}
-                        <View style={styles.sideMenuList}>
+                        {/* SECTION 1: SERVIÇOS & BENEFÍCIOS */}
+                        <Text style={styles.sideMenuSectionTitle}>SERVIÇOS & BENEFÍCIOS</Text>
+                        <View style={styles.sideMenuGroup}>
                           {/* 1. Meu Contrato */}
                           <TouchableOpacity
-                            style={[
-                              styles.sideMenuItem,
-                              activeTab === 'PLANO' && styles.sideMenuItemActive
-                            ]}
+                            style={styles.sideMenuRow}
                             onPress={() => {
                               setActiveTab('PLANO');
                               setIsSideMenuOpen(false);
                             }}
-                            activeOpacity={0.7}
+                            activeOpacity={0.65}
                           >
-                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#2563EB20' }]}>
-                              <FileText size={20} color="#2563EB" />
+                            <View style={styles.sideMenuIconWrapper}>
+                              <FileCheck size={20} color="#94A3B8" strokeWidth={1.7} />
                             </View>
                             <View style={{ flex: 1 }}>
-                              <Text style={styles.sideMenuItemTitle}>Meu Contrato</Text>
-                              <Text style={styles.sideMenuItemSubtitle}>Detalhes do plano, Wi-Fi e endereço</Text>
+                              <Text style={styles.sideMenuRowTitle}>Meu Contrato</Text>
+                              <Text style={styles.sideMenuRowSubtitle}>Detalhes da rede e Wi-Fi</Text>
                             </View>
-                            <ChevronRight size={18} color="#64748B" />
+                            <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
+
+                          <View style={styles.sideMenuDivider} />
 
                           {/* 2. Clube de Descontos */}
                           <TouchableOpacity
-                            style={[
-                              styles.sideMenuItem,
-                              activeTab === 'CLUBE' && styles.sideMenuItemActive
-                            ]}
+                            style={styles.sideMenuRow}
                             onPress={() => {
                               setActiveTab('CLUBE');
                               setIsSideMenuOpen(false);
                             }}
-                            activeOpacity={0.7}
+                            activeOpacity={0.65}
                           >
-                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#F59E0B20' }]}>
-                              <Percent size={20} color="#F59E0B" />
+                            <View style={styles.sideMenuIconWrapper}>
+                              <Ticket size={20} color="#94A3B8" strokeWidth={1.7} />
                             </View>
                             <View style={{ flex: 1 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.sideMenuItemTitle}>Clube de Descontos</Text>
-                                <View style={styles.sideMenuTagNew}>
-                                  <Text style={styles.sideMenuTagNewText}>CUPONS</Text>
+                                <Text style={styles.sideMenuRowTitle}>Clube de Descontos</Text>
+                                <View style={styles.sideMenuBadgeTag}>
+                                  <Text style={styles.sideMenuBadgeTagText}>CUPONS</Text>
                                 </View>
                               </View>
-                              <Text style={styles.sideMenuItemSubtitle}>Descontos em farmácias, cinema e lojas</Text>
+                              <Text style={styles.sideMenuRowSubtitle}>Parcerias em lojas e farmácias</Text>
                             </View>
-                            <ChevronRight size={18} color="#64748B" />
+                            <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
+
+                          <View style={styles.sideMenuDivider} />
 
                           {/* 3. Clube do Cliente */}
                           <TouchableOpacity
-                            style={[
-                              styles.sideMenuItem,
-                              activeTab === 'CLUBE_CLIENTE' && styles.sideMenuItemActive
-                            ]}
+                            style={styles.sideMenuRow}
                             onPress={() => {
                               setActiveTab('CLUBE_CLIENTE');
                               setIsSideMenuOpen(false);
                             }}
-                            activeOpacity={0.7}
+                            activeOpacity={0.65}
                           >
-                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#8B5CF620' }]}>
-                              <Crown size={20} color="#8B5CF6" />
+                            <View style={styles.sideMenuIconWrapper}>
+                              <Sparkles size={20} color="#94A3B8" strokeWidth={1.7} />
                             </View>
                             <View style={{ flex: 1 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.sideMenuItemTitle}>Clube do Cliente</Text>
-                                <View style={[styles.sideMenuTagNew, { backgroundColor: '#8B5CF620', borderColor: '#8B5CF660' }]}>
-                                  <Text style={[styles.sideMenuTagNewText, { color: '#C084FC' }]}>VIP</Text>
+                                <Text style={styles.sideMenuRowTitle}>Clube do Cliente</Text>
+                                <View style={[styles.sideMenuBadgeTag, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
+                                  <Text style={[styles.sideMenuBadgeTagText, { color: '#CBD5E1' }]}>VIP</Text>
                                 </View>
                               </View>
-                              <Text style={styles.sideMenuItemSubtitle}>Vantagens exclusivas e fidelidade do assinante</Text>
+                              <Text style={styles.sideMenuRowSubtitle}>Vantagens e fidelidade do assinante</Text>
                             </View>
-                            <ChevronRight size={18} color="#64748B" />
+                            <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
+                        </View>
 
-                          {/* 4. Trocar Contrato (if multiple) */}
+                        {/* SECTION 2: CONTA & SISTEMA */}
+                        <Text style={styles.sideMenuSectionTitle}>CONTA & PREFERÊNCIAS</Text>
+                        <View style={styles.sideMenuGroup}>
+                          {/* 4. Trocar Contrato (se houver mais de 1) */}
                           {contracts.length > 1 && (
-                            <TouchableOpacity
-                              style={styles.sideMenuItem}
-                              onPress={() => {
-                                setIsSideMenuOpen(false);
-                                setScreenState('SELECT_CONTRACT');
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#3B82F620' }]}>
-                                <RefreshCw size={20} color="#3B82F6" />
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <Text style={styles.sideMenuItemTitle}>Trocar Contrato</Text>
-                                <Text style={styles.sideMenuItemSubtitle}>Você possui {contracts.length} contratos ativos</Text>
-                              </View>
-                              <ChevronRight size={18} color="#64748B" />
-                            </TouchableOpacity>
+                            <>
+                              <TouchableOpacity
+                                style={styles.sideMenuRow}
+                                onPress={() => {
+                                  setIsSideMenuOpen(false);
+                                  setScreenState('SELECT_CONTRACT');
+                                }}
+                                activeOpacity={0.65}
+                              >
+                                <View style={styles.sideMenuIconWrapper}>
+                                  <ArrowLeftRight size={20} color="#94A3B8" strokeWidth={1.7} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.sideMenuRowTitle}>Trocar Contrato</Text>
+                                  <Text style={styles.sideMenuRowSubtitle}>{contracts.length} contratos vinculados</Text>
+                                </View>
+                                <ChevronRight size={16} color="#475569" />
+                              </TouchableOpacity>
+                              <View style={styles.sideMenuDivider} />
+                            </>
                           )}
 
-                          {/* 5. Notificações */}
+                          {/* 5. Sair da Conta */}
                           <TouchableOpacity
-                            style={styles.sideMenuItem}
-                            onPress={() => {
-                              setIsSideMenuOpen(false);
-                              handleOpenNotificationCenter();
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#10B98120' }]}>
-                              <Bell size={20} color="#10B981" />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <Text style={styles.sideMenuItemTitle}>Notificações e Avisos</Text>
-                              <Text style={styles.sideMenuItemSubtitle}>Histórico de comunicados e alertas</Text>
-                            </View>
-                            {unreadCount > 0 && (
-                              <View style={styles.sideMenuBadgeCount}>
-                                <Text style={styles.sideMenuBadgeCountText}>{unreadCount}</Text>
-                              </View>
-                            )}
-                            <ChevronRight size={18} color="#64748B" />
-                          </TouchableOpacity>
-
-                          {/* 6. Sair da Conta */}
-                          <TouchableOpacity
-                            style={[styles.sideMenuItem, { borderBottomWidth: 0, marginTop: 4 }]}
+                            style={styles.sideMenuRow}
                             onPress={() => {
                               setIsSideMenuOpen(false);
                               handleLogout();
                             }}
-                            activeOpacity={0.7}
+                            activeOpacity={0.65}
                           >
-                            <View style={[styles.sideMenuItemIconBox, { backgroundColor: '#EF444420' }]}>
-                              <LogOut size={20} color="#EF4444" />
+                            <View style={styles.sideMenuIconWrapper}>
+                              <LogOut size={20} color="#94A3B8" strokeWidth={1.7} />
                             </View>
                             <View style={{ flex: 1 }}>
-                              <Text style={[styles.sideMenuItemTitle, { color: '#EF4444' }]}>Sair da Conta</Text>
-                              <Text style={styles.sideMenuItemSubtitle}>Desconectar seu acesso com segurança</Text>
+                              <Text style={styles.sideMenuRowTitle}>Sair da Conta</Text>
+                              <Text style={styles.sideMenuRowSubtitle}>Encerrar sessão no aparelho</Text>
                             </View>
-                            <ChevronRight size={18} color="#EF444460" />
+                            <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
                         </View>
+
+                        {/* FOOTER */}
+                        <Text style={styles.sideMenuFooterText}>Web Connect • Versão 1.0.0</Text>
                       </View>
                     </View>
                   </Modal>
@@ -4627,49 +4364,43 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 100,
-    backgroundColor: '#0F172A', // Dark navbar background
-    borderTopWidth: 1.5,
-    borderTopColor: '#1E293B',
-    paddingBottom: Platform.OS === 'ios' ? 20 : 6,
+    backgroundColor: '#0A0F1D', // Sleek dark slate navbar
+    borderTopWidth: 1,
+    borderTopColor: '#1A2338',
+    paddingTop: 8,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 12,
   },
   bottomTabBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    height: 58,
     width: '100%',
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
+    paddingVertical: 2,
   },
   tabIconWrapper: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 2,
   },
-  activeTabElevatedIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2563EB',
-    marginTop: -22, // Elevates the active button dynamically!
-    borderWidth: 3,
-    borderColor: '#0F172A',
-    shadowColor: '#2563EB',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 6,
+  tabIconWrapperActive: {
+    backgroundColor: 'rgba(37, 99, 235, 0.12)',
   },
   tabLabel: {
-    fontSize: 10,
-    marginTop: 2,
-    letterSpacing: 0.1,
+    fontSize: 11,
+    letterSpacing: -0.1,
   },
   whatsappBanner: {
     backgroundColor: '#111625',
@@ -5800,7 +5531,7 @@ const styles = StyleSheet.create({
   /* SANDWICH MENU (DRAWER / BOTTOM SHEET) STYLES */
   sideMenuOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'flex-end',
   },
   sideMenuBackdrop: {
@@ -5811,116 +5542,133 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   sideMenuContainer: {
-    backgroundColor: '#0E131F',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1.5,
-    borderColor: '#28354E',
+    backgroundColor: '#0A0F1D',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderWidth: 1,
+    borderColor: '#1E293B',
     borderBottomWidth: 0,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 44 : 28,
-    paddingHorizontal: 20,
-    maxHeight: '85%',
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    paddingHorizontal: 18,
+    maxHeight: '88%',
   },
   sideMenuHandle: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
     backgroundColor: '#334155',
     alignSelf: 'center',
     marginBottom: 16,
   },
-  sideMenuHeader: {
+  sideMenuProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 16,
-    borderBottomWidth: 1.2,
-    borderBottomColor: '#1E293B',
-    marginBottom: 12,
-  },
-  sideMenuUserRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 16,
     gap: 12,
-    flex: 1,
   },
-  sideMenuUserName: {
+  sideMenuAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#2563EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sideMenuAvatarText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
-    color: '#FFFFFF',
+  },
+  sideMenuUserName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F8FAFC',
     letterSpacing: -0.2,
   },
-  sideMenuUserContract: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
+  sideMenuContractPill: {
     marginTop: 2,
   },
+  sideMenuContractPillText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
   sideMenuCloseBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#161F30',
-    borderWidth: 1,
-    borderColor: '#28354E',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#1E293B',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 10,
   },
-  sideMenuList: {
-    gap: 4,
+  sideMenuSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 6,
+    marginLeft: 4,
   },
-  sideMenuItem: {
+  sideMenuGroup: {
+    backgroundColor: '#111827',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+    overflow: 'hidden',
+    marginBottom: 14,
+  },
+  sideMenuRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    backgroundColor: '#111625',
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    marginBottom: 6,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
     gap: 12,
   },
-  sideMenuItemActive: {
-    borderColor: '#2563EB',
-    backgroundColor: '#2563EB10',
-  },
-  sideMenuItemIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
+  sideMenuIconWrapper: {
+    width: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sideMenuItemTitle: {
+  sideMenuRowTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    fontWeight: '600',
+    color: '#F8FAFC',
+    letterSpacing: -0.1,
   },
-  sideMenuItemSubtitle: {
-    fontSize: 11,
-    fontWeight: '500',
+  sideMenuRowSubtitle: {
+    fontSize: 12,
+    fontWeight: '400',
     color: '#64748B',
     marginTop: 1,
   },
-  sideMenuTagNew: {
-    backgroundColor: '#F59E0B20',
-    borderWidth: 1,
-    borderColor: '#F59E0B60',
-    paddingVertical: 1,
+  sideMenuDivider: {
+    height: 1,
+    backgroundColor: '#1E293B',
+    marginLeft: 52,
+  },
+  sideMenuBadgeTag: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 6,
   },
-  sideMenuTagNewText: {
-    color: '#F59E0B',
+  sideMenuBadgeTagText: {
+    color: '#FBBF24',
     fontSize: 9,
-    fontWeight: '900',
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
   sideMenuBadgeCount: {
     backgroundColor: '#EF4444',
-    paddingHorizontal: 7,
+    paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
     marginRight: 4,
@@ -5929,6 +5677,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 10,
     fontWeight: '800',
+  },
+  sideMenuFooterText: {
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: 4,
   },
 
   /* CLUBE DE VANTAGENS STYLES */
