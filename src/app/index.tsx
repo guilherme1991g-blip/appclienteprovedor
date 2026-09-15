@@ -80,6 +80,7 @@ import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import * as Updates from 'expo-updates';
 import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
@@ -681,6 +682,22 @@ export default function LoginScreen() {
   const [receivedNotification, setReceivedNotification] = useState<Notifications.Notification | null>(null);
 
   React.useEffect(() => {
+    // Proactively check, download and apply OTA updates
+    async function checkForUpdates() {
+      if (__DEV__) return;
+      try {
+        const update = await Updates.checkForUpdateAsync();
+        if (update.isAvailable) {
+          console.log('Nova atualização encontrada! Baixando...');
+          await Updates.fetchUpdateAsync();
+          await Updates.reloadAsync();
+        }
+      } catch (e) {
+        console.log('Verificação de atualização (silenciosa):', e);
+      }
+    }
+    checkForUpdates();
+
     registerForPushNotificationsAsync().then(token => {
       if (token) {
         setExpoPushToken(token);
