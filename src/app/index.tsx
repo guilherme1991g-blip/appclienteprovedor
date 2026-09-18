@@ -435,6 +435,7 @@ export default function LoginScreen() {
   }, []);
 
   const [documentInput, setDocumentInput] = useState('');
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Restaura sessão salva caso o cliente tenha optado por "Manter-me conectado"
   React.useEffect(() => {
@@ -604,6 +605,8 @@ export default function LoginScreen() {
         }
       } catch (e) {
         console.error('Session restore error:', e);
+      } finally {
+        setIsInitializing(false);
       }
     };
 
@@ -2110,6 +2113,14 @@ export default function LoginScreen() {
     setActiveTab('HOME');
     refreshContractStatus();
   };
+
+  if (isInitializing) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={primaryColor || '#2563EB'} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
