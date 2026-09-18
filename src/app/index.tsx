@@ -1609,10 +1609,13 @@ export default function LoginScreen() {
     setDiagnosticReport(null);
     setDiagnosticProgress(5);
 
+    const targetProviderIp = (providerConfig.ip_diagnostico || '177.221.128.60').trim();
+    const providerDisplayName = providerConfig.nome || 'Provedor';
+
     const initialSteps = [
-      { id: 'wifi', title: '1. Interface Wi-Fi & Frequência', description: 'Consultando conexão, banda 2.4/5.8 GHz e qualidade do sinal', status: 'running' as const },
+      { id: 'wifi', title: '1. Interface Wi-Fi & Frequência', description: 'Consultando conexão Wi-Fi e qualidade do sinal', status: 'running' as const },
       { id: 'gateway', title: '2. Gateway Local (Roteador)', description: 'Verificando comunicação com o roteador da residência', status: 'pending' as const },
-      { id: 'provider', title: '3. Servidor Provedor (177.221.128.60)', description: 'Medindo latência na rota direta de fibra óptica WebConnect', status: 'pending' as const },
+      { id: 'provider', title: `3. Servidor Provedor (${targetProviderIp})`, description: `Medindo latência na rota direta com ${providerDisplayName}`, status: 'pending' as const },
       { id: 'google', title: '4. Google DNS (8.8.8.8)', description: 'Testando tempo de resposta do servidor Google', status: 'pending' as const },
       { id: 'cloudflare', title: '5. Cloudflare DNS (1.1.1.1)', description: 'Testando rota de alta velocidade Cloudflare', status: 'pending' as const },
       { id: 'quad9', title: '6. Quad9 DNS (9.9.9.9)', description: 'Testando estabilidade e resolução mundial da internet', status: 'pending' as const },
@@ -1678,7 +1681,7 @@ export default function LoginScreen() {
 
       setDiagnosticSteps(prev => prev.map(s => s.id === 'wifi' ? {
         ...s,
-        status: isWeakSignal ? 'warning' : has5gRecommendation ? 'warning' : 'success',
+        status: isWeakSignal ? 'warning' : 'success',
         detail: `${frequencyBand} • Sinal: ${signalQuality}${wifiDetails.ssid ? ` (${wifiDetails.ssid})` : ''}`,
         latencyMs: gatewayLatency
       } : s.id === 'gateway' ? {
@@ -1688,10 +1691,10 @@ export default function LoginScreen() {
         latencyMs: gwResult.avg
       } : s.id === 'provider' ? { ...s, status: 'running' } : s));
 
-      // 3. Provider IP Test (177.221.128.60 & WebConnect SGP) with 6 packets
+      // 3. Provider IP Test (Configured IP in Supabase) with 6 packets
       setDiagnosticProgress(38);
-      const provResult = await multiPing('http://177.221.128.60', 6, 200, 'provider', (curr, total, lat) => {
-        setDiagnosticCurrentStep(`Passo 3/6: Testando Fibra Óptica WebConnect 177.221.128.60 (${curr}/${total})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
+      const provResult = await multiPing(`http://${targetProviderIp}`, 6, 200, 'provider', (curr, total, lat) => {
+        setDiagnosticCurrentStep(`Passo 3/6: Testando rota com ${providerDisplayName} (${targetProviderIp})... ${lat > 0 ? `${lat}ms` : 'aguardando...'}`);
         setDiagnosticProgress(38 + Math.round((curr / total) * 18));
       });
 
@@ -1774,25 +1777,20 @@ export default function LoginScreen() {
         recommendations.push("📶 Aproxime-se do roteador da sua residência para verificar se o sinal e a velocidade aumentam.");
       } else if (topology.routerToProvider !== 'ok') {
         score -= 3.0;
-        rootCause = '🔴 Problema detectado na rota da Fibra Óptica com a central do provedor WebConnect!';
-        recommendations.push("🏢 O roteador local está bom, mas a conexão externa de fibra está instável. Caso persista, abra um chamado técnico.");
+        rootCause = `🔴 Problema detectado na rota com a central do provedor ${providerDisplayName}!`;
+        recommendations.push("🏢 O roteador local está bom, mas a conexão externa com o provedor está instável. Caso persista, abra um chamado técnico.");
       } else if (topology.providerToInternet !== 'ok') {
         score -= 2.0;
         rootCause = '⚠️ Problema detectado na saída externa para os servidores da Internet mundial.';
         recommendations.push("🌐 Conexão local ativa, porém alguns servidores externos da internet estão lentos no momento.");
       }
 
-      if (has5gRecommendation) {
-        score -= 0.8;
-        if (wifiDetails.recommendation) {
-          recommendations.push(`💡 ${wifiDetails.recommendation}`);
-        } else {
-          recommendations.push("💡 Você está conectado na frequência 2.4 GHz. Conecte no Wi-Fi com o mesmo nome terminado em '_5G' ou '5.8GHz' para atingir a velocidade máxima do seu plano!");
-        }
+      if (has5gRecommendation && wifiDetails.recommendation) {
+        recommendations.push(`💡 ${wifiDetails.recommendation}`);
       }
 
       if (providerLatency <= 30 && topology.routerToProvider === 'ok') {
-        recommendations.push("🚀 Rota de Fibra Óptica WebConnect com ultra-baixa latência (média de " + providerLatency + "ms) e jitter estável (" + provResult.jitter + "ms).");
+        recommendations.push(`🚀 Rota com ${providerDisplayName} com ultra-baixa latência (média de ${providerLatency}ms) e jitter estável (${provResult.jitter}ms).`);
       }
 
       let verdict = 'Conexão Excelente e Estável';
@@ -3714,11 +3712,11 @@ export default function LoginScreen() {
                                           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                                             <Radio size={16} color="#F59E0B" style={{ marginRight: 8 }} />
                                             <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '800' }}>
-                                              💡 Sugestão: Conecte no Wi-Fi 5.8 GHz
+                                              💡 Dica de Frequência: Wi-Fi 5.8 GHz
                                             </Text>
                                           </View>
                                           <Text style={{ color: '#CBD5E1', fontSize: 12, lineHeight: 18 }}>
-                                            Seu smartphone está conectado na frequência <Text style={{ fontWeight: '700', color: '#F59E0B' }}>2.4 GHz</Text>. Para atingir 100% da velocidade contratada do seu plano, abra os ajustes de Wi-Fi do celular e conecte na rede com o mesmo nome terminada em <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>_5G</Text> ou <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>5.8GHz</Text>!
+                                            Para obter a velocidade máxima e estabilidade da sua fibra, verifique nos ajustes de Wi-Fi do seu celular se você está conectado na rede terminada em <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>_5G</Text> ou <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>5.8GHz</Text>!
                                           </Text>
                                         </View>
                                       )}

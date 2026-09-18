@@ -5,8 +5,8 @@ export interface WifiInfoResult {
   ssid: string | null;
   bssid: string | null;
   frequencyMHz: number | null;
-  frequencyBand: '2.4 GHz' | '5.8 GHz' | '6 GHz' | 'Dados Móveis' | 'Desconhecida';
-  detectionMethod: 'native_mhz' | 'ssid_pattern' | 'latency_profiling' | 'cellular';
+  frequencyBand: '2.4 GHz' | '5.8 GHz' | '6 GHz' | 'Dados Móveis' | 'Wi-Fi' | 'Desconhecida';
+  detectionMethod: 'native_mhz' | 'ssid_pattern' | 'ios_general' | 'cellular';
   signalLevel: number | null;
   isDualBandHint: boolean;
   recommendation: string | null;
@@ -67,11 +67,12 @@ export function analyzeSsidPattern(ssid: string | null): {
     return { detectedBand: '2.4 GHz', hasMatching5gCandidate: true };
   }
 
-  return { detectedBand: null, hasMatching5gCandidate: true };
+  return { detectedBand: null, hasMatching5gCandidate: false };
 }
 
 /**
- * Safely inspects native device Wi-Fi details (Android WifiManager / iOS Network / safe fallbacks)
+ * Safely inspects device Wi-Fi details (Android WifiManager / iOS Network / safe fallbacks)
+ * On iPhone / iOS or when frequency is not natively returned, does NOT guess frequency.
  */
 export async function getDetailedWifiInfo(
   gatewayLatencyAvg: number,
@@ -97,31 +98,33 @@ export async function getDetailedWifiInfo(
     };
   }
 
-  // Attempt 1: Safe query to native modules if available in runtime
-  try {
-    const wifiModule =
-      (NativeModules as any).RNWifi ||
-      (NativeModules as any).RNNetworkInfo ||
-      (NativeModules as any).WifiManager;
+  // Attempt 1: Safe query to native modules if available in runtime (Android)
+  if (Platform.OS === 'android') {
+    try {
+      const wifiModule =
+        (NativeModules as any).RNWifi ||
+        (NativeModules as any).RNNetworkInfo ||
+        (NativeModules as any).WifiManager;
 
-    if (wifiModule) {
-      if (typeof wifiModule.getFrequency === 'function') {
-        const freq = await wifiModule.getFrequency();
-        if (typeof freq === 'number' && freq > 0) {
-          frequencyMHz = freq;
+      if (wifiModule) {
+        if (typeof wifiModule.getFrequency === 'function') {
+          const freq = await wifiModule.getFrequency();
+          if (typeof freq === 'number' && freq > 0) {
+            frequencyMHz = freq;
+          }
+        }
+        if (typeof wifiModule.getCurrentWifiSSID === 'function') {
+          ssid = await wifiModule.getCurrentWifiSSID();
+        } else if (typeof wifiModule.getSSID === 'function') {
+          ssid = await wifiModule.getSSID();
+        }
+        if (typeof wifiModule.getCurrentSignalStrength === 'function') {
+          signalLevel = await wifiModule.getCurrentSignalStrength();
         }
       }
-      if (typeof wifiModule.getCurrentWifiSSID === 'function') {
-        ssid = await wifiModule.getCurrentWifiSSID();
-      } else if (typeof wifiModule.getSSID === 'function') {
-        ssid = await wifiModule.getSSID();
-      }
-      if (typeof wifiModule.getCurrentSignalStrength === 'function') {
-        signalLevel = await wifiModule.getCurrentSignalStrength();
-      }
+    } catch (_e) {
+      // Native module not linked in current JS bundle / permission denied
     }
-  } catch (_e) {
-    // Native module not linked in current JS bundle / permission denied, silently fallback
   }
 
   // Decision Logic:
@@ -143,38 +146,33 @@ export async function getDetailedWifiInfo(
     };
   }
 
-  // 2. If SSID pattern is recognizable (iOS / Android without location permission)
+  // 2. If SSID pattern is recognizable by name (e.g. "_5G" or "_2.4G")
   const pattern = analyzeSsidPattern(ssid);
   if (pattern.detectedBand) {
     const is24 = pattern.detectedBand === '2.4 GHz';
     return {
       ssid,
       bssid,
-      frequencyMHz: is24 ? 2437 : 5745,
+      frequencyMHz: null,
       frequencyBand: pattern.detectedBand,
       detectionMethod: 'ssid_pattern',
       signalLevel,
       isDualBandHint: is24,
       recommendation: is24
-        ? `Identificado rede 2.4 GHz pelo nome${ssid ? ` ("${ssid}")` : ''}. Procure uma rede com o mesmo nome terminada em "_5G" nas configurações de Wi-Fi.`
+        ? `Identificada rede 2.4 GHz pelo nome${ssid ? ` ("${ssid}")` : ''}. Verifique nos ajustes se está conectado na rede 5.8 GHz (ou terminada em _5G) para melhor conexão.`
         : `Conectado na rede 5.8 GHz de alta velocidade.`,
     };
   }
 
-  // 3. Fallback: Ultra-low latency & jitter profiling for the Gateway (5.8 GHz < 5ms & Jitter < 3ms)
-  const isLikely5G = gatewayLatencyAvg > 0 && gatewayLatencyAvg <= 5 && gatewayJitter <= 3;
-  const estimatedBand = isLikely5G ? '5.8 GHz' : '2.4 GHz';
-
+  // 3. Fallback for iOS / Unknown frequency: Do NOT guess. Inform user to verify 5.8 GHz for best speed.
   return {
     ssid,
     bssid,
-    frequencyMHz: isLikely5G ? 5745 : 2437,
-    frequencyBand: estimatedBand,
-    detectionMethod: 'latency_profiling',
+    frequencyMHz: null,
+    frequencyBand: 'Wi-Fi',
+    detectionMethod: Platform.OS === 'ios' ? 'ios_general' : 'ssid_pattern',
     signalLevel,
-    isDualBandHint: !isLikely5G,
-    recommendation: !isLikely5G
-      ? `A latência e estabilidade do sinal indicam conexão em 2.4 GHz. Se o seu roteador tiver rede 5.8 GHz, conecte-se nela para menor latência.`
-      : `Latência local extremamente baixa (${gatewayLatencyAvg}ms), compatível com a banda 5.8 GHz.`,
+    isDualBandHint: true,
+    recommendation: 'Verifique nos ajustes do seu aparelho se está conectado na rede 5.8 GHz (ou _5G) para obter a melhor velocidade e estabilidade.',
   };
 }

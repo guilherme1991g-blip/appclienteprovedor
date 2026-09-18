@@ -30,6 +30,7 @@ export interface ProviderConfig {
   mensagem_atualizacao?: string;
   habilitar_clube?: boolean;
   exigir_confirmacao_numero?: boolean;
+  ip_diagnostico?: string;
 }
 
 const CACHE_LOGO_KEY = '@isp_app_cached_logo_url';
@@ -60,6 +61,7 @@ const DEFAULT_PROVIDER_CONFIG: ProviderConfig = {
   primary_color: '#2563EB',
   secondary_color: '#1E40AF',
   accent_color: '#10B981',
+  ip_diagnostico: '177.221.128.60',
 };
 
 /**
@@ -185,6 +187,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         mensagem_atualizacao: data.mensagem_atualizacao || data.update_message || undefined,
         habilitar_clube: data.habilitar_clube === true || data.clube_ativo === true || data.habilitar_clube_descontos === true,
         exigir_confirmacao_numero: data.exigir_confirmacao_numero === true || data.confirmar_numero_chamado === true || data.verificar_telefone_suporte === true,
+        ip_diagnostico: (data.ip_diagnostico || data.ip_provedor || data.ip_servidor || data.ip_teste || DEFAULT_PROVIDER_CONFIG.ip_diagnostico || '177.221.128.60').trim(),
       };
     }
   } catch (err) {
