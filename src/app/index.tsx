@@ -1267,6 +1267,11 @@ export default function LoginScreen() {
 
   // Send verification code via WhatsApp
   const handleSendVerificationCode = async () => {
+    if (!supportContent.trim()) {
+      Alert.alert('Atenção', 'Por favor, descreva o problema antes de abrir o chamado.');
+      return;
+    }
+
     const cleanPhone = verificationPhone.replace(/\D/g, '');
     if (cleanPhone.length < 10 || cleanPhone.length > 11) {
       Alert.alert('Atenção', 'Informe um número de WhatsApp válido com DDD.');
@@ -3262,18 +3267,24 @@ export default function LoginScreen() {
                             />
                           </View>
 
-                          {/* Submit Button (sends verification code) - visible when code NOT yet sent */}
+                          {/* Submit Button */}
                           {!codeSent && (
                             <TouchableOpacity
                               style={[
                                 styles.supportSubmitBtn,
-                                { backgroundColor: sendingCode ? '#1E293B' : '#2563EB' }
+                                { backgroundColor: (sendingCode || submittingSupport) ? '#1E293B' : '#2563EB' }
                               ]}
-                              onPress={handleSendVerificationCode}
-                              disabled={sendingCode}
+                              onPress={() => {
+                                if (providerConfig.exigir_confirmacao_numero) {
+                                  handleSendVerificationCode();
+                                } else {
+                                  handleSubmitSupport(verificationPhone || selectedContract?.phone);
+                                }
+                              }}
+                              disabled={sendingCode || submittingSupport}
                               activeOpacity={0.8}
                             >
-                              {sendingCode ? (
+                              {(sendingCode || submittingSupport) ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
                               ) : (
                                 <Text style={styles.supportSubmitBtnText}>Abrir Chamado</Text>

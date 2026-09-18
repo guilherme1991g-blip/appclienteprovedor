@@ -26,6 +26,7 @@ export interface ProviderConfig {
   forcar_atualizacao?: boolean;
   mensagem_atualizacao?: string;
   habilitar_clube?: boolean;
+  exigir_confirmacao_numero?: boolean;
 }
 
 const CACHE_LOGO_KEY = '@isp_app_cached_logo_url';
@@ -177,6 +178,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         forcar_atualizacao: data.forcar_atualizacao === true || data.force_update === true,
         mensagem_atualizacao: data.mensagem_atualizacao || data.update_message || undefined,
         habilitar_clube: data.habilitar_clube === true || data.clube_ativo === true || data.habilitar_clube_descontos === true,
+        exigir_confirmacao_numero: data.exigir_confirmacao_numero === true || data.confirmar_numero_chamado === true || data.verificar_telefone_suporte === true,
       };
     }
   } catch (err) {
