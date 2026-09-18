@@ -894,7 +894,14 @@ export default function LoginScreen() {
 
   // Support Tickets & Form States
   const [loadingSuporte, setLoadingSuporte] = useState(false);
+  const [loadingMotives, setLoadingMotives] = useState(false);
   const [suporteTickets, setSuporteTickets] = useState<any[]>([]);
+  const [supportMotivesList, setSupportMotivesList] = useState<{ value: string; label: string }[]>([
+    { label: 'Sem Conexão', value: '2' },
+    { label: 'Acesso Lento', value: '1' },
+    { label: 'Mudança de Endereço', value: '4' },
+    { label: 'Outros Assuntos', value: '5' },
+  ]);
   const [supportContact, setSupportContact] = useState('');
   const [supportPhone, setSupportPhone] = useState('');
   const [supportMotive, setSupportMotive] = useState('2'); // default to '2' (Suporte - Sem Acesso)
@@ -1076,6 +1083,45 @@ export default function LoginScreen() {
       });
   };
 
+  // Fetch dynamic motives from SGP API
+  const fetchSupportMotives = async () => {
+    try {
+      setLoadingMotives(true);
+      const res = await fetch(`${providerConfig.api_url}/api/os/ocorrencia/motivo/list/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          app: providerConfig.api_app,
+          token: providerConfig.api_token,
+        }),
+      });
+      const data = await res.json();
+      console.log('Motivos de ocorrência recebidos da API SGP:', data);
+
+      const rawList = Array.isArray(data)
+        ? data
+        : (data?.motivos || data?.ocorrencias || data?.dados || data?.results || []);
+
+      if (Array.isArray(rawList) && rawList.length > 0) {
+        const parsed = rawList.map((item: any) => ({
+          value: String(item.id ?? item.codigo ?? item.value ?? item.motivo_id ?? ''),
+          label: String(item.motivo || item.nome || item.descricao || item.label || item.name || 'Motivo'),
+        })).filter((m: any) => m.value && m.label);
+
+        if (parsed.length > 0) {
+          setSupportMotivesList(parsed);
+          setSupportMotive(prev => parsed.some(p => p.value === prev) ? prev : parsed[0].value);
+        }
+      }
+    } catch (err) {
+      console.log('Aviso ao buscar motivos de ocorrência do SGP (mantendo padrões):', err);
+    } finally {
+      setLoadingMotives(false);
+    }
+  };
+
   // Format phone number as (XX) XXXXX-XXXX
   const formatPhoneInput = (text: string) => {
     const cleaned = text.replace(/\D/g, '').slice(0, 11);
@@ -1095,23 +1141,6 @@ export default function LoginScreen() {
     const effectivePhone = phoneOverride || verificationPhone || '';
     const formattedContact = effectivePhone ? `Contato: ${formatPhoneInput(effectivePhone)}` : '';
 
-    let motivoos = '100';
-    let ocorrenciatipo = '5';
-
-    if (supportMotive === '1') {
-      motivoos = '1';
-      ocorrenciatipo = '3';
-    } else if (supportMotive === '2') {
-      motivoos = '2';
-      ocorrenciatipo = '1';
-    } else if (supportMotive === '4') {
-      motivoos = '4';
-      ocorrenciatipo = '5';
-    } else if (supportMotive === '5') {
-      motivoos = '100';
-      ocorrenciatipo = '5';
-    }
-
     // Envia o contato junto na descrição/conteúdo do chamado para o SGP
     const fullContent = formattedContact
       ? `${supportContent.trim()}\n\n${formattedContact}`
@@ -1123,13 +1152,9 @@ export default function LoginScreen() {
       cpfcnpj: documentInput.replace(/\D/g, ''),
       contrato: selectedContract!.id.toString(),
       conteudo: fullContent,
-      contato: selectedContract!.clientName || 'Cliente',
-      os_prioridade: '2',
-      motivoos,
-      ocorrenciatipo,
+      motivoos: supportMotive,
+      ocorrenciatipo: '5',
       data_hora_agendamento: getNearestBusinessDayString(),
-      os_tecnico_responsavel: 'samuel',
-      setor: '1'
     };
 
     if (effectivePhone) {
@@ -1186,15 +1211,16 @@ export default function LoginScreen() {
                 cliente: clienteStr,
                 whatsapp: formattedContact,
                 contato: formattedContact,
-                telefone: effectivePhone.replace(/\D/g, ''),
+                telefone: effectivePhone ? effectivePhone.replace(/\D/g, '') : '',
                 descricao: descricaoStr,
                 local: localStr,
                 obs: obsStr,
+                motivoos: supportMotive,
+                ocorrenciatipo: '5',
               }),
             }).catch((wErr) => console.error('Erro ao enviar ocorrência para o webhook:', wErr));
 
             setSupportContent('');
-            setSupportMotive('5');
             fetchSupportTickets();
           }
         } else {
@@ -1211,6 +1237,7 @@ export default function LoginScreen() {
   React.useEffect(() => {
     if (screenState === 'DASHBOARD' && activeTab === 'SUPORTE' && selectedContract) {
       fetchSupportTickets();
+      fetchSupportMotives();
     }
   }, [activeTab, screenState, selectedContract]);
 
@@ -2845,19 +2872,19 @@ export default function LoginScreen() {
                           </View>
 
                           <View style={styles.supportFormGroup}>
-                            <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
+                              {loadingMotives && (
+                                <ActivityIndicator size="small" color="#2563EB" />
+                              )}
+                            </View>
                             <TouchableOpacity
                               style={styles.dropdownSelector}
                               onPress={() => setIsMotiveDropdownOpen(!isMotiveDropdownOpen)}
                               activeOpacity={0.8}
                             >
                               <Text style={styles.dropdownSelectorText}>
-                                {[
-                                  { label: 'Acesso Lento', value: '1' },
-                                  { label: 'Sem Conexão', value: '2' },
-                                  { label: 'Mudança de Endereço', value: '4' },
-                                  { label: 'Outros Assuntos', value: '5' }
-                                ].find(item => item.value === supportMotive)?.label || 'Selecione o motivo'}
+                                {supportMotivesList.find(item => item.value === supportMotive)?.label || 'Selecione o motivo'}
                               </Text>
                               {isMotiveDropdownOpen ? (
                                 <ChevronUp size={20} color="#64748B" />
@@ -2868,12 +2895,7 @@ export default function LoginScreen() {
 
                             {isMotiveDropdownOpen && (
                               <View style={styles.dropdownMenu}>
-                                {[
-                                  { label: 'Acesso Lento', value: '1' },
-                                  { label: 'Sem Conexão', value: '2' },
-                                  { label: 'Mudança de Endereço', value: '4' },
-                                  { label: 'Outros Assuntos', value: '5' }
-                                ].map((item) => {
+                                {supportMotivesList.map((item) => {
                                   const isSelected = supportMotive === item.value;
                                   return (
                                     <TouchableOpacity
