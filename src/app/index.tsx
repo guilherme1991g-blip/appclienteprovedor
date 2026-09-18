@@ -4342,13 +4342,13 @@ export default function LoginScreen() {
         )}
       </KeyboardAvoidingView>
 
-      {/* POPUP MODAL: ATUALIZAÇÃO RÁPIDA (OTA / EAS UPDATE) */}
+      {/* POPUP MODAL: ATUALIZAÇÃO RÁPIDA OBRIGATÓRIA (OTA / EAS UPDATE) */}
       <Modal
         visible={isOtaUpdateModalOpen}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
-          if (!isDownloadingOtaUpdate) setIsOtaUpdateModalOpen(false);
+          // Bloqueado: Não permite fechar pelo botão voltar do Android
         }}
       >
         <View style={styles.modalOverlay}>
@@ -4368,22 +4368,22 @@ export default function LoginScreen() {
             </View>
 
             <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 8 }]}>
-              Atualização Disponível! 🚀
+              Atualização Obrigatória 🚀
             </Text>
 
             <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20, textAlign: 'center', marginBottom: 20 }}>
-              Preparamos melhorias de estabilidade, novo visual e correções para você. Deseja atualizar o aplicativo agora?
+              Uma nova versão foi lançada com melhorias essenciais. Para continuar utilizando o aplicativo, aplique a atualização abaixo.
             </Text>
 
             {isDownloadingOtaUpdate ? (
               <View style={{ width: '100%', alignItems: 'center', paddingVertical: 12 }}>
                 <ActivityIndicator size="large" color={primaryColor} />
                 <Text style={{ color: '#E2E8F0', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
-                  Baixando e aplicando atualização...
+                  Baixando e reiniciando o aplicativo...
                 </Text>
               </View>
             ) : (
-              <View style={{ width: '100%', gap: 10 }}>
+              <View style={{ width: '100%' }}>
                 <TouchableOpacity
                   style={{
                     backgroundColor: primaryColor,
@@ -4398,16 +4398,8 @@ export default function LoginScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <RefreshCw size={16} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>Atualizar Agora</Text>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>Atualizar e Reiniciar</Text>
                   </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{ width: '100%', paddingVertical: 12, alignItems: 'center' }}
-                  onPress={() => setIsOtaUpdateModalOpen(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ color: '#64748B', fontSize: 13, fontWeight: '600' }}>Depois</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -4415,13 +4407,13 @@ export default function LoginScreen() {
         </View>
       </Modal>
 
-      {/* POPUP MODAL: ATUALIZAÇÃO DA LOJA (PLAY STORE / APP STORE) */}
+      {/* POPUP MODAL: ATUALIZAÇÃO DA LOJA OBRIGATÓRIA (PLAY STORE / APP STORE) */}
       <Modal
         visible={isStoreUpdateModalOpen}
         transparent={true}
         animationType="fade"
         onRequestClose={() => {
-          if (!storeUpdateInfo.isMandatory) setIsStoreUpdateModalOpen(false);
+          // Bloqueado: Não permite fechar pelo botão voltar do Android
         }}
       >
         <View style={styles.modalOverlay}>
@@ -4441,22 +4433,22 @@ export default function LoginScreen() {
             </View>
 
             <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 8 }]}>
-              {storeUpdateInfo.isMandatory ? 'Atualização Necessária 📲' : 'Nova Versão na Loja 📲'}
+              Atualização Necessária 📲
             </Text>
 
             {storeUpdateInfo.latestVersion ? (
               <View style={{ backgroundColor: '#1E293B', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 12 }}>
                 <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '700' }}>
-                  Versão {storeUpdateInfo.latestVersion}
+                  Nova Versão {storeUpdateInfo.latestVersion}
                 </Text>
               </View>
             ) : null}
 
             <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20, textAlign: 'center', marginBottom: 20 }}>
-              {storeUpdateInfo.message}
+              {storeUpdateInfo.message || 'Uma nova versão do aplicativo está disponível na loja. Atualize para continuar utilizando seus serviços.'}
             </Text>
 
-            <View style={{ width: '100%', gap: 10 }}>
+            <View style={{ width: '100%' }}>
               <TouchableOpacity
                 style={{
                   backgroundColor: '#10B981',
@@ -4476,16 +4468,6 @@ export default function LoginScreen() {
                   </Text>
                 </View>
               </TouchableOpacity>
-
-              {!storeUpdateInfo.isMandatory && (
-                <TouchableOpacity
-                  style={{ width: '100%', paddingVertical: 12, alignItems: 'center' }}
-                  onPress={() => setIsStoreUpdateModalOpen(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={{ color: '#64748B', fontSize: 13, fontWeight: '600' }}>Lembrar Mais Tarde</Text>
-                </TouchableOpacity>
-              )}
             </View>
           </View>
         </View>
