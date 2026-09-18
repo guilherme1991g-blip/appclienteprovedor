@@ -461,6 +461,7 @@ export default function LoginScreen() {
     getProviderConfig(APP_CONFIG.PROVIDER_CODE).then(config => {
       if (config) {
         setProviderConfig(config);
+        fetchSupportMotives(config);
 
         // Check for Store (Google Play / App Store) updates
         try {
@@ -1084,18 +1085,21 @@ export default function LoginScreen() {
   };
 
   // Fetch dynamic motives from SGP API
-  const fetchSupportMotives = async () => {
+  const fetchSupportMotives = async (customConfig?: ProviderConfig) => {
+    const configToUse = customConfig || providerConfig;
+    const apiUrl = configToUse.api_url || 'https://webcnnect.sgp.tsmx.com.br';
+    const apiApp = configToUse.api_app || 'App';
+    const apiToken = configToUse.api_token || '9720002b-a4f6-4c48-9a20-65f86669f6d6';
+
     try {
       setLoadingMotives(true);
-      const res = await fetch(`${providerConfig.api_url}/api/os/ocorrencia/motivo/list/`, {
-        method: 'POST',
+      const url = `${apiUrl}/api/os/ocorrencia/motivo/list/?app=${encodeURIComponent(apiApp)}&token=${encodeURIComponent(apiToken)}`;
+      const res = await fetch(url, {
+        method: 'GET',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          app: providerConfig.api_app,
-          token: providerConfig.api_token,
-        }),
       });
       const data = await res.json();
       console.log('Motivos de ocorrência recebidos da API SGP:', data);
@@ -1105,10 +1109,13 @@ export default function LoginScreen() {
         : (data?.motivos || data?.ocorrencias || data?.dados || data?.results || []);
 
       if (Array.isArray(rawList) && rawList.length > 0) {
-        const parsed = rawList.map((item: any) => ({
-          value: String(item.id ?? item.codigo ?? item.value ?? item.motivo_id ?? ''),
-          label: String(item.motivo || item.nome || item.descricao || item.label || item.name || 'Motivo'),
-        })).filter((m: any) => m.value && m.label);
+        const parsed = rawList
+          .filter((item: any) => item.ativo !== false)
+          .map((item: any) => ({
+            value: String(item.codigo ?? item.id ?? item.value ?? ''),
+            label: String(item.descricao || item.motivo || item.nome || item.label || 'Motivo'),
+          }))
+          .filter((m: any) => m.value && m.label);
 
         if (parsed.length > 0) {
           setSupportMotivesList(parsed);
