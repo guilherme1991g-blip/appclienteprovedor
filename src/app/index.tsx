@@ -15,6 +15,7 @@ import {
   Image,
   ImageBackground,
   Alert,
+  AppState,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -708,13 +709,28 @@ export default function LoginScreen() {
       }
     });
 
+    // Check if app was opened by tapping a notification (cold start)
+    Notifications.getLastNotificationResponseAsync().then(response => {
+      if (response) {
+        console.log('App aberto via toque em notificação (cold start):', response);
+        setIsNotificationModalOpen(true);
+        AsyncStorage.setItem('@isp_app_last_read_notif_time', new Date().toISOString()).catch(() => {});
+        setUnreadCount(0);
+      }
+    });
+
     const notificationListener = Notifications.addNotificationReceivedListener(noti => {
       setReceivedNotification(noti);
       console.log('Notificação recebida no app:', noti);
+      fetchNotificationHistory();
     });
 
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
       console.log('Notificação tocada pelo usuário:', response);
+      setIsNotificationModalOpen(true);
+      AsyncStorage.setItem('@isp_app_last_read_notif_time', new Date().toISOString()).catch(() => {});
+      setUnreadCount(0);
+      fetchNotificationHistory(true);
     });
 
     return () => {
@@ -827,6 +843,8 @@ export default function LoginScreen() {
   const [unreadCount, setUnreadCount] = useState(0);
   const lastSeenIdRef = React.useRef<string | null>(null);
 
+  const LAST_READ_NOTIF_KEY = '@isp_app_last_read_notif_time';
+
   const fetchNotificationHistory = async (showLoading = false): Promise<any[]> => {
     if (showLoading) setLoadingNotifications(true);
     try {
@@ -852,8 +870,28 @@ export default function LoginScreen() {
         console.log('Aviso ao carregar histórico de notificações:', error.message);
         return [];
       } else {
-        setNotificationHistory(data || []);
-        return data || [];
+        const list = data || [];
+        setNotificationHistory(list);
+
+        // Calculate unread count persistently based on last viewed timestamp
+        try {
+          const lastReadTimeStr = await AsyncStorage.getItem(LAST_READ_NOTIF_KEY);
+          if (lastReadTimeStr) {
+            const lastReadTime = new Date(lastReadTimeStr).getTime();
+            const unread = list.filter(n => {
+              if (!n.created_at) return false;
+              return new Date(n.created_at).getTime() > lastReadTime;
+            }).length;
+            setUnreadCount(unread);
+          } else {
+            // First run: all fetched notifications from last 7 days are unread until opened
+            setUnreadCount(list.length);
+          }
+        } catch (e) {
+          console.log('Erro ao calcular notificações não lidas:', e);
+        }
+
+        return list;
       }
     } catch (err) {
       console.log('Exceção ao buscar notificações:', err);
@@ -863,25 +901,22 @@ export default function LoginScreen() {
     }
   };
 
-  // Active polling & Supabase Realtime Listener for new incoming notifications
+  // Active polling, AppState foreground detection & Supabase Realtime Listener
   React.useEffect(() => {
     if (!selectedContract) return;
 
-    const checkNewNotifications = async () => {
-      const data = await fetchNotificationHistory();
-      if (data && data.length > 0) {
-        const newest = data[0];
-        if (newest && newest.id) {
-          if (lastSeenIdRef.current !== null && newest.id !== lastSeenIdRef.current) {
-            setUnreadCount(prev => prev + 1);
-          }
-          lastSeenIdRef.current = newest.id;
-        }
-      }
-    };
+    fetchNotificationHistory();
 
-    checkNewNotifications();
-    const interval = setInterval(checkNewNotifications, 10000);
+    // Re-check unread notifications whenever the app returns from background / closed state
+    const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        fetchNotificationHistory();
+      }
+    });
+
+    const interval = setInterval(() => {
+      fetchNotificationHistory();
+    }, 10000);
 
     const channelName = `realtime_notif_${Date.now()}`;
     const channel = supabase
@@ -891,13 +926,10 @@ export default function LoginScreen() {
         { event: 'INSERT', schema: 'public', table: 'notificacoes_historico' },
         (payload) => {
           console.log('Nova notificação recebida em tempo real via Supabase:', payload.new);
-          if (payload.new && payload.new.id) {
-            if (lastSeenIdRef.current === payload.new.id) return;
-            lastSeenIdRef.current = payload.new.id;
+          if (payload.new) {
+            setNotificationHistory(prev => [payload.new, ...prev]);
+            setUnreadCount(prev => prev + 1);
           }
-
-          setUnreadCount(prev => prev + 1);
-          setNotificationHistory(prev => [payload.new, ...prev]);
         }
       )
       .subscribe((status) => {
@@ -906,13 +938,19 @@ export default function LoginScreen() {
 
     return () => {
       clearInterval(interval);
+      appStateSub.remove();
       supabase.removeChannel(channel);
     };
   }, [selectedContract]);
 
-  const handleOpenNotificationCenter = () => {
+  const handleOpenNotificationCenter = async () => {
     setIsNotificationModalOpen(true);
-    setUnreadCount(0); // Clears unread badge when opening notification center
+    setUnreadCount(0); // Clears unread badge immediately
+    try {
+      await AsyncStorage.setItem(LAST_READ_NOTIF_KEY, new Date().toISOString());
+    } catch (e) {
+      console.log('Erro ao salvar timestamp de leitura:', e);
+    }
     fetchNotificationHistory(true);
   };
 
