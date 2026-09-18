@@ -7,6 +7,7 @@ export interface ProviderConfig {
   nome: string;
   api_url: string;
   api_token: string;
+  token_central_assinante?: string;
   api_app: string;
   logo_url?: string;
   icone_url?: string;
@@ -157,6 +158,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         nome: data.nome || 'Provedor',
         api_url: data.api_url || DEFAULT_PROVIDER_CONFIG.api_url,
         api_token: data.api_token || DEFAULT_PROVIDER_CONFIG.api_token,
+        token_central_assinante: data.token_central_assinante || data.token_central || data.api_token_central || data.central_token || undefined,
         api_app: data.api_app || 'App',
         logo_url: activeLogo,
         icone_url: activeIcon,

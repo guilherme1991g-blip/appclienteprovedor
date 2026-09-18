@@ -16,8 +16,9 @@ import {
   ImageBackground,
   Alert,
   AppState,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowRight,
   CheckCircle,
@@ -75,8 +76,13 @@ import {
   LayoutGrid,
   ArrowLeftRight,
   FileCheck,
+  Download,
+  Share2,
 } from 'lucide-react-native';
 import * as Network from 'expo-network';
+import * as WebBrowser from 'expo-web-browser';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -422,6 +428,7 @@ async function registerForPushNotificationsAsync() {
 }
 
 export default function LoginScreen() {
+  const insets = useSafeAreaInsets();
   const [providerConfig, setProviderConfig] = useState<ProviderConfig>({
     codigo: APP_CONFIG.PROVIDER_CODE,
     nome: 'WebConnect Telecom',
@@ -679,6 +686,9 @@ export default function LoginScreen() {
   const [selectedContract, setSelectedContract] = useState<ContractDisplay | null>(null);
   const [activeTab, setActiveTab] = useState<TabName>('HOME');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+  const [loadingDeclaracao, setLoadingDeclaracao] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfModalData, setPdfModalData] = useState<{ visible: boolean; html: string; title: string; year: number } | null>(null);
 
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
@@ -2112,6 +2122,314 @@ export default function LoginScreen() {
         console.error('Trust Unlock Error:', err);
         Alert.alert('Erro de Conexão', 'Falha ao comunicar com o servidor. Tente novamente.');
       });
+  };
+
+  const handleOpenDeclaracaoQuitacao = (targetYear?: number) => {
+    if (!selectedContract) {
+      Alert.alert('Atenção', 'Selecione um contrato para emitir a declaração de quitação.');
+      return;
+    }
+
+    setIsSideMenuOpen(false);
+
+    const yearToFetch = targetYear || new Date().getFullYear();
+    const providerName = providerConfig.nome || 'WebConnect Telecom';
+    const clientName = selectedContract.clientName || 'Cliente';
+    const cpfCnpj = documentInput || selectedContract.centralLogin || 'Não informado';
+    const contractId = selectedContract.id;
+    const planName = selectedContract.planName || 'Plano de Internet';
+    const address = selectedContract.address || 'Endereço cadastrado';
+
+    // Filtrar faturas pagas (do ano selecionado ou as mais recentes caso não haja no ano atual)
+    let paidInvoices = allTitulos.filter((t) => {
+      if (t.status?.toLowerCase() !== 'pago') return false;
+      const vYear = t.dataVencimento ? new Date(t.dataVencimento).getFullYear() : null;
+      const pYear = t.dataPagamento ? new Date(t.dataPagamento).getFullYear() : null;
+      return vYear === yearToFetch || pYear === yearToFetch;
+    });
+
+    if (paidInvoices.length === 0) {
+      paidInvoices = allTitulos.filter((t) => t.status?.toLowerCase() === 'pago').slice(0, 12);
+    }
+
+    if (paidInvoices.length === 0) {
+      Alert.alert('Declaração de Quitação', `Não foram encontrados registros de faturas pagas para o contrato nº ${contractId}.`);
+      return;
+    }
+
+    const totalPaid = paidInvoices.reduce((acc, curr) => acc + (Number(curr.valorPago) || Number(curr.valor) || 0), 0);
+
+    const rowsHtml = paidInvoices
+      .map((item, idx) => {
+        const venc = item.dataVencimento ? item.dataVencimento.split('-').reverse().join('/') : '-';
+        const pag = item.dataPagamento ? item.dataPagamento.split('-').reverse().join('/') : '-';
+        const val = (Number(item.valorPago) || Number(item.valor) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const desc = item.demonstrativo || `Fatura #${item.id || item.numeroDocumento || idx + 1}`;
+        return `
+          <tr>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; font-weight: 500;">${desc}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center;">${venc}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center; color: #15803D; font-weight: 600;">${pag}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: right; font-weight: 700;">${val}</td>
+            <td style="padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: center;"><span style="background: #DCFCE7; color: #15803D; padding: 3px 8px; border-radius: 4px; font-size: 10.5px; font-weight: 700;">QUITADO</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const formattedDate = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+    const authCode = `DOC-SGP-${contractId}-${yearToFetch}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+        <title>Declaração de Quitação Anual de Débitos</title>
+        <style>
+          * { box-sizing: border-box; }
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 16px;
+            background-color: #0F172A;
+            color: #1E293B;
+            font-size: 12.5px;
+            line-height: 1.5;
+          }
+          .card {
+            background: #FFFFFF;
+            max-width: 780px;
+            margin: 0 auto;
+            padding: 28px 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #2563EB;
+            padding-bottom: 14px;
+            margin-bottom: 18px;
+          }
+          .brand-title {
+            font-size: 20px;
+            font-weight: 800;
+            color: #0F172A;
+            margin: 0;
+            letter-spacing: -0.3px;
+          }
+          .brand-sub {
+            font-size: 11px;
+            color: #64748B;
+            margin: 2px 0 0 0;
+          }
+          .stamp {
+            background: #EFF6FF;
+            border: 1px solid #BFDBFE;
+            color: #1D4ED8;
+            font-weight: 700;
+            font-size: 11px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            text-transform: uppercase;
+          }
+          .title-box {
+            text-align: center;
+            margin-bottom: 18px;
+          }
+          .title {
+            font-size: 16px;
+            font-weight: 800;
+            color: #0F172A;
+            margin: 0 0 4px 0;
+            text-transform: uppercase;
+          }
+          .law-sub {
+            font-size: 12px;
+            font-weight: 600;
+            color: #2563EB;
+            margin: 0;
+          }
+          .info-box {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 16px;
+          }
+          .info-item { font-size: 12px; }
+          .info-label { color: #64748B; font-size: 10.5px; font-weight: 600; text-transform: uppercase; }
+          .info-val { color: #0F172A; font-weight: 700; margin-top: 1px; }
+          .statement {
+            font-size: 12.5px;
+            color: #334155;
+            text-align: justify;
+            line-height: 1.6;
+            margin-bottom: 18px;
+          }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 14px;
+            font-size: 11.5px;
+          }
+          th {
+            background: #F1F5F9;
+            color: #475569;
+            font-weight: 700;
+            text-align: left;
+            padding: 9px 12px;
+            border-bottom: 2px solid #CBD5E1;
+          }
+          .total-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            margin-bottom: 20px;
+          }
+          .total-label { font-size: 12px; font-weight: 700; color: #475569; }
+          .total-val { font-size: 15px; font-weight: 800; color: #15803D; }
+          .footer-box {
+            border-top: 1px solid #E2E8F0;
+            padding-top: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .date-location { font-size: 12px; color: #475569; margin-bottom: 4px; }
+          .auth-code { font-size: 10px; color: #94A3B8; font-family: monospace; }
+          .signature { text-align: right; }
+          .sig-name { font-weight: 700; font-size: 12.5px; color: #0F172A; }
+          .sig-role { font-size: 11px; color: #64748B; }
+          @media print {
+            body { padding: 0; background: white; }
+            .card { box-shadow: none; border: none; padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="card">
+          <div class="header">
+            <div>
+              <h1 class="brand-title">${providerName}</h1>
+              <p class="brand-sub">Serviços de Comunicação Multimídia • SGP</p>
+            </div>
+            <div class="stamp">Quitação ${yearToFetch}</div>
+          </div>
+
+          <div class="title-box">
+            <h2 class="title">Declaração de Quitação Anual de Débitos</h2>
+            <p class="law-sub">Em cumprimento à Lei Federal nº 12.007/2009</p>
+          </div>
+
+          <div class="info-box">
+            <div class="info-item">
+              <div class="info-label">Cliente / Titular</div>
+              <div class="info-val">${clientName}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">CPF / CNPJ</div>
+              <div class="info-val">${cpfCnpj}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Contrato</div>
+              <div class="info-val">#${contractId} - ${planName}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Endereço de Instalação</div>
+              <div class="info-val">${address}</div>
+            </div>
+          </div>
+
+          <p class="statement">
+            Declaramos para os devidos fins de direito, em cumprimento ao disposto na <strong>Lei Federal nº 12.007, de 29 de julho de 2009</strong>, que o(a) cliente acima qualificado(a) encontra-se em dia com suas obrigações financeiras relativas à prestação de serviços de internet/telecomunicações, tendo <strong>quitado integralmente</strong> todos os débitos e faturas compreendidos no período de referência discriminados a seguir:
+          </p>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Demonstrativo / Referência</th>
+                <th style="text-align: center;">Vencimento</th>
+                <th style="text-align: center;">Data Pagamento</th>
+                <th style="text-align: right;">Valor Pago</th>
+                <th style="text-align: center;">Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHtml}
+            </tbody>
+          </table>
+
+          <div class="total-box">
+            <span class="total-label">VALOR TOTAL QUITADO NO PERÍODO:</span>
+            <span class="total-val">${totalPaid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+          </div>
+
+          <div class="footer-box">
+            <div>
+              <div class="date-location">Emitido em ${formattedDate}</div>
+              <div class="auth-code">Autenticação: ${authCode}</div>
+            </div>
+            <div class="signature">
+              <div class="sig-name">${providerName}</div>
+              <div class="sig-role">Departamento Financeiro & Cobrança</div>
+            </div>
+          </div>
+
+          <div style="text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px dashed #CBD5E1;">
+            <button
+              style="background: #2563EB; color: #FFFFFF; border: none; padding: 12px 28px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);"
+              onclick="window.ReactNativeWebView && window.ReactNativeWebView.postMessage('download')"
+            >
+              📥 Baixar / Salvar PDF Oficial
+            </button>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    setPdfModalData({
+      visible: true,
+      html: htmlContent,
+      title: `Declaração de Quitação Anual (${yearToFetch})`,
+      year: yearToFetch,
+    });
+  };
+
+  const handleDownloadQuitacaoPdf = async () => {
+    if (!pdfModalData?.html) return;
+    setDownloadingPdf(true);
+    try {
+      const { uri } = await Print.printToFileAsync({
+        html: pdfModalData.html,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(uri, {
+          UTI: '.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: 'Baixar / Salvar Declaração de Quitação',
+        });
+      } else {
+        await Print.printAsync({ html: pdfModalData.html });
+      }
+    } catch (err) {
+      console.error('Erro ao baixar/imprimir PDF:', err);
+      Alert.alert('Erro', 'Não foi possível baixar o documento PDF no momento.');
+    } finally {
+      setDownloadingPdf(false);
+    }
   };
 
   const [refreshingHomeStatus, setRefreshingHomeStatus] = useState(false);
@@ -3853,6 +4171,29 @@ export default function LoginScreen() {
                             <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
 
+                          <View style={styles.sideMenuDivider} />
+
+                          {/* 2. Declaração de Quitação */}
+                          <TouchableOpacity
+                            style={styles.sideMenuRow}
+                            onPress={() => handleOpenDeclaracaoQuitacao()}
+                            activeOpacity={0.65}
+                            disabled={loadingDeclaracao}
+                          >
+                            <View style={styles.sideMenuIconWrapper}>
+                              {loadingDeclaracao ? (
+                                <ActivityIndicator size="small" color="#2563EB" />
+                              ) : (
+                                <FileText size={20} color="#94A3B8" strokeWidth={1.7} />
+                              )}
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.sideMenuRowTitle}>Declaração de Quitação</Text>
+                              <Text style={styles.sideMenuRowSubtitle}>Comprovante anual de débitos</Text>
+                            </View>
+                            <ChevronRight size={16} color="#475569" />
+                          </TouchableOpacity>
+
                           {providerConfig.habilitar_clube && (
                             <>
                               <View style={styles.sideMenuDivider} />
@@ -3959,6 +4300,118 @@ export default function LoginScreen() {
 
                         {/* FOOTER */}
                         <Text style={styles.sideMenuFooterText}>Web Connect • Versão 1.0.0</Text>
+                      </View>
+                    </View>
+                  </Modal>
+
+                  {/* DECLARAÇÃO DE QUITAÇÃO PDF POPUP MODAL */}
+                  <Modal
+                    visible={pdfModalData !== null && pdfModalData.visible}
+                    transparent={false}
+                    animationType="slide"
+                    onRequestClose={() => setPdfModalData(null)}
+                  >
+                    <View style={{
+                      flex: 1,
+                      backgroundColor: '#0B0F19',
+                      paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44),
+                    }}>
+                      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+                        backgroundColor: '#0F172A'
+                      }}>
+                        <View style={{ flex: 1, marginRight: 10 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC' }} numberOfLines={1}>
+                            {pdfModalData?.title || 'Declaração de Quitação'}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 1 }}>
+                            Documento oficial • Lei 12.007/2009
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          {/* Botão Baixar / Salvar PDF */}
+                          <TouchableOpacity
+                            onPress={handleDownloadQuitacaoPdf}
+                            disabled={downloadingPdf}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              backgroundColor: '#2563EB',
+                              paddingHorizontal: 12,
+                              paddingVertical: 7,
+                              borderRadius: 8,
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            {downloadingPdf ? (
+                              <ActivityIndicator size="small" color="#FFFFFF" />
+                            ) : (
+                              <>
+                                <Download size={15} color="#FFFFFF" />
+                                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Baixar PDF</Text>
+                              </>
+                            )}
+                          </TouchableOpacity>
+
+                          {/* Botão Fechar */}
+                          <TouchableOpacity
+                            onPress={() => setPdfModalData(null)}
+                            style={{
+                              padding: 7,
+                              borderRadius: 20,
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <X size={18} color="#CBD5E1" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
+                        {pdfModalData?.html ? (
+                          <WebView
+                            originWhitelist={['*']}
+                            source={{ html: pdfModalData.html }}
+                            onMessage={(event) => {
+                              if (event.nativeEvent.data === 'download') {
+                                handleDownloadQuitacaoPdf();
+                              }
+                            }}
+                            style={{ flex: 1, backgroundColor: '#0F172A' }}
+                            javaScriptEnabled={true}
+                            domStorageEnabled={true}
+                            startInLoadingState={true}
+                            renderLoading={() => (
+                              <View style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: '#0F172A'
+                              }}>
+                                <ActivityIndicator size="large" color="#2563EB" />
+                                <Text style={{ color: '#94A3B8', marginTop: 12, fontSize: 13 }}>Gerando declaração...</Text>
+                              </View>
+                            )}
+                          />
+                        ) : (
+                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color="#2563EB" />
+                          </View>
+                        )}
                       </View>
                     </View>
                   </Modal>
