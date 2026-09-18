@@ -18,6 +18,12 @@ export interface ProviderConfig {
   primary_color?: string;
   secondary_color?: string;
   accent_color?: string;
+  versao_app_loja?: string;
+  versao_app_minima?: string;
+  url_playstore?: string;
+  url_appstore?: string;
+  forcar_atualizacao?: boolean;
+  mensagem_atualizacao?: string;
 }
 
 const CACHE_LOGO_KEY = '@isp_app_cached_logo_url';
@@ -161,6 +167,12 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         primary_color: fetchedPrimary,
         secondary_color: fetchedSecondary,
         accent_color: fetchedAccent,
+        versao_app_loja: data.versao_app_loja || data.versao_loja || undefined,
+        versao_app_minima: data.versao_app_minima || data.versao_minima || undefined,
+        url_playstore: data.url_playstore || data.playstore_url || 'https://play.google.com/store/apps/details?id=br.com.webconnect.cliente',
+        url_appstore: data.url_appstore || data.appstore_url || undefined,
+        forcar_atualizacao: data.forcar_atualizacao === true || data.force_update === true,
+        mensagem_atualizacao: data.mensagem_atualizacao || data.update_message || undefined,
       };
     }
   } catch (err) {

@@ -82,10 +82,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import * as Updates from 'expo-updates';
+import Constants from 'expo-constants';
 import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
 import { getDetailedWifiInfo } from '@/services/wifiDiagnostic';
+
+// Helper function to compare semantic versions (e.g. '1.0.1' vs '1.1.0')
+function compareSemVer(v1: string, v2: string): number {
+  const parts1 = (v1 || '').replace(/[^0-9.]/g, '').split('.').map(Number);
+  const parts2 = (v2 || '').replace(/[^0-9.]/g, '').split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const num1 = parts1[i] || 0;
+    const num2 = parts2[i] || 0;
+    if (num1 > num2) return 1;
+    if (num1 < num2) return -1;
+  }
+  return 0;
+}
 
 // Configure foreground notification behavior
 Notifications.setNotificationHandler({
@@ -427,10 +441,50 @@ export default function LoginScreen() {
 
   const [rememberMe, setRememberMe] = useState(true);
 
+  // In-App Update States
+  const [isOtaUpdateModalOpen, setIsOtaUpdateModalOpen] = useState(false);
+  const [isDownloadingOtaUpdate, setIsDownloadingOtaUpdate] = useState(false);
+  const [isStoreUpdateModalOpen, setIsStoreUpdateModalOpen] = useState(false);
+  const [storeUpdateInfo, setStoreUpdateInfo] = useState<{
+    isMandatory: boolean;
+    latestVersion: string;
+    url: string;
+    message: string;
+  }>({
+    isMandatory: false,
+    latestVersion: '',
+    url: '',
+    message: '',
+  });
+
   React.useEffect(() => {
     getProviderConfig(APP_CONFIG.PROVIDER_CODE).then(config => {
       if (config) {
         setProviderConfig(config);
+
+        // Check for Store (Google Play / App Store) updates
+        try {
+          const currentAppVersion = Constants.expoConfig?.version || '1.0.1';
+          const targetStoreVersion = config.versao_app_loja;
+          const minStoreVersion = config.versao_app_minima;
+
+          if (targetStoreVersion && compareSemVer(targetStoreVersion, currentAppVersion) > 0) {
+            const isMandatory = (minStoreVersion && compareSemVer(minStoreVersion, currentAppVersion) > 0) || !!config.forcar_atualizacao;
+            const storeUrl = Platform.OS === 'ios'
+              ? (config.url_appstore || 'https://apps.apple.com')
+              : (config.url_playstore || 'https://play.google.com/store/apps/details?id=br.com.webconnect.cliente');
+
+            setStoreUpdateInfo({
+              isMandatory,
+              latestVersion: targetStoreVersion,
+              url: storeUrl,
+              message: config.mensagem_atualizacao || 'Uma nova versão do aplicativo com melhorias e novidades está disponível na loja de aplicativos.',
+            });
+            setIsStoreUpdateModalOpen(true);
+          }
+        } catch (err) {
+          console.log('Erro ao verificar atualização da loja:', err);
+        }
       }
     });
   }, []);
@@ -686,18 +740,17 @@ export default function LoginScreen() {
   const [receivedNotification, setReceivedNotification] = useState<Notifications.Notification | null>(null);
 
   React.useEffect(() => {
-    // Proactively check, download and apply OTA updates
+    // Proactively check for OTA updates and notify user via popup
     async function checkForUpdates() {
       if (__DEV__) return;
       try {
         const update = await Updates.checkForUpdateAsync();
         if (update.isAvailable) {
-          console.log('Nova atualização encontrada! Baixando...');
-          await Updates.fetchUpdateAsync();
-          await Updates.reloadAsync();
+          console.log('Nova atualização OTA disponível! Abrindo popup...');
+          setIsOtaUpdateModalOpen(true);
         }
       } catch (e) {
-        console.log('Verificação de atualização (silenciosa):', e);
+        console.log('Verificação de atualização OTA:', e);
       }
     }
     checkForUpdates();
@@ -809,6 +862,29 @@ export default function LoginScreen() {
     } catch (e) {
       console.error('Erro ao agendar notificação:', e);
       Alert.alert('Erro', 'Não foi possível disparar a notificação de teste.');
+    }
+  };
+
+  const handleApplyOtaUpdate = async () => {
+    try {
+      setIsDownloadingOtaUpdate(true);
+      await Updates.fetchUpdateAsync();
+      await Updates.reloadAsync();
+    } catch (e) {
+      console.log('Erro ao aplicar atualização OTA:', e);
+      setIsDownloadingOtaUpdate(false);
+      Alert.alert('Aviso', 'Não foi possível baixar a atualização agora. Ela será aplicada na próxima inicialização.');
+      setIsOtaUpdateModalOpen(false);
+    }
+  };
+
+  const handleOpenStore = async () => {
+    try {
+      if (storeUpdateInfo.url) {
+        await Linking.openURL(storeUpdateInfo.url);
+      }
+    } catch (e) {
+      console.log('Erro ao abrir loja:', e);
     }
   };
 
@@ -4265,6 +4341,155 @@ export default function LoginScreen() {
           </ScrollView>
         )}
       </KeyboardAvoidingView>
+
+      {/* POPUP MODAL: ATUALIZAÇÃO RÁPIDA (OTA / EAS UPDATE) */}
+      <Modal
+        visible={isOtaUpdateModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDownloadingOtaUpdate) setIsOtaUpdateModalOpen(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { width: '90%', maxWidth: 380, padding: 24, alignItems: 'center' }]}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: `${primaryColor}20`,
+              borderWidth: 1.5,
+              borderColor: `${primaryColor}50`,
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}>
+              <Sparkles size={32} color={primaryColor} />
+            </View>
+
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 8 }]}>
+              Atualização Disponível! 🚀
+            </Text>
+
+            <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20, textAlign: 'center', marginBottom: 20 }}>
+              Preparamos melhorias de estabilidade, novo visual e correções para você. Deseja atualizar o aplicativo agora?
+            </Text>
+
+            {isDownloadingOtaUpdate ? (
+              <View style={{ width: '100%', alignItems: 'center', paddingVertical: 12 }}>
+                <ActivityIndicator size="large" color={primaryColor} />
+                <Text style={{ color: '#E2E8F0', marginTop: 12, fontSize: 13, fontWeight: '600' }}>
+                  Baixando e aplicando atualização...
+                </Text>
+              </View>
+            ) : (
+              <View style={{ width: '100%', gap: 10 }}>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: primaryColor,
+                    width: '100%',
+                    paddingVertical: 14,
+                    borderRadius: 14,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={handleApplyOtaUpdate}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <RefreshCw size={16} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>Atualizar Agora</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ width: '100%', paddingVertical: 12, alignItems: 'center' }}
+                  onPress={() => setIsOtaUpdateModalOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: '#64748B', fontSize: 13, fontWeight: '600' }}>Depois</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* POPUP MODAL: ATUALIZAÇÃO DA LOJA (PLAY STORE / APP STORE) */}
+      <Modal
+        visible={isStoreUpdateModalOpen}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (!storeUpdateInfo.isMandatory) setIsStoreUpdateModalOpen(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { width: '90%', maxWidth: 380, padding: 24, alignItems: 'center' }]}>
+            <View style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: '#10B98120',
+              borderWidth: 1.5,
+              borderColor: '#10B98150',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}>
+              <ExternalLink size={30} color="#10B981" />
+            </View>
+
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 8 }]}>
+              {storeUpdateInfo.isMandatory ? 'Atualização Necessária 📲' : 'Nova Versão na Loja 📲'}
+            </Text>
+
+            {storeUpdateInfo.latestVersion ? (
+              <View style={{ backgroundColor: '#1E293B', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, marginBottom: 12 }}>
+                <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '700' }}>
+                  Versão {storeUpdateInfo.latestVersion}
+                </Text>
+              </View>
+            ) : null}
+
+            <Text style={{ color: '#94A3B8', fontSize: 13.5, lineHeight: 20, textAlign: 'center', marginBottom: 20 }}>
+              {storeUpdateInfo.message}
+            </Text>
+
+            <View style={{ width: '100%', gap: 10 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#10B981',
+                  width: '100%',
+                  paddingVertical: 14,
+                  borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={handleOpenStore}
+                activeOpacity={0.8}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <ShoppingBag size={16} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 15 }}>
+                    {Platform.OS === 'ios' ? 'Atualizar na App Store' : 'Atualizar na Play Store'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {!storeUpdateInfo.isMandatory && (
+                <TouchableOpacity
+                  style={{ width: '100%', paddingVertical: 12, alignItems: 'center' }}
+                  onPress={() => setIsStoreUpdateModalOpen(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ color: '#64748B', fontSize: 13, fontWeight: '600' }}>Lembrar Mais Tarde</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
