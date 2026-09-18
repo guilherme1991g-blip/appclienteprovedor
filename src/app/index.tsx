@@ -3923,7 +3923,7 @@ export default function LoginScreen() {
                     onRequestClose={() => setIsNotificationModalOpen(false)}
                   >
                     <View style={styles.modalOverlay}>
-                      <View style={[styles.modalContainer, { maxHeight: '80%', width: '90%', maxWidth: 420 }]}>
+                      <View style={[styles.modalContainer, { maxHeight: '85%', width: '92%', maxWidth: 440, padding: 20, alignItems: 'stretch' }]}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: 16 }}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                             <Bell size={24} color="#2563EB" />
@@ -3948,23 +3948,68 @@ export default function LoginScreen() {
                             </Text>
                           </View>
                         ) : (
-                          <ScrollView style={{ width: '100%', maxHeight: 350 }} showsVerticalScrollIndicator={false}>
-                            {notificationHistory.map((item, idx) => (
-                              <View key={item.id || idx} style={{ backgroundColor: '#182235', padding: 14, borderRadius: 14, marginBottom: 10, borderWidth: 1, borderColor: '#28354E' }}>
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                                  <Text style={{ color: '#60A5FA', fontWeight: '800', fontSize: 13 }}>{item.titulo || 'Aviso do Provedor 📡'}</Text>
-                                  <Text style={{ color: '#64748B', fontSize: 10 }}>
-                                    {item.created_at ? new Date(item.created_at).toLocaleDateString('pt-BR') : ''}
+                          <ScrollView
+                            style={{ width: '100%', flexShrink: 1 }}
+                            contentContainerStyle={{ paddingBottom: 10 }}
+                            showsVerticalScrollIndicator={true}
+                            nestedScrollEnabled={true}
+                          >
+                            {notificationHistory.map((item, idx) => {
+                              const title = item.titulo || item.title || item.assunto || 'Aviso do Provedor 📡';
+                              const message = item.mensagem || item.body || item.conteudo || item.texto || item.message || '';
+                              let formattedDate = '';
+                              if (item.created_at) {
+                                try {
+                                  const d = new Date(item.created_at);
+                                  formattedDate = `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+                                } catch (_) {
+                                  formattedDate = '';
+                                }
+                              }
+
+                              return (
+                                <View
+                                  key={item.id || idx}
+                                  style={{
+                                    backgroundColor: '#182235',
+                                    padding: 14,
+                                    borderRadius: 14,
+                                    marginBottom: 12,
+                                    borderWidth: 1,
+                                    borderColor: '#28354E',
+                                    width: '100%',
+                                  }}
+                                >
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+                                    <Text style={{ color: '#60A5FA', fontWeight: '800', fontSize: 13.5, flex: 1, marginRight: 8, lineHeight: 18 }}>
+                                      {title}
+                                    </Text>
+                                    {formattedDate ? (
+                                      <Text style={{ color: '#64748B', fontSize: 10.5, flexShrink: 0, marginTop: 2 }}>
+                                        {formattedDate}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                  <Text
+                                    selectable={true}
+                                    style={{
+                                      color: '#E2E8F0',
+                                      fontSize: 13,
+                                      lineHeight: 20,
+                                      marginTop: 4,
+                                      flexWrap: 'wrap',
+                                    }}
+                                  >
+                                    {message}
                                   </Text>
                                 </View>
-                                <Text style={{ color: '#E2E8F0', fontSize: 13, lineHeight: 18 }}>{item.mensagem}</Text>
-                              </View>
-                            ))}
+                              );
+                            })}
                           </ScrollView>
                         )}
 
                         <TouchableOpacity
-                          style={[styles.modalCloseBtn, { width: '100%', marginTop: 16 }]}
+                          style={[styles.modalCloseBtn, { width: '100%', marginTop: 14 }]}
                           onPress={() => setIsNotificationModalOpen(false)}
                           activeOpacity={0.7}
                         >
