@@ -3824,57 +3824,61 @@ export default function LoginScreen() {
                             <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
 
-                          <View style={styles.sideMenuDivider} />
+                          {providerConfig.habilitar_clube && (
+                            <>
+                              <View style={styles.sideMenuDivider} />
 
-                          {/* 2. Clube de Descontos */}
-                          <TouchableOpacity
-                            style={styles.sideMenuRow}
-                            onPress={() => {
-                              setActiveTab('CLUBE');
-                              setIsSideMenuOpen(false);
-                            }}
-                            activeOpacity={0.65}
-                          >
-                            <View style={styles.sideMenuIconWrapper}>
-                              <Ticket size={20} color="#94A3B8" strokeWidth={1.7} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.sideMenuRowTitle}>Clube de Descontos</Text>
-                                <View style={styles.sideMenuBadgeTag}>
-                                  <Text style={styles.sideMenuBadgeTagText}>CUPONS</Text>
+                              {/* 2. Clube de Descontos */}
+                              <TouchableOpacity
+                                style={styles.sideMenuRow}
+                                onPress={() => {
+                                  setActiveTab('CLUBE');
+                                  setIsSideMenuOpen(false);
+                                }}
+                                activeOpacity={0.65}
+                              >
+                                <View style={styles.sideMenuIconWrapper}>
+                                  <Ticket size={20} color="#94A3B8" strokeWidth={1.7} />
                                 </View>
-                              </View>
-                              <Text style={styles.sideMenuRowSubtitle}>Parcerias em lojas e farmácias</Text>
-                            </View>
-                            <ChevronRight size={16} color="#475569" />
-                          </TouchableOpacity>
-
-                          <View style={styles.sideMenuDivider} />
-
-                          {/* 3. Clube do Cliente */}
-                          <TouchableOpacity
-                            style={styles.sideMenuRow}
-                            onPress={() => {
-                              setActiveTab('CLUBE_CLIENTE');
-                              setIsSideMenuOpen(false);
-                            }}
-                            activeOpacity={0.65}
-                          >
-                            <View style={styles.sideMenuIconWrapper}>
-                              <Sparkles size={20} color="#94A3B8" strokeWidth={1.7} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Text style={styles.sideMenuRowTitle}>Clube do Cliente</Text>
-                                <View style={[styles.sideMenuBadgeTag, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
-                                  <Text style={[styles.sideMenuBadgeTagText, { color: '#CBD5E1' }]}>VIP</Text>
+                                <View style={{ flex: 1 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={styles.sideMenuRowTitle}>Clube de Descontos</Text>
+                                    <View style={styles.sideMenuBadgeTag}>
+                                      <Text style={styles.sideMenuBadgeTagText}>CUPONS</Text>
+                                    </View>
+                                  </View>
+                                  <Text style={styles.sideMenuRowSubtitle}>Parcerias em lojas e farmácias</Text>
                                 </View>
-                              </View>
-                              <Text style={styles.sideMenuRowSubtitle}>Vantagens e fidelidade do assinante</Text>
-                            </View>
-                            <ChevronRight size={16} color="#475569" />
-                          </TouchableOpacity>
+                                <ChevronRight size={16} color="#475569" />
+                              </TouchableOpacity>
+
+                              <View style={styles.sideMenuDivider} />
+
+                              {/* 3. Clube do Cliente */}
+                              <TouchableOpacity
+                                style={styles.sideMenuRow}
+                                onPress={() => {
+                                  setActiveTab('CLUBE_CLIENTE');
+                                  setIsSideMenuOpen(false);
+                                }}
+                                activeOpacity={0.65}
+                              >
+                                <View style={styles.sideMenuIconWrapper}>
+                                  <Sparkles size={20} color="#94A3B8" strokeWidth={1.7} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Text style={styles.sideMenuRowTitle}>Clube do Cliente</Text>
+                                    <View style={[styles.sideMenuBadgeTag, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
+                                      <Text style={[styles.sideMenuBadgeTagText, { color: '#CBD5E1' }]}>VIP</Text>
+                                    </View>
+                                  </View>
+                                  <Text style={styles.sideMenuRowSubtitle}>Vantagens e fidelidade do assinante</Text>
+                                </View>
+                                <ChevronRight size={16} color="#475569" />
+                              </TouchableOpacity>
+                            </>
+                          )}
                         </View>
 
                         {/* SECTION 2: CONTA & SISTEMA */}
