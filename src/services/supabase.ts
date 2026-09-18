@@ -14,7 +14,10 @@ export interface ProviderConfig {
   fundo_url?: string;
   cor_fundo?: string;
   webhook_url?: string;
+  webhook_chamado_url?: string;
+  habilitar_webhook_chamado?: boolean;
   webhook_verificacao_url?: string;
+  habilitar_webhook_verificacao?: boolean;
   whatsapp_number?: string;
   primary_color?: string;
   secondary_color?: string;
@@ -165,8 +168,11 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         icone_url: activeIcon,
         fundo_url: fetchedFundoUrl || cachedBg?.fundo_url || undefined,
         cor_fundo: fetchedCorFundo,
-        webhook_url: data.webhook_url || DEFAULT_PROVIDER_CONFIG.webhook_url,
-        webhook_verificacao_url: data.webhook_verificacao_url || DEFAULT_PROVIDER_CONFIG.webhook_verificacao_url,
+        webhook_url: (data.webhook_chamado_url || data.webhook_url || data.webhook_ocorrencia_url || DEFAULT_PROVIDER_CONFIG.webhook_url || '').trim(),
+        webhook_chamado_url: (data.webhook_chamado_url || data.webhook_url || data.webhook_ocorrencia_url || DEFAULT_PROVIDER_CONFIG.webhook_url || '').trim(),
+        habilitar_webhook_chamado: data.habilitar_webhook_chamado !== undefined ? (data.habilitar_webhook_chamado === true || data.habilitar_webhook_chamado === 'true') : (data.webhook_chamado_ativo !== undefined ? data.webhook_chamado_ativo === true : true),
+        webhook_verificacao_url: (data.webhook_verificacao_url || data.webhook_codigo_url || data.webhook_confirmacao_url || DEFAULT_PROVIDER_CONFIG.webhook_verificacao_url || '').trim(),
+        habilitar_webhook_verificacao: data.habilitar_webhook_verificacao !== undefined ? (data.habilitar_webhook_verificacao === true || data.habilitar_webhook_verificacao === 'true') : true,
         whatsapp_number: data.whatsapp_number || data.whatsapp || data.telefone || DEFAULT_PROVIDER_CONFIG.whatsapp_number,
         primary_color: fetchedPrimary,
         secondary_color: fetchedSecondary,

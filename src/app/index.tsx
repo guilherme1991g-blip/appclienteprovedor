@@ -1205,37 +1205,41 @@ export default function LoginScreen() {
           } else {
             alert(`Ordem de serviço aberta com sucesso! Protocolo: ${data.protocolo || 'N/A'}`);
             
-            // Dispara dados para o Webhook do n8n com o WhatsApp do cliente nas observações
-            const protocoloStr = data.protocolo || 'N/A';
-            const clienteStr = selectedContract?.clientName || 'Cliente';
-            const descricaoStr = supportContent.trim();
-            const localStr = selectedContract?.neighborhood || selectedContract?.city || 'Não informado';
-            const obsStr = formattedContact ? `Aberto pelo app do cliente • ${formattedContact}` : 'Aberto pelo app do cliente';
+            // Dispara dados para o Webhook de chamado se estiver habilitado
+            if (providerConfig.habilitar_webhook_chamado !== false) {
+              const protocoloStr = data.protocolo || 'N/A';
+              const clienteStr = selectedContract?.clientName || 'Cliente';
+              const descricaoStr = supportContent.trim();
+              const localStr = selectedContract?.neighborhood || selectedContract?.city || 'Não informado';
+              const obsStr = formattedContact ? `Aberto pelo app do cliente • ${formattedContact}` : 'Aberto pelo app do cliente';
 
-            const webhookMessage = `🚨 *OS Aberta!!*\n📋 *Protocolo:* ${protocoloStr}\n👤 *Cliente:* ${clienteStr}${formattedContact ? `\n📱 *${formattedContact}*` : ''}\n📝 *Descrição:* ${descricaoStr}\n📍 *Local:* ${localStr}\n📝 *Obs:* ${obsStr}`;
+              const webhookMessage = `🚨 *OS Aberta!!*\n📋 *Protocolo:* ${protocoloStr}\n👤 *Cliente:* ${clienteStr}${formattedContact ? `\n📱 *${formattedContact}*` : ''}\n📝 *Descrição:* ${descricaoStr}\n📍 *Local:* ${localStr}\n📝 *Obs:* ${obsStr}`;
 
-            const targetWebhook = providerConfig.webhook_url || 'https://n8n.zentos.com.br/webhook/recebeocorrenciaapp';
+              const targetWebhook = (providerConfig.webhook_chamado_url || providerConfig.webhook_url || '').trim();
 
-            fetch(targetWebhook, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                mensagem: webhookMessage,
-                text: webhookMessage,
-                protocolo: protocoloStr,
-                cliente: clienteStr,
-                whatsapp: formattedContact,
-                contato: formattedContact,
-                telefone: effectivePhone ? effectivePhone.replace(/\D/g, '') : '',
-                descricao: descricaoStr,
-                local: localStr,
-                obs: obsStr,
-                motivoos: supportMotive,
-                ocorrenciatipo: '5',
-              }),
-            }).catch((wErr) => console.error('Erro ao enviar ocorrência para o webhook:', wErr));
+              if (targetWebhook) {
+                fetch(targetWebhook, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    mensagem: webhookMessage,
+                    text: webhookMessage,
+                    protocolo: protocoloStr,
+                    cliente: clienteStr,
+                    whatsapp: formattedContact,
+                    contato: formattedContact,
+                    telefone: effectivePhone ? effectivePhone.replace(/\D/g, '') : '',
+                    descricao: descricaoStr,
+                    local: localStr,
+                    obs: obsStr,
+                    motivoos: supportMotive,
+                    ocorrenciatipo: '5',
+                  }),
+                }).catch((wErr) => console.error('Erro ao enviar ocorrência para o webhook:', wErr));
+              }
+            }
 
             setSupportContent('');
             fetchSupportTickets();
@@ -1305,49 +1309,53 @@ export default function LoginScreen() {
         return;
       }
 
-      // Send code via n8n webhook to WhatsApp (supports production webhook and test fallback)
-      const primaryWebhookUrl = providerConfig.webhook_verificacao_url || 'https://n8n.zentos.com.br/webhook/enviar-codigo-verificacao';
-      const message = `🔐 Seu código de verificação WebConnect é: *${code}*\n\nVálido por 5 minutos.\nNão compartilhe este código com ninguém.`;
+      // Send code via webhook to WhatsApp if enabled
+      if (providerConfig.habilitar_webhook_verificacao !== false) {
+        const primaryWebhookUrl = (providerConfig.webhook_verificacao_url || '').trim();
+        if (primaryWebhookUrl) {
+          const message = `🔐 Seu código de verificação é: *${code}*\n\nVálido por 5 minutos.\nNão compartilhe este código com ninguém.`;
 
-      const webhookPayload = {
-        phone: fullPhone,
-        code: code,
-        message: message,
-        text: message,
-        cliente: selectedContract?.clientName || 'Cliente',
-        cpf_cnpj: documentInput.replace(/\D/g, ''),
-      };
+          const webhookPayload = {
+            phone: fullPhone,
+            code: code,
+            message: message,
+            text: message,
+            cliente: selectedContract?.clientName || 'Cliente',
+            cpf_cnpj: documentInput.replace(/\D/g, ''),
+          };
 
-      try {
-        const response = await fetch(primaryWebhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(webhookPayload),
-        });
+          try {
+            const response = await fetch(primaryWebhookUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(webhookPayload),
+            });
 
-        // Se a URL de teste não estiver ouvindo (404) ou se for produção
-        if (!response.ok) {
-          const alternateUrl = primaryWebhookUrl.includes('/webhook-test/')
-            ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
-            : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
+            // Se a URL de teste não estiver ouvindo (404) ou se for produção
+            if (!response.ok) {
+              const alternateUrl = primaryWebhookUrl.includes('/webhook-test/')
+                ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
+                : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
 
-          console.log(`Webhook retornou status ${response.status}. Tentando URL alternativa: ${alternateUrl}`);
-          await fetch(alternateUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(webhookPayload),
-          }).catch((err) => console.error('Erro ao enviar webhook alternativo:', err));
+              console.log(`Webhook retornou status ${response.status}. Tentando URL alternativa: ${alternateUrl}`);
+              await fetch(alternateUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(webhookPayload),
+              }).catch((err) => console.error('Erro ao enviar webhook alternativo:', err));
+            }
+          } catch (webhookErr) {
+            console.warn('Tentativa primária de webhook falhou, tentando alternativa...', webhookErr);
+            const fallbackUrl = primaryWebhookUrl.includes('/webhook-test/')
+              ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
+              : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
+            await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(webhookPayload),
+            }).catch((err) => console.error('Erro ao enviar webhook fallback:', err));
+          }
         }
-      } catch (webhookErr) {
-        console.warn('Tentativa primária de webhook falhou, tentando alternativa...', webhookErr);
-        const fallbackUrl = primaryWebhookUrl.includes('/webhook-test/')
-          ? primaryWebhookUrl.replace('/webhook-test/', '/webhook/')
-          : primaryWebhookUrl.replace('/webhook/', '/webhook-test/');
-        await fetch(fallbackUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(webhookPayload),
-        }).catch((err) => console.error('Erro ao enviar webhook fallback:', err));
       }
 
       setCodeSent(true);
