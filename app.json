@@ -49,15 +49,6 @@
       "expo-web-browser",
       "expo-image",
       "expo-status-bar",
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "enableProguardInReleaseBuilds": true,
-            "enableShrinkResourcesInReleaseBuilds": true
-          }
-        }
-      ],
       "expo-sharing"
     ],
     "experiments": {
