@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -11,6 +11,27 @@ const CACHE_KEY = '@isp_app_cached_logo_url';
 
 export default function BrandLogo({ logoUrl }: BrandLogoProps) {
   const [activeLogo, setActiveLogo] = useState<string | undefined>(logoUrl);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    // Pulse animation: smooth interactive breathing effect
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.06,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1.0,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+    return () => pulseLoop.stop();
+  }, []);
 
   useEffect(() => {
     if (logoUrl && logoUrl.trim().length > 0) {
@@ -57,12 +78,14 @@ export default function BrandLogo({ logoUrl }: BrandLogoProps) {
 
   return (
     <View style={styles.container}>
-      <Image
-        key={hasLogo ? effectiveLogo : 'default_logo'}
-        style={styles.logoImage}
-        source={getLogoSource()}
-        contentFit="contain"
-      />
+      <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+        <Image
+          key={hasLogo ? effectiveLogo : 'default_logo'}
+          style={styles.logoImage}
+          source={getLogoSource()}
+          contentFit="contain"
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -71,14 +94,14 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: 14,
     width: '100%',
     backgroundColor: 'transparent',
     borderWidth: 0,
   },
   logoImage: {
-    width: 280,
-    height: 100,
+    width: 320,
+    height: 150,
     backgroundColor: 'transparent',
   },
 });

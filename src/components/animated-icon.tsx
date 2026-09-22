@@ -8,6 +8,30 @@ import { scheduleOnRN } from 'react-native-worklets';
 const INITIAL_SCALE_FACTOR = Dimensions.get('screen').height / 90;
 const DURATION = 600;
 
+const bounceKeyframe = new Keyframe({
+  0: {
+    transform: [{ translateY: 70 }, { scale: 0.5 }],
+    opacity: 0,
+  },
+  35: {
+    transform: [{ translateY: -30 }, { scale: 1.15 }],
+    opacity: 1,
+    easing: Easing.bezier(0.25, 1, 0.5, 1),
+  },
+  60: {
+    transform: [{ translateY: 12 }, { scale: 0.95 }],
+    opacity: 1,
+  },
+  80: {
+    transform: [{ translateY: -5 }, { scale: 1.03 }],
+    opacity: 1,
+  },
+  100: {
+    transform: [{ translateY: 0 }, { scale: 1 }],
+    opacity: 1,
+  },
+});
+
 export function AnimatedSplashOverlay() {
   const [animate, setAnimate] = useState(false);
   const [visible, setVisible] = useState(true);
@@ -19,21 +43,24 @@ export function AnimatedSplashOverlay() {
       transform: [{ scale: 1 }],
       opacity: 1,
     },
-    20: {
-      opacity: 1,
-    },
     70: {
-      opacity: 0,
-      easing: Easing.elastic(0.7),
+      opacity: 1,
     },
     100: {
       opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.elastic(0.7),
+      transform: [{ scale: 1.1 }],
     },
   });
 
-  const image = <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />;
+  const image = (
+    <Animated.View entering={bounceKeyframe.duration(900)} style={{ alignItems: 'center', justifyContent: 'center' }}>
+      <Image
+        style={styles.splashImage}
+        source={require('@/assets/images/splash-icon.png')}
+        contentFit="contain"
+      />
+    </Animated.View>
+  );
 
   return animate ? (
     <Animated.View
@@ -104,7 +131,7 @@ export function AnimatedIcon() {
 
       <Animated.View entering={keyframe.duration(DURATION)} style={styles.background} />
       <Animated.View style={styles.imageContainer} entering={logoKeyframe.duration(DURATION)}>
-        <Image style={styles.image} source={require('@/assets/images/expo-logo.png')} />
+        <Image style={styles.image} source={require('@/assets/images/splash-icon.png')} contentFit="contain" />
       </Animated.View>
     </View>
   );
@@ -128,8 +155,12 @@ const styles = StyleSheet.create({
     zIndex: 100,
   },
   image: {
-    width: 76,
-    height: 71,
+    width: 90,
+    height: 90,
+  },
+  splashImage: {
+    width: 160,
+    height: 160,
   },
   background: {
     borderRadius: 40,
@@ -140,7 +171,7 @@ const styles = StyleSheet.create({
   },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: '#208AEF',
+    backgroundColor: '#080B11',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
