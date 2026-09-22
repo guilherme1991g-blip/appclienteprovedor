@@ -2749,8 +2749,8 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* 🎬 STORIES AUTO-ROTATING BANNER (COMPACT HEIGHT & AUTO-SWAP) */}
-                        <View style={{ marginBottom: 16 }}>
+                        {/* 🎬 STORIES AUTO-ROTATING FULL-WIDTH BANNER (FULL PHONE WIDTH & INCREASED HEIGHT) */}
+                        <View style={{ marginHorizontal: -16, marginBottom: 16 }}>
                           {(() => {
                             const stories = [
                               {
@@ -2762,8 +2762,8 @@ export default function LoginScreen() {
                                 icon: Zap,
                                 iconColor: primaryColor || '#2563EB',
                                 title: 'Turbine sua Velocidade!',
-                                subtitle: 'Novos planos de 600 Mega com Wi-Fi 6.',
-                                btnText: 'Turbinar',
+                                subtitle: 'Conheça os novos planos de 600 Mega com Wi-Fi 6 e suporte prioritário.',
+                                btnText: 'Turbinar meu Plano',
                                 action: handleOpenWhatsApp,
                               },
                               {
@@ -2775,8 +2775,8 @@ export default function LoginScreen() {
                                 icon: Gift,
                                 iconColor: '#10B981',
                                 title: 'Ganhe 50% na Fatura!',
-                                subtitle: 'Indique amigos e ganhe desconto na mensalidade.',
-                                btnText: 'Indicar',
+                                subtitle: 'Indique amigos ou vizinhos. Para cada indicação confirmada você ganha desconto.',
+                                btnText: 'Copiar Link de Indicação',
                                 action: () => {
                                   Clipboard.setString(`Estou usando a ${providerConfig.nome || 'WebConnect'} e recomendo! Contrate com meu link de indicação.`);
                                   Alert.alert('Link Copiado!', 'Texto de indicação copiado para sua área de transferência.');
@@ -2791,8 +2791,8 @@ export default function LoginScreen() {
                                 icon: Sparkles,
                                 iconColor: '#C084FC',
                                 title: 'Descontos Exclusivos',
-                                subtitle: 'Economize em farmácias, cinemas e lojas.',
-                                btnText: 'Benefícios',
+                                subtitle: 'Economize em farmácias, cinemas e redes credenciadas por ser assinante ativo.',
+                                btnText: 'Ver Clube de Benefícios',
                                 action: () => setActiveTab('CLUBE_CLIENTE'),
                               },
                             ];
@@ -2803,20 +2803,24 @@ export default function LoginScreen() {
                             return (
                               <View style={{
                                 backgroundColor: '#0F172A',
-                                borderRadius: 14,
-                                padding: 12,
+                                paddingHorizontal: 18,
+                                paddingVertical: 16,
                                 borderWidth: 1,
+                                borderLeftWidth: 0,
+                                borderRightWidth: 0,
                                 borderColor: currentStory.borderColor,
+                                minHeight: 155,
+                                justifyContent: 'space-between',
                               }}>
                                 {/* Stories Top Progress Bar */}
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
                                   {stories.map((s, idx) => (
                                     <TouchableOpacity
                                       key={s.id}
                                       onPress={() => setBannerIndex(idx)}
                                       style={{
                                         flex: 1,
-                                        height: 3,
+                                        height: 4,
                                         borderRadius: 2,
                                         backgroundColor: idx === (bannerIndex % stories.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.2)',
                                       }}
@@ -2824,44 +2828,46 @@ export default function LoginScreen() {
                                   ))}
                                 </View>
 
-                                {/* Compact Content Row */}
-                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                                  <View style={{ flex: 1, marginRight: 10 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-                                      <View style={{ backgroundColor: currentStory.tagBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                                        <Text style={{ fontSize: 8, fontWeight: '800', color: currentStory.tagColor }}>
-                                          {currentStory.tag}
-                                        </Text>
-                                      </View>
-                                      <IconComponent size={14} color={currentStory.iconColor} />
+                                {/* Full Width Banner Header & Subtitle */}
+                                <View>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                                    <View style={{ backgroundColor: currentStory.tagBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                      <Text style={{ fontSize: 9, fontWeight: '800', color: currentStory.tagColor }}>
+                                        {currentStory.tag}
+                                      </Text>
                                     </View>
-                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>
-                                      {currentStory.title}
-                                    </Text>
-                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }} numberOfLines={1}>
-                                      {currentStory.subtitle}
-                                    </Text>
+                                    <IconComponent size={16} color={currentStory.iconColor} />
                                   </View>
 
-                                  <TouchableOpacity
-                                    style={{
-                                      backgroundColor: currentStory.iconColor,
-                                      paddingVertical: 7,
-                                      paddingHorizontal: 12,
-                                      borderRadius: 8,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 4,
-                                    }}
-                                    onPress={currentStory.action}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
-                                      {currentStory.btnText}
-                                    </Text>
-                                    <ChevronRight size={13} color="#FFFFFF" />
-                                  </TouchableOpacity>
+                                  <Text style={{ fontSize: 17, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 }}>
+                                    {currentStory.title}
+                                  </Text>
+                                  <Text style={{ fontSize: 12, color: '#94A3B8', lineHeight: 17 }}>
+                                    {currentStory.subtitle}
+                                  </Text>
                                 </View>
+
+                                {/* Full Width Action Button */}
+                                <TouchableOpacity
+                                  style={{
+                                    backgroundColor: currentStory.iconColor,
+                                    paddingVertical: 10,
+                                    paddingHorizontal: 16,
+                                    borderRadius: 10,
+                                    marginTop: 14,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 6,
+                                  }}
+                                  onPress={currentStory.action}
+                                  activeOpacity={0.85}
+                                >
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                                    {currentStory.btnText}
+                                  </Text>
+                                  <ChevronRight size={15} color="#FFFFFF" />
+                                </TouchableOpacity>
                               </View>
                             );
                           })()}
