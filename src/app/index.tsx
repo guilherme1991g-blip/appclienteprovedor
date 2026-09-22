@@ -5437,6 +5437,15 @@ export default function LoginScreen() {
                             {item.address}
                           </Text>
                         </View>
+
+                        {item.pppoeLogin ? (
+                          <View style={[styles.contractAddressRow, { marginTop: 6 }]}>
+                            <Globe size={14} color="#64748B" style={styles.addressIcon} />
+                            <Text style={styles.contractAddressText} numberOfLines={1}>
+                              Login / PPPoE: <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>{item.pppoeLogin}</Text>
+                            </Text>
+                          </View>
+                        ) : null}
                       </TouchableOpacity>
                     ))}
 
