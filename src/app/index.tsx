@@ -697,6 +697,7 @@ export default function LoginScreen() {
   const [conexaoOnline, setConexaoOnline] = useState<boolean | null>(null);
   const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
   const [consumoPeriod, setConsumoPeriod] = useState<'7' | '30'>('7');
+  const [selectedChartIndex, setSelectedChartIndex] = useState<number | null>(null);
   const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
   const [bannerIndex, setBannerIndex] = useState(0);
 
@@ -4289,7 +4290,7 @@ export default function LoginScreen() {
                                     {/* Period Toggle Selector */}
                                     <View style={{ flexDirection: 'row', backgroundColor: '#020617', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: '#1E293B' }}>
                                       <TouchableOpacity
-                                        onPress={() => setConsumoPeriod('7')}
+                                        onPress={() => { setConsumoPeriod('7'); setSelectedChartIndex(null); }}
                                         style={{
                                           paddingHorizontal: 12,
                                           paddingVertical: 5,
@@ -4303,7 +4304,7 @@ export default function LoginScreen() {
                                         </Text>
                                       </TouchableOpacity>
                                       <TouchableOpacity
-                                        onPress={() => setConsumoPeriod('30')}
+                                        onPress={() => { setConsumoPeriod('30'); setSelectedChartIndex(null); }}
                                         style={{
                                           paddingHorizontal: 12,
                                           paddingVertical: 5,
@@ -4335,167 +4336,288 @@ export default function LoginScreen() {
                                     </View>
                                   </View>
 
-                                  {/* Chart Legend */}
-                                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 12, marginBottom: 8, gap: 16 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: primaryColor || '#2563EB', marginRight: 6 }} />
-                                      <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Download</Text>
-                                    </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#10B981', marginRight: 6 }} />
-                                      <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Upload</Text>
+                                  {/* Chart Legend & Selected Point Inspector */}
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 10 }}>
+                                    <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '600' }}>
+                                      Toque nos pontos para detalhar
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: primaryColor || '#2563EB', marginRight: 5 }} />
+                                        <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Download</Text>
+                                      </View>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981', marginRight: 5 }} />
+                                        <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Upload</Text>
+                                      </View>
                                     </View>
                                   </View>
 
-                                  {/* Line Chart Visualization with Numbers in MB */}
-                                  <View style={{ backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B' }}>
-                                    <View style={{ height: 130, width: '100%', justifyContent: 'center' }}>
-                                      {(() => {
-                                        const svgWidth = 300;
-                                        const svgHeight = 95;
-                                        const pointsCount = chartDays.length;
-                                        const stepX = pointsCount > 1 ? svgWidth / (pointsCount - 1) : svgWidth;
+                                  {/* Interactive Selected Point Callout Banner */}
+                                  {(() => {
+                                    const activeIdx = selectedChartIndex !== null && selectedChartIndex < chartDays.length
+                                      ? selectedChartIndex
+                                      : chartDays.length - 1;
+                                    const activeItem = chartDays[activeIdx];
+                                    if (!activeItem) return null;
 
-                                        function bytesToMB(bytes: number): string {
-                                          if (!bytes || bytes <= 0) return '0 MB';
-                                          const mb = bytes / (1024 * 1024);
-                                          if (mb >= 1000) {
-                                            return `${(mb / 1024).toFixed(1)} GB`;
-                                          }
-                                          return `${Math.round(mb)} MB`;
+                                    const [rawLabel, activeVal] = activeItem;
+                                    let dateLabel = rawLabel;
+                                    if (consumoPeriod === '7') {
+                                      const dObj = new Date(rawLabel + 'T00:00:00');
+                                      dateLabel = `Dia ${String(dObj.getDate()).padStart(2, '0')}/${String(dObj.getMonth() + 1).padStart(2, '0')}`;
+                                    }
+
+                                    return (
+                                      <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        backgroundColor: '#0F172A',
+                                        borderRadius: 10,
+                                        paddingVertical: 8,
+                                        paddingHorizontal: 12,
+                                        marginBottom: 10,
+                                        borderWidth: 1,
+                                        borderColor: primaryColor ? `${primaryColor}40` : '#2563EB40'
+                                      }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: primaryColor || '#2563EB', marginRight: 6 }} />
+                                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC' }}>{dateLabel}</Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                                          <Text style={{ fontSize: 11, fontWeight: '700', color: primaryColor || '#3B82F6' }}>
+                                            ↓ {formatBytes(activeVal.download)}
+                                          </Text>
+                                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#10B981' }}>
+                                            ↑ {formatBytes(activeVal.upload)}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                    );
+                                  })()}
+
+                                  {/* Modern SVG Area & Line Chart */}
+                                  <View style={{ backgroundColor: '#020617', borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#1E293B' }}>
+                                    {(() => {
+                                      const svgWidth = 320;
+                                      const svgHeight = 110;
+                                      const paddingBottom = 20;
+                                      const paddingTop = 15;
+                                      const usableHeight = svgHeight - paddingBottom - paddingTop;
+                                      const pointsCount = chartDays.length;
+                                      const stepX = pointsCount > 1 ? svgWidth / (pointsCount - 1) : svgWidth / 2;
+
+                                      const activeIdx = selectedChartIndex !== null && selectedChartIndex < chartDays.length
+                                        ? selectedChartIndex
+                                        : chartDays.length - 1;
+
+                                      function valToY(val: number) {
+                                        if (maxVal <= 0) return svgHeight - paddingBottom;
+                                        const pct = Math.max(Math.min(val / maxVal, 1), 0);
+                                        return svgHeight - paddingBottom - pct * usableHeight;
+                                      }
+
+                                      const dlPoints = chartDays.map(([, v], i) => ({
+                                        x: pointsCount === 1 ? svgWidth / 2 : i * stepX,
+                                        y: valToY(v.download),
+                                      }));
+
+                                      const ulPoints = chartDays.map(([, v], i) => ({
+                                        x: pointsCount === 1 ? svgWidth / 2 : i * stepX,
+                                        y: valToY(v.upload),
+                                      }));
+
+                                      function getCurvedPath(pts: { x: number; y: number }[]): string {
+                                        if (pts.length === 0) return '';
+                                        if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+                                        let pathStr = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+                                        for (let i = 0; i < pts.length - 1; i++) {
+                                          const p0 = pts[i];
+                                          const p1 = pts[i + 1];
+                                          const cx1 = p0.x + (p1.x - p0.x) / 2;
+                                          const cy1 = p0.y;
+                                          const cx2 = p0.x + (p1.x - p0.x) / 2;
+                                          const cy2 = p1.y;
+                                          pathStr += ` C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
                                         }
+                                        return pathStr;
+                                      }
 
-                                        function valToPct(val: number, max: number) {
-                                          if (max <= 0) return 0;
-                                          return Math.max(Math.min((val / max) * 100, 100), 5);
-                                        }
+                                      const dlPath = getCurvedPath(dlPoints);
+                                      const ulPath = getCurvedPath(ulPoints);
 
-                                        const dlPoints = chartDays.map(([, v], i) => {
-                                          const x = i * stepX;
-                                          const y = svgHeight - (valToPct(v.download, maxVal) / 100) * (svgHeight - 24) - 12;
-                                          return { x, y };
-                                        });
+                                      const dlAreaPath = dlPoints.length > 1
+                                        ? `${dlPath} L ${dlPoints[dlPoints.length - 1].x} ${svgHeight - paddingBottom} L ${dlPoints[0].x} ${svgHeight - paddingBottom} Z`
+                                        : '';
 
-                                        const ulPoints = chartDays.map(([, v], i) => {
-                                          const x = i * stepX;
-                                          const y = svgHeight - (valToPct(v.upload, maxVal) / 100) * (svgHeight - 24) - 12;
-                                          return { x, y };
-                                        });
+                                      const ulAreaPath = ulPoints.length > 1
+                                        ? `${ulPath} L ${ulPoints[ulPoints.length - 1].x} ${svgHeight - paddingBottom} L ${ulPoints[0].x} ${svgHeight - paddingBottom} Z`
+                                        : '';
 
-                                        // Smooth Cubic Bezier Curves
-                                        function getCurvedPath(pts: { x: number; y: number }[]): string {
-                                          if (pts.length === 0) return '';
-                                          if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-                                          let pathStr = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
-                                          for (let i = 0; i < pts.length - 1; i++) {
-                                            const p0 = pts[i];
-                                            const p1 = pts[i + 1];
-                                            const cx1 = p0.x + (p1.x - p0.x) / 2;
-                                            const cy1 = p0.y;
-                                            const cx2 = p0.x + (p1.x - p0.x) / 2;
-                                            const cy2 = p1.y;
-                                            pathStr += ` C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-                                          }
-                                          return pathStr;
-                                        }
+                                      const activePt = dlPoints[activeIdx] || dlPoints[dlPoints.length - 1];
 
-                                        const dlPath = getCurvedPath(dlPoints);
-                                        const ulPath = getCurvedPath(ulPoints);
+                                      return (
+                                        <View style={{ width: '100%' }}>
+                                          <Svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 120 }}>
+                                            <SvgGradient id="dlGrad" x1="0" y1="0" x2="0" y2="1">
+                                              <SvgStop offset="0" stopColor={primaryColor || '#2563EB'} stopOpacity="0.40" />
+                                              <SvgStop offset="1" stopColor={primaryColor || '#2563EB'} stopOpacity="0.02" />
+                                            </SvgGradient>
 
-                                        // Area fill path under Download curve
-                                        const dlAreaPath = `${dlPath} L ${svgWidth} ${svgHeight} L 0 ${svgHeight} Z`;
+                                            <SvgGradient id="ulGrad" x1="0" y1="0" x2="0" y2="1">
+                                              <SvgStop offset="0" stopColor="#10B981" stopOpacity="0.25" />
+                                              <SvgStop offset="1" stopColor="#10B981" stopOpacity="0.01" />
+                                            </SvgGradient>
 
-                                        return (
-                                          <View style={{ flex: 1, width: '100%' }}>
-                                            <Svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 95 }}>
-                                              <SvgGradient id="dlGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <SvgStop offset="0" stopColor={primaryColor || '#2563EB'} stopOpacity="0.30" />
-                                                <SvgStop offset="1" stopColor={primaryColor || '#2563EB'} stopOpacity="0.0" />
-                                              </SvgGradient>
+                                            {/* Horizontal Gridlines */}
+                                            {[0.25, 0.5, 0.75, 1.0].map((pct, idx) => {
+                                              const yGrid = svgHeight - paddingBottom - pct * usableHeight;
+                                              return (
+                                                <Path
+                                                  key={`grid-${idx}`}
+                                                  d={`M 0 ${yGrid} L ${svgWidth} ${yGrid}`}
+                                                  stroke="#1E293B"
+                                                  strokeWidth="1"
+                                                  strokeDasharray="4 4"
+                                                />
+                                              );
+                                            })}
 
-                                              {/* Area Fill */}
-                                              <Path d={dlAreaPath} fill="url(#dlGradient)" />
+                                            {/* Download & Upload Gradient Areas */}
+                                            {dlAreaPath ? <Path d={dlAreaPath} fill="url(#dlGrad)" /> : null}
+                                            {ulAreaPath ? <Path d={ulAreaPath} fill="url(#ulGrad)" /> : null}
 
-                                              {/* Upload Curve */}
-                                              <Path d={ulPath} fill="none" stroke="#10B981" strokeWidth="2.5" />
-                                              
-                                              {/* Download Curve */}
-                                              <Path d={dlPath} fill="none" stroke={primaryColor || '#2563EB'} strokeWidth="3" />
+                                            {/* Upload Curve */}
+                                            <Path d={ulPath} fill="none" stroke="#10B981" strokeWidth="2" />
 
-                                              {/* Numerical values in MB rendered on SVG points */}
-                                              {dlPoints.map((pt, i) => (
-                                                <SvgText
-                                                  key={`dl-mb-${i}`}
-                                                  x={pt.x}
-                                                  y={Math.max(pt.y - 5, 10)}
-                                                  fill={primaryColor || '#60A5FA'}
-                                                  fontSize="7"
-                                                  fontWeight="bold"
-                                                  textAnchor="middle"
+                                            {/* Download Curve */}
+                                            <Path d={dlPath} fill="none" stroke={primaryColor || '#2563EB'} strokeWidth="3" />
+
+                                            {/* Active Selection Vertical Guideline */}
+                                            {activePt ? (
+                                              <Path
+                                                d={`M ${activePt.x} ${paddingTop} L ${activePt.x} ${svgHeight - paddingBottom}`}
+                                                stroke="#64748B"
+                                                strokeWidth="1.5"
+                                                strokeDasharray="3 3"
+                                              />
+                                            ) : null}
+
+                                            {/* Data Points */}
+                                            {dlPoints.map((pt, i) => {
+                                              const isSelected = i === activeIdx;
+                                              return (
+                                                <React.Fragment key={`pts-${i}`}>
+                                                  {/* Upload Point */}
+                                                  <Circle
+                                                    cx={ulPoints[i].x}
+                                                    cy={ulPoints[i].y}
+                                                    r={isSelected ? "5" : "3"}
+                                                    fill="#10B981"
+                                                    stroke="#0F172A"
+                                                    strokeWidth="1.5"
+                                                  />
+
+                                                  {/* Download Point */}
+                                                  <Circle
+                                                    cx={pt.x}
+                                                    cy={pt.y}
+                                                    r={isSelected ? "6" : "3.5"}
+                                                    fill={primaryColor || '#2563EB'}
+                                                    stroke="#FFFFFF"
+                                                    strokeWidth={isSelected ? "2" : "1"}
+                                                  />
+                                                </React.Fragment>
+                                              );
+                                            })}
+                                          </Svg>
+
+                                          {/* X-Axis Day Buttons / Labels */}
+                                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6, paddingHorizontal: 2 }}>
+                                            {chartDays.map(([label], i) => {
+                                              let displayLabel = label;
+                                              if (consumoPeriod === '7') {
+                                                const dateObj = new Date(label + 'T00:00:00');
+                                                displayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                                              }
+                                              const isSelected = i === activeIdx;
+
+                                              return (
+                                                <TouchableOpacity
+                                                  key={`lbl-${label}`}
+                                                  onPress={() => setSelectedChartIndex(i)}
+                                                  activeOpacity={0.7}
+                                                  style={{
+                                                    paddingHorizontal: consumoPeriod === '7' ? 5 : 8,
+                                                    paddingVertical: 3,
+                                                    borderRadius: 6,
+                                                    backgroundColor: isSelected ? (primaryColor || '#2563EB') : 'transparent',
+                                                  }}
                                                 >
-                                                  {bytesToMB(chartDays[i][1].download)}
-                                                </SvgText>
-                                              ))}
-                                            </Svg>
-
-                                            {/* Labels below chart */}
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 4 }}>
-                                              {chartDays.map(([label]) => {
-                                                let displayLabel = label;
-                                                if (consumoPeriod === '7') {
-                                                  const dateObj = new Date(label + 'T00:00:00');
-                                                  displayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-                                                }
-
-                                                return (
-                                                  <Text key={label} style={{ fontSize: 10, fontWeight: '600', color: '#64748B' }}>
+                                                  <Text style={{
+                                                    fontSize: 10,
+                                                    fontWeight: isSelected ? '800' : '600',
+                                                    color: isSelected ? '#FFFFFF' : '#64748B',
+                                                  }}>
                                                     {displayLabel}
                                                   </Text>
-                                                );
-                                              })}
-                                            </View>
+                                                </TouchableOpacity>
+                                              );
+                                            })}
                                           </View>
-                                        );
-                                      })()}
-                                    </View>
+                                        </View>
+                                      );
+                                    })()}
 
-                                    {/* COLUMNS CONSUMPTION VALUES BREAKDOWN (IN MB) */}
-                                    <View style={{ marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1E293B' }}>
-                                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 8 }}>
-                                        Consumo por Coluna (em MB)
+                                    {/* DETAILED CONSUMPTION CARDS LIST */}
+                                    <View style={{ marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1E293B' }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 0.5 }}>
+                                        Detalhamento do Período
                                       </Text>
-                                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                                        {chartDays.map(([label, v]) => {
+                                      
+                                      <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+                                      >
+                                        {chartDays.map(([label, v], i) => {
                                           let displayLabel = label;
                                           if (consumoPeriod === '7') {
                                             const dateObj = new Date(label + 'T00:00:00');
                                             displayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
                                           }
-                                          const dlMB = (v.download / (1024 * 1024)).toFixed(0) + ' MB';
-                                          const ulMB = (v.upload / (1024 * 1024)).toFixed(0) + ' MB';
+                                          const isSelected = (selectedChartIndex !== null ? selectedChartIndex : chartDays.length - 1) === i;
 
                                           return (
-                                            <View
-                                              key={label}
+                                            <TouchableOpacity
+                                              key={`card-${label}`}
+                                              onPress={() => setSelectedChartIndex(i)}
+                                              activeOpacity={0.8}
                                               style={{
-                                                flex: 1,
-                                                minWidth: consumoPeriod === '7' ? 36 : 64,
-                                                backgroundColor: '#0F172A',
-                                                borderRadius: 8,
-                                                paddingVertical: 6,
-                                                paddingHorizontal: 4,
+                                                minWidth: 72,
+                                                backgroundColor: isSelected ? '#1E293B' : '#0F172A',
+                                                borderRadius: 10,
+                                                paddingVertical: 8,
+                                                paddingHorizontal: 10,
                                                 alignItems: 'center',
                                                 borderWidth: 1,
-                                                borderColor: '#1E293B',
+                                                borderColor: isSelected ? (primaryColor || '#3B82F6') : '#1E293B',
                                               }}
                                             >
-                                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 }}>{displayLabel}</Text>
-                                              <Text style={{ fontSize: 9, fontWeight: '800', color: primaryColor || '#3B82F6' }}>↓ {dlMB}</Text>
-                                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#10B981', marginTop: 1 }}>↑ {ulMB}</Text>
-                                            </View>
+                                              <Text style={{ fontSize: 11, fontWeight: '700', color: isSelected ? '#FFFFFF' : '#94A3B8', marginBottom: 4 }}>
+                                                {displayLabel}
+                                              </Text>
+                                              <Text style={{ fontSize: 10, fontWeight: '800', color: primaryColor || '#3B82F6' }}>
+                                                ↓ {formatBytes(v.download)}
+                                              </Text>
+                                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#10B981', marginTop: 2 }}>
+                                                ↑ {formatBytes(v.upload)}
+                                              </Text>
+                                            </TouchableOpacity>
                                           );
                                         })}
-                                      </View>
+                                      </ScrollView>
                                     </View>
                                   </View>
                                 </View>
