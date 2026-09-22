@@ -2,6 +2,12 @@ import { createClient } from '@supabase/supabase-js';
 import { APP_CONFIG } from '../config/providerConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+export interface ProviderBanner {
+  id?: string | number;
+  imagem_url: string;
+  link_url?: string;
+}
+
 export interface ProviderConfig {
   codigo: string;
   nome: string;
@@ -31,6 +37,7 @@ export interface ProviderConfig {
   habilitar_clube?: boolean;
   exigir_confirmacao_numero?: boolean;
   ip_diagnostico?: string;
+  banners?: ProviderBanner[];
 }
 
 const CACHE_LOGO_KEY = '@isp_app_cached_logo_url';
@@ -158,7 +165,66 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
       const newBgObj = { fundo_url: fetchedFundoUrl, cor_fundo: fetchedCorFundo };
       await AsyncStorage.setItem(CACHE_BG_KEY, JSON.stringify(newBgObj)).catch(() => {});
 
-      console.log('Configurações do provedor, logo, ícone e cores carregadas do Supabase:', data.nome);
+      // Extração e Busca de Banners vinculados ao Provedor (No máximo 3 banners)
+      let fetchedBanners: ProviderBanner[] = [];
+
+      if (data.banners && Array.isArray(data.banners) && data.banners.length > 0) {
+        fetchedBanners = data.banners
+          .map((b: any, idx: number): ProviderBanner => ({
+            id: b.id || idx,
+            imagem_url: (b.imagem_url || b.image_url || b.url_imagem || b.url || b.imagem || '').trim(),
+            link_url: (b.link_url || b.url_link || b.link || b.target_url || b.action_url || '').trim(),
+          }))
+          .filter((b: ProviderBanner) => b.imagem_url.length > 0)
+          .slice(0, 3);
+      } else if (data.banner1_url || data.banner2_url || data.banner3_url || data.banner_url) {
+        const bList: ProviderBanner[] = [];
+        if (data.banner1_url || data.banner_url) {
+          bList.push({
+            imagem_url: (data.banner1_url || data.banner_url || '').trim(),
+            link_url: (data.banner1_link || data.banner_link || data.link_banner1 || '').trim(),
+          });
+        }
+        if (data.banner2_url) {
+          bList.push({
+            imagem_url: (data.banner2_url || '').trim(),
+            link_url: (data.banner2_link || data.link_banner2 || '').trim(),
+          });
+        }
+        if (data.banner3_url) {
+          bList.push({
+            imagem_url: (data.banner3_url || '').trim(),
+            link_url: (data.banner3_link || data.link_banner3 || '').trim(),
+          });
+        }
+        fetchedBanners = bList.filter((b: ProviderBanner) => b.imagem_url.length > 0).slice(0, 3);
+      }
+
+      // Se não encontrou banners na tabela 'provedores', consulta a tabela separada 'banners'
+      if (fetchedBanners.length === 0) {
+        try {
+          const { data: bTable } = await supabase
+            .from('banners')
+            .select('*')
+            .or(`provedor_codigo.eq.${providerCode},provedor.eq.${providerCode},provedor_id.eq.${providerCode}`)
+            .limit(3);
+
+          if (bTable && Array.isArray(bTable) && bTable.length > 0) {
+            fetchedBanners = bTable
+              .map((b: any, idx: number): ProviderBanner => ({
+                id: b.id || idx,
+                imagem_url: (b.imagem_url || b.image_url || b.url_imagem || b.url || b.imagem || '').trim(),
+                link_url: (b.link_url || b.url_link || b.link || b.target_url || b.action_url || '').trim(),
+              }))
+              .filter((b: ProviderBanner) => b.imagem_url.length > 0)
+              .slice(0, 3);
+          }
+        } catch (e) {
+          console.log('Busca na tabela banners:', e);
+        }
+      }
+
+      console.log('Configurações do provedor, logo, ícone e cores carregadas do Supabase:', data.nome, 'Banners:', fetchedBanners.length);
       return {
         codigo: data.codigo || providerCode,
         nome: data.nome || 'Provedor',
@@ -188,6 +254,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         habilitar_clube: data.habilitar_clube === true || data.clube_ativo === true || data.habilitar_clube_descontos === true,
         exigir_confirmacao_numero: data.exigir_confirmacao_numero === true || data.confirmar_numero_chamado === true || data.verificar_telefone_suporte === true,
         ip_diagnostico: (data.ip_diagnostico || data.ip_provedor || data.ip_servidor || data.ip_teste || DEFAULT_PROVIDER_CONFIG.ip_diagnostico || '177.221.128.60').trim(),
+        banners: fetchedBanners,
       };
     }
   } catch (err) {

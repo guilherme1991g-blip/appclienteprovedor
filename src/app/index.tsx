@@ -18,7 +18,7 @@ import {
   AppState,
   StatusBar,
 } from 'react-native';
-import Svg, { Path, Circle, Polyline, LinearGradient as SvgGradient, Stop as SvgStop, Rect as SvgRect } from 'react-native-svg';
+import Svg, { Path, Circle, Polyline, LinearGradient as SvgGradient, Stop as SvgStop, Rect as SvgRect, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowRight,
@@ -2707,20 +2707,8 @@ export default function LoginScreen() {
                     {activeTab === 'HOME' && (
                       <View style={styles.planoTabWrapper}>
 
-                        {/* ⚡ QUICK ACTIONS GRID */}
+                        {/* ⚡ QUICK ACTIONS GRID (3 Buttons) */}
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
-                          <TouchableOpacity
-                            style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
-                            onPress={() => setActiveTab('CONEXAO')}
-                            activeOpacity={0.7}
-                          >
-                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${primaryColor || '#2563EB'}20`, justifyContent: 'center', alignItems: 'center', marginBottom: 6 }}>
-                              <Zap size={18} color={primaryColor || '#2563EB'} />
-                            </View>
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' }}>Diagnóstico</Text>
-                            <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>Status Wi-Fi</Text>
-                          </TouchableOpacity>
-
                           <TouchableOpacity
                             style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
                             onPress={() => setActiveTab('VELOCIDADE')}
@@ -2758,128 +2746,71 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* 🎬 STORIES AUTO-ROTATING BANNER (ELEGANT LATERAL MARGIN & EXPANDED HEIGHT) */}
-                        <View style={{ marginBottom: 16 }}>
-                          {(() => {
-                            const stories = [
-                              {
-                                id: 'upgrade',
-                                tag: 'UPGRADE FIBRA',
-                                tagColor: primaryColor || '#60A5FA',
-                                tagBg: `${primaryColor || '#2563EB'}25`,
-                                borderColor: `${primaryColor || '#2563EB'}40`,
-                                icon: Zap,
-                                iconColor: primaryColor || '#2563EB',
-                                title: 'Turbine sua Velocidade!',
-                                subtitle: 'Conheça os novos planos de 600 Mega com Wi-Fi 6 e suporte prioritário.',
-                                btnText: 'Turbinar meu Plano',
-                                action: handleOpenWhatsApp,
-                              },
-                              {
-                                id: 'indique',
-                                tag: 'INDIQUE E GANHE',
-                                tagColor: '#34D399',
-                                tagBg: '#10B98125',
-                                borderColor: '#10B98140',
-                                icon: Gift,
-                                iconColor: '#10B981',
-                                title: 'Ganhe 50% na Fatura!',
-                                subtitle: 'Indique amigos ou vizinhos. Para cada indicação confirmada você ganha desconto.',
-                                btnText: 'Copiar Link de Indicação',
-                                action: () => {
-                                  Clipboard.setString(`Estou usando a ${providerConfig.nome || 'WebConnect'} e recomendo! Contrate com meu link de indicação.`);
-                                  Alert.alert('Link Copiado!', 'Texto de indicação copiado para sua área de transferência.');
-                                },
-                              },
-                              {
-                                id: 'clube',
-                                tag: 'VANTAGENS VIP',
-                                tagColor: '#C084FC',
-                                tagBg: '#8B5CF625',
-                                borderColor: '#8B5CF640',
-                                icon: Sparkles,
-                                iconColor: '#C084FC',
-                                title: 'Descontos Exclusivos',
-                                subtitle: 'Economize em farmácias, cinemas e redes credenciadas por ser assinante ativo.',
-                                btnText: 'Ver Clube de Benefícios',
-                                action: () => setActiveTab('CLUBE_CLIENTE'),
-                              },
-                            ];
+                        {/* 🎬 DYNAMIC IMAGE BANNERS FROM SUPABASE (MAX 3 - ONLY RENDER IF REGISTERED) */}
+                        {providerConfig.banners && providerConfig.banners.length > 0 && (
+                          <View style={{ marginBottom: 16 }}>
+                            {(() => {
+                              const activeBanners = providerConfig.banners!.slice(0, 3);
+                              const currentBanner = activeBanners[bannerIndex % activeBanners.length];
 
-                            const currentStory = stories[bannerIndex % stories.length];
-                            const IconComponent = currentStory.icon;
+                              const handlePressBanner = () => {
+                                if (currentBanner.link_url && currentBanner.link_url.trim()) {
+                                  let url = currentBanner.link_url.trim();
+                                  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                                    url = `https://${url}`;
+                                  }
+                                  Linking.openURL(url).catch(err => {
+                                    console.error('Erro ao abrir link do banner:', err);
+                                  });
+                                }
+                              };
 
-                            return (
-                              <View style={{
-                                backgroundColor: '#0F172A',
-                                borderRadius: 16,
-                                paddingHorizontal: 16,
-                                paddingVertical: 16,
-                                borderWidth: 1,
-                                borderColor: currentStory.borderColor,
-                                minHeight: 155,
-                                justifyContent: 'space-between',
-                              }}>
-                                {/* Stories Top Progress Bar */}
-                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
-                                  {stories.map((s, idx) => (
-                                    <TouchableOpacity
-                                      key={s.id}
-                                      onPress={() => setBannerIndex(idx)}
-                                      style={{
-                                        flex: 1,
-                                        height: 4,
-                                        borderRadius: 2,
-                                        backgroundColor: idx === (bannerIndex % stories.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.2)',
-                                      }}
-                                    />
-                                  ))}
-                                </View>
-
-                                {/* Full Width Banner Header & Subtitle */}
-                                <View>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                                    <View style={{ backgroundColor: currentStory.tagBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                      <Text style={{ fontSize: 9, fontWeight: '800', color: currentStory.tagColor }}>
-                                        {currentStory.tag}
-                                      </Text>
+                              return (
+                                <View style={{
+                                  backgroundColor: '#0F172A',
+                                  borderRadius: 16,
+                                  borderWidth: 1,
+                                  borderColor: '#1E293B',
+                                  overflow: 'hidden',
+                                }}>
+                                  {/* Stories Top Progress Bar if multiple banners */}
+                                  {activeBanners.length > 1 && (
+                                    <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, backgroundColor: '#0F172A' }}>
+                                      {activeBanners.map((b, idx) => (
+                                        <TouchableOpacity
+                                          key={b.id || idx}
+                                          onPress={() => setBannerIndex(idx)}
+                                          style={{
+                                            flex: 1,
+                                            height: 4,
+                                            borderRadius: 2,
+                                            backgroundColor: idx === (bannerIndex % activeBanners.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.2)',
+                                          }}
+                                        />
+                                      ))}
                                     </View>
-                                    <IconComponent size={16} color={currentStory.iconColor} />
-                                  </View>
+                                  )}
 
-                                  <Text style={{ fontSize: 17, fontWeight: '900', color: '#FFFFFF', marginBottom: 4 }}>
-                                    {currentStory.title}
-                                  </Text>
-                                  <Text style={{ fontSize: 12, color: '#94A3B8', lineHeight: 17 }}>
-                                    {currentStory.subtitle}
-                                  </Text>
+                                  {/* Banner Image Component */}
+                                  <TouchableOpacity
+                                    onPress={handlePressBanner}
+                                    activeOpacity={currentBanner.link_url ? 0.85 : 1}
+                                    disabled={!currentBanner.link_url}
+                                  >
+                                    <Image
+                                      source={{ uri: currentBanner.imagem_url }}
+                                      style={{
+                                        width: '100%',
+                                        height: 160,
+                                      }}
+                                      resizeMode="cover"
+                                    />
+                                  </TouchableOpacity>
                                 </View>
-
-                                {/* Full Width Action Button */}
-                                <TouchableOpacity
-                                  style={{
-                                    backgroundColor: currentStory.iconColor,
-                                    paddingVertical: 10,
-                                    paddingHorizontal: 16,
-                                    borderRadius: 10,
-                                    marginTop: 14,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 6,
-                                  }}
-                                  onPress={currentStory.action}
-                                  activeOpacity={0.85}
-                                >
-                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
-                                    {currentStory.btnText}
-                                  </Text>
-                                  <ChevronRight size={15} color="#FFFFFF" />
-                                </TouchableOpacity>
-                              </View>
-                            );
-                          })()}
-                        </View>
+                              );
+                            })()}
+                          </View>
+                        )}
                         {/* SUSPENDED SERVICE WARNING CARD WITH TRUST UNLOCK */}
                         {statusLower === 'suspenso' ? (
                           <View style={styles.suspendedWarningCard}>
@@ -4416,8 +4347,8 @@ export default function LoginScreen() {
                                     </View>
                                   </View>
 
-                                  {/* Line Chart Visualization */}
-                                  <View style={{ height: 160, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'center' }}>
+                                  {/* Line Chart Visualization with Numbers in MB */}
+                                  <View style={{ backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B' }}>
                                     <View style={{ height: 130, width: '100%', justifyContent: 'center' }}>
                                       {(() => {
                                         const svgWidth = 300;
@@ -4425,22 +4356,31 @@ export default function LoginScreen() {
                                         const pointsCount = chartDays.length;
                                         const stepX = pointsCount > 1 ? svgWidth / (pointsCount - 1) : svgWidth;
 
-                                        const dlPoints = chartDays.map(([, v], i) => {
-                                          const x = i * stepX;
-                                          const y = svgHeight - (valToPct(v.download, maxVal) / 100) * (svgHeight - 16) - 8;
-                                          return { x, y };
-                                        });
-
-                                        const ulPoints = chartDays.map(([, v], i) => {
-                                          const x = i * stepX;
-                                          const y = svgHeight - (valToPct(v.upload, maxVal) / 100) * (svgHeight - 16) - 8;
-                                          return { x, y };
-                                        });
+                                        function bytesToMB(bytes: number): string {
+                                          if (!bytes || bytes <= 0) return '0 MB';
+                                          const mb = bytes / (1024 * 1024);
+                                          if (mb >= 1000) {
+                                            return `${(mb / 1024).toFixed(1)} GB`;
+                                          }
+                                          return `${Math.round(mb)} MB`;
+                                        }
 
                                         function valToPct(val: number, max: number) {
                                           if (max <= 0) return 0;
                                           return Math.max(Math.min((val / max) * 100, 100), 5);
                                         }
+
+                                        const dlPoints = chartDays.map(([, v], i) => {
+                                          const x = i * stepX;
+                                          const y = svgHeight - (valToPct(v.download, maxVal) / 100) * (svgHeight - 24) - 12;
+                                          return { x, y };
+                                        });
+
+                                        const ulPoints = chartDays.map(([, v], i) => {
+                                          const x = i * stepX;
+                                          const y = svgHeight - (valToPct(v.upload, maxVal) / 100) * (svgHeight - 24) - 12;
+                                          return { x, y };
+                                        });
 
                                         // Smooth Cubic Bezier Curves
                                         function getCurvedPath(pts: { x: number; y: number }[]): string {
@@ -4481,6 +4421,21 @@ export default function LoginScreen() {
                                               
                                               {/* Download Curve */}
                                               <Path d={dlPath} fill="none" stroke={primaryColor || '#2563EB'} strokeWidth="3" />
+
+                                              {/* Numerical values in MB rendered on SVG points */}
+                                              {dlPoints.map((pt, i) => (
+                                                <SvgText
+                                                  key={`dl-mb-${i}`}
+                                                  x={pt.x}
+                                                  y={Math.max(pt.y - 5, 10)}
+                                                  fill={primaryColor || '#60A5FA'}
+                                                  fontSize="7"
+                                                  fontWeight="bold"
+                                                  textAnchor="middle"
+                                                >
+                                                  {bytesToMB(chartDays[i][1].download)}
+                                                </SvgText>
+                                              ))}
                                             </Svg>
 
                                             {/* Labels below chart */}
@@ -4502,6 +4457,45 @@ export default function LoginScreen() {
                                           </View>
                                         );
                                       })()}
+                                    </View>
+
+                                    {/* COLUMNS CONSUMPTION VALUES BREAKDOWN (IN MB) */}
+                                    <View style={{ marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1E293B' }}>
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 8 }}>
+                                        Consumo por Coluna (em MB)
+                                      </Text>
+                                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                                        {chartDays.map(([label, v]) => {
+                                          let displayLabel = label;
+                                          if (consumoPeriod === '7') {
+                                            const dateObj = new Date(label + 'T00:00:00');
+                                            displayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                                          }
+                                          const dlMB = (v.download / (1024 * 1024)).toFixed(0) + ' MB';
+                                          const ulMB = (v.upload / (1024 * 1024)).toFixed(0) + ' MB';
+
+                                          return (
+                                            <View
+                                              key={label}
+                                              style={{
+                                                flex: 1,
+                                                minWidth: consumoPeriod === '7' ? 36 : 64,
+                                                backgroundColor: '#0F172A',
+                                                borderRadius: 8,
+                                                paddingVertical: 6,
+                                                paddingHorizontal: 4,
+                                                alignItems: 'center',
+                                                borderWidth: 1,
+                                                borderColor: '#1E293B',
+                                              }}
+                                            >
+                                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#FFFFFF', marginBottom: 2 }}>{displayLabel}</Text>
+                                              <Text style={{ fontSize: 9, fontWeight: '800', color: primaryColor || '#3B82F6' }}>↓ {dlMB}</Text>
+                                              <Text style={{ fontSize: 9, fontWeight: '800', color: '#10B981', marginTop: 1 }}>↑ {ulMB}</Text>
+                                            </View>
+                                          );
+                                        })}
+                                      </View>
                                     </View>
                                   </View>
                                 </View>
