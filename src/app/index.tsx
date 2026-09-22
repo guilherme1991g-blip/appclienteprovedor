@@ -698,6 +698,7 @@ export default function LoginScreen() {
   const [loadingConexao, setLoadingConexao] = useState(false);
   const [conexaoOnline, setConexaoOnline] = useState<boolean | null>(null);
   const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
+  const [consumoPeriod, setConsumoPeriod] = useState<'7' | '30'>('7');
 
   // Network Diagnostic Suite States
   const [diagnosticRunning, setDiagnosticRunning] = useState(false);
@@ -3496,13 +3497,26 @@ export default function LoginScreen() {
                             const currentSession = conexaoSessions[0] || null;
                             const ipAddress = currentSession?.framedipaddress || selectedContract.ip || 'Dinâmico';
                             
-                            // 2. Calculations for last 30 days consumption
+                            // 2. Aggregate daily consumption for charts (last 30 days)
+                            const now = new Date();
                             const limit30 = new Date();
                             limit30.setDate(limit30.getDate() - 30);
                             limit30.setHours(0,0,0,0);
+                            const limit7 = new Date();
+                            limit7.setDate(limit7.getDate() - 7);
+                            limit7.setHours(0,0,0,0);
 
                             let totalDownloadBytes = 0;
                             let totalUploadBytes = 0;
+
+                            // Daily buckets for last 30 days
+                            const dailyMap: Record<string, { download: number; upload: number }> = {};
+                            for (let i = 29; i >= 0; i--) {
+                              const d = new Date();
+                              d.setDate(d.getDate() - i);
+                              const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                              dailyMap[key] = { download: 0, upload: 0 };
+                            }
 
                             conexaoSessions.forEach(s => {
                               if (s.acctstarttime) {
@@ -3510,9 +3524,25 @@ export default function LoginScreen() {
                                 if (sDate.getTime() >= limit30.getTime()) {
                                   totalDownloadBytes += s.acctoutputoctets || 0;
                                   totalUploadBytes += s.acctinputoctets || 0;
+                                  const key = `${sDate.getFullYear()}-${String(sDate.getMonth() + 1).padStart(2, '0')}-${String(sDate.getDate()).padStart(2, '0')}`;
+                                  if (dailyMap[key]) {
+                                    dailyMap[key].download += s.acctoutputoctets || 0;
+                                    dailyMap[key].upload += s.acctinputoctets || 0;
+                                  }
                                 }
                               }
                             });
+
+                            const allDays = Object.entries(dailyMap).sort((a, b) => a[0].localeCompare(b[0]));
+                            const last7Days = allDays.slice(-7);
+                            const last30Days = allDays;
+
+                            const chartDays = consumoPeriod === '7' ? last7Days : last30Days;
+                            const maxVal = Math.max(...chartDays.map(([, v]) => Math.max(v.download, v.upload)), 1);
+
+                            // Period totals
+                            const periodDownload = chartDays.reduce((acc, [, v]) => acc + v.download, 0);
+                            const periodUpload = chartDays.reduce((acc, [, v]) => acc + v.upload, 0);
 
                             return (
                               <>
@@ -3875,81 +3905,115 @@ export default function LoginScreen() {
                                   </View>
                                 </View>
 
-                                {/* B. TOTAL CONSUMPTION CARD (LAST 30 DAYS) */}
+                                {/* B. CONSUMPTION CHART CARD (7 DAYS & 30 DAYS) */}
                                 <View style={styles.infoCard}>
-                                  <View style={styles.infoCardHeader}>
-                                    <Globe size={18} color="#2563EB" style={{ marginRight: 8 }} />
-                                    <Text style={styles.infoCardHeaderTitle}>Consumo dos Últimos 30 Dias</Text>
+                                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                    <View style={styles.infoCardHeader}>
+                                      <Globe size={18} color={primaryColor || "#2563EB"} style={{ marginRight: 8 }} />
+                                      <Text style={styles.infoCardHeaderTitle}>Gráfico de Consumo</Text>
+                                    </View>
+                                    
+                                    {/* Period Toggle Selector */}
+                                    <View style={{ flexDirection: 'row', backgroundColor: '#020617', borderRadius: 8, padding: 3, borderWidth: 1, borderColor: '#1E293B' }}>
+                                      <TouchableOpacity
+                                        onPress={() => setConsumoPeriod('7')}
+                                        style={{
+                                          paddingHorizontal: 12,
+                                          paddingVertical: 5,
+                                          borderRadius: 6,
+                                          backgroundColor: consumoPeriod === '7' ? (primaryColor || '#2563EB') : 'transparent',
+                                        }}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: consumoPeriod === '7' ? '#FFFFFF' : '#64748B' }}>
+                                          7 Dias
+                                        </Text>
+                                      </TouchableOpacity>
+                                      <TouchableOpacity
+                                        onPress={() => setConsumoPeriod('30')}
+                                        style={{
+                                          paddingHorizontal: 12,
+                                          paddingVertical: 5,
+                                          borderRadius: 6,
+                                          backgroundColor: consumoPeriod === '30' ? (primaryColor || '#2563EB') : 'transparent',
+                                        }}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: consumoPeriod === '30' ? '#FFFFFF' : '#64748B' }}>
+                                          30 Dias
+                                        </Text>
+                                      </TouchableOpacity>
+                                    </View>
                                   </View>
 
+                                  {/* Period Totals Row */}
                                   <View style={styles.totalConsumptionRow}>
                                     <View style={styles.consumptionBox}>
-                                      <Text style={styles.consumptionBoxLabel}>DOWNLOAD</Text>
-                                      <Text style={[styles.consumptionBoxValue, { color: '#2563EB' }]}>
-                                        {formatBytes(totalDownloadBytes)}
+                                      <Text style={styles.consumptionBoxLabel}>DOWNLOAD ({consumoPeriod === '7' ? '7D' : '30D'})</Text>
+                                      <Text style={[styles.consumptionBoxValue, { color: primaryColor || '#2563EB' }]}>
+                                        {formatBytes(periodDownload)}
                                       </Text>
                                     </View>
                                     <View style={styles.consumptionBox}>
-                                      <Text style={styles.consumptionBoxLabel}>UPLOAD</Text>
-                                      <Text style={styles.consumptionBoxValue}>
-                                        {formatBytes(totalUploadBytes)}
+                                      <Text style={styles.consumptionBoxLabel}>UPLOAD ({consumoPeriod === '7' ? '7D' : '30D'})</Text>
+                                      <Text style={[styles.consumptionBoxValue, { color: '#10B981' }]}>
+                                        {formatBytes(periodUpload)}
                                       </Text>
                                     </View>
                                   </View>
-                                </View>
 
-                                {/* C. SPEED TEST WEBVIEW CARD */}
-                                <View style={styles.speedtestWebviewCard}>
-                                  <View style={styles.infoCardHeader}>
-                                    <Activity size={18} color="#2563EB" style={{ marginRight: 8 }} />
-                                    <Text style={styles.infoCardHeaderTitle}>Teste de Velocidade (OpenSpeedTest)</Text>
+                                  {/* Chart Legend */}
+                                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', marginTop: 12, marginBottom: 8, gap: 16 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: primaryColor || '#2563EB', marginRight: 6 }} />
+                                      <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Download</Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                      <View style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#10B981', marginRight: 6 }} />
+                                      <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>Upload</Text>
+                                    </View>
                                   </View>
 
-                                  <View style={styles.webviewWrapper}>
-                                    <WebView
-                                      source={{
-                                        html: `
-                                          <!DOCTYPE html>
-                                          <html>
-                                          <head>
-                                            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-                                            <style>
-                                              body {
-                                                margin: 0;
-                                                padding: 0;
-                                                background-color: #FFFFFF;
-                                                overflow: hidden;
-                                                display: flex;
-                                                justify-content: center;
-                                                align-items: center;
-                                                height: 100vh;
-                                              }
-                                              iframe {
-                                                width: 100%;
-                                                height: 100%;
-                                                min-height: 360px;
-                                                border: none;
-                                              }
-                                            </style>
-                                          </head>
-                                          <body>
-                                            <iframe src="https://openspeedtest.com/speedtest" allow="geolocation"></iframe>
-                                          </body>
-                                          </html>
-                                        `
-                                      }}
-                                      style={styles.webview}
-                                      javaScriptEnabled={true}
-                                      domStorageEnabled={true}
-                                      startInLoadingState={true}
-                                      renderLoading={() => (
-                                        <View style={styles.webviewLoading}>
-                                          <ActivityIndicator size="large" color="#2563EB" />
-                                        </View>
-                                      )}
-                                      originWhitelist={['*']}
-                                      mixedContentMode="always"
-                                    />
+                                  {/* Bar Chart Visualization */}
+                                  <View style={{ height: 160, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'flex-end' }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, width: '100%' }}>
+                                      {chartDays.map(([dateStr, val], index) => {
+                                        const dateObj = new Date(dateStr + 'T00:00:00');
+                                        const dayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                                        
+                                        const dlHeightPct = Math.max(Math.min(Math.round((val.download / maxVal) * 100), 100), 4);
+                                        const ulHeightPct = Math.max(Math.min(Math.round((val.upload / maxVal) * 100), 100), 4);
+
+                                        // Skip some labels if 30 days view to prevent overcrowding
+                                        const showLabel = consumoPeriod === '7' || index % 5 === 0 || index === chartDays.length - 1;
+
+                                        return (
+                                          <View key={dateStr} style={{ flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                                            <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: '85%', gap: 2 }}>
+                                              {/* Download Bar */}
+                                              <View style={{
+                                                width: consumoPeriod === '7' ? 12 : 4,
+                                                height: `${dlHeightPct}%`,
+                                                backgroundColor: primaryColor || '#2563EB',
+                                                borderTopLeftRadius: 3,
+                                                borderTopRightRadius: 3,
+                                              }} />
+                                              {/* Upload Bar */}
+                                              <View style={{
+                                                width: consumoPeriod === '7' ? 12 : 4,
+                                                height: `${ulHeightPct}%`,
+                                                backgroundColor: '#10B981',
+                                                borderTopLeftRadius: 3,
+                                                borderTopRightRadius: 3,
+                                              }} />
+                                            </View>
+                                            <Text style={{ fontSize: consumoPeriod === '7' ? 9 : 8, color: '#64748B', marginTop: 4, opacity: showLabel ? 1 : 0 }}>
+                                              {dayLabel}
+                                            </Text>
+                                          </View>
+                                        );
+                                      })}
+                                    </View>
                                   </View>
                                 </View>
                               </>
