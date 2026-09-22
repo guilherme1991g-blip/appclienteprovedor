@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -698,6 +698,7 @@ export default function LoginScreen() {
   const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
   const [consumoPeriod, setConsumoPeriod] = useState<'7' | '30'>('7');
   const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
+  const [bannerIndex, setBannerIndex] = useState(0);
 
   // Network Diagnostic Suite States
   const [diagnosticRunning, setDiagnosticRunning] = useState(false);
@@ -1516,6 +1517,16 @@ export default function LoginScreen() {
         });
     }
   }, [activeTab, screenState, selectedContract]);
+
+  // Auto-rotate Stories Banner on Home Screen
+  useEffect(() => {
+    if (activeTab === 'HOME' && screenState === 'DASHBOARD') {
+      const timer = setInterval(() => {
+        setBannerIndex(prev => (prev + 1) % 3);
+      }, 4500);
+      return () => clearInterval(timer);
+    }
+  }, [activeTab, screenState]);
 
   // Network Probing Engine with ICMP-equivalent transport calibration
   const probeEndpoint = async (url: string, timeoutMs: number = 2500): Promise<{ ok: boolean; latencyMs: number }> => {
@@ -2738,93 +2749,122 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* 🎨 HORIZONTAL TEST PROMO BANNERS CAROUSEL */}
+                        {/* 🎬 STORIES AUTO-ROTATING BANNER (COMPACT HEIGHT & AUTO-SWAP) */}
                         <View style={{ marginBottom: 16 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAFC' }}>Novidades & Destaques</Text>
-                            <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Arraste para ver mais ➔</Text>
-                          </View>
-
-                          <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={{ gap: 12 }}
-                          >
-                            {/* Banner 1: Upgrade Turbo Fibra */}
-                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: `${primaryColor || '#2563EB'}40` }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <View style={{ backgroundColor: `${primaryColor || '#2563EB'}25`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: primaryColor || '#60A5FA' }}>UPGRADE FIBRA</Text>
-                                </View>
-                                <Zap size={16} color={primaryColor || '#2563EB'} />
-                              </View>
-                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
-                                Turbine sua Velocidade!
-                              </Text>
-                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
-                                Conheça os novos planos de 600 Mega com Wi-Fi 6 e latência ultra baixa.
-                              </Text>
-                              <TouchableOpacity
-                                style={{ backgroundColor: primaryColor || '#2563EB', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                onPress={handleOpenWhatsApp}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Turbinar meu Plano</Text>
-                                <ChevronRight size={14} color="#FFFFFF" />
-                              </TouchableOpacity>
-                            </View>
-
-                            {/* Banner 2: Indique e Ganhe */}
-                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#10B98140' }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <View style={{ backgroundColor: '#10B98125', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#34D399' }}>INDIQUE E GANHE</Text>
-                                </View>
-                                <Gift size={16} color="#10B981" />
-                              </View>
-                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
-                                Ganhe 50% na Fatura!
-                              </Text>
-                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
-                                Indique vizinhos e amigos. Para cada contrato fechado você ganha desconto na mensalidade.
-                              </Text>
-                              <TouchableOpacity
-                                style={{ backgroundColor: '#10B981', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                onPress={() => {
+                          {(() => {
+                            const stories = [
+                              {
+                                id: 'upgrade',
+                                tag: 'UPGRADE FIBRA',
+                                tagColor: primaryColor || '#60A5FA',
+                                tagBg: `${primaryColor || '#2563EB'}25`,
+                                borderColor: `${primaryColor || '#2563EB'}40`,
+                                icon: Zap,
+                                iconColor: primaryColor || '#2563EB',
+                                title: 'Turbine sua Velocidade!',
+                                subtitle: 'Novos planos de 600 Mega com Wi-Fi 6.',
+                                btnText: 'Turbinar',
+                                action: handleOpenWhatsApp,
+                              },
+                              {
+                                id: 'indique',
+                                tag: 'INDIQUE E GANHE',
+                                tagColor: '#34D399',
+                                tagBg: '#10B98125',
+                                borderColor: '#10B98140',
+                                icon: Gift,
+                                iconColor: '#10B981',
+                                title: 'Ganhe 50% na Fatura!',
+                                subtitle: 'Indique amigos e ganhe desconto na mensalidade.',
+                                btnText: 'Indicar',
+                                action: () => {
                                   Clipboard.setString(`Estou usando a ${providerConfig.nome || 'WebConnect'} e recomendo! Contrate com meu link de indicação.`);
                                   Alert.alert('Link Copiado!', 'Texto de indicação copiado para sua área de transferência.');
-                                }}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Copiar Convite</Text>
-                                <ChevronRight size={14} color="#FFFFFF" />
-                              </TouchableOpacity>
-                            </View>
+                                },
+                              },
+                              {
+                                id: 'clube',
+                                tag: 'VANTAGENS VIP',
+                                tagColor: '#C084FC',
+                                tagBg: '#8B5CF625',
+                                borderColor: '#8B5CF640',
+                                icon: Sparkles,
+                                iconColor: '#C084FC',
+                                title: 'Descontos Exclusivos',
+                                subtitle: 'Economize em farmácias, cinemas e lojas.',
+                                btnText: 'Benefícios',
+                                action: () => setActiveTab('CLUBE_CLIENTE'),
+                              },
+                            ];
 
-                            {/* Banner 3: Clube do Cliente */}
-                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#8B5CF640' }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                                <View style={{ backgroundColor: '#8B5CF625', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#C084FC' }}>VANTAGENS VIP</Text>
+                            const currentStory = stories[bannerIndex % stories.length];
+                            const IconComponent = currentStory.icon;
+
+                            return (
+                              <View style={{
+                                backgroundColor: '#0F172A',
+                                borderRadius: 14,
+                                padding: 12,
+                                borderWidth: 1,
+                                borderColor: currentStory.borderColor,
+                              }}>
+                                {/* Stories Top Progress Bar */}
+                                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                                  {stories.map((s, idx) => (
+                                    <TouchableOpacity
+                                      key={s.id}
+                                      onPress={() => setBannerIndex(idx)}
+                                      style={{
+                                        flex: 1,
+                                        height: 3,
+                                        borderRadius: 2,
+                                        backgroundColor: idx === (bannerIndex % stories.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.2)',
+                                      }}
+                                    />
+                                  ))}
                                 </View>
-                                <Sparkles size={16} color="#C084FC" />
+
+                                {/* Compact Content Row */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <View style={{ flex: 1, marginRight: 10 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                                      <View style={{ backgroundColor: currentStory.tagBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                        <Text style={{ fontSize: 8, fontWeight: '800', color: currentStory.tagColor }}>
+                                          {currentStory.tag}
+                                        </Text>
+                                      </View>
+                                      <IconComponent size={14} color={currentStory.iconColor} />
+                                    </View>
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }} numberOfLines={1}>
+                                      {currentStory.title}
+                                    </Text>
+                                    <Text style={{ fontSize: 10, color: '#94A3B8', marginTop: 1 }} numberOfLines={1}>
+                                      {currentStory.subtitle}
+                                    </Text>
+                                  </View>
+
+                                  <TouchableOpacity
+                                    style={{
+                                      backgroundColor: currentStory.iconColor,
+                                      paddingVertical: 7,
+                                      paddingHorizontal: 12,
+                                      borderRadius: 8,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4,
+                                    }}
+                                    onPress={currentStory.action}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
+                                      {currentStory.btnText}
+                                    </Text>
+                                    <ChevronRight size={13} color="#FFFFFF" />
+                                  </TouchableOpacity>
+                                </View>
                               </View>
-                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
-                                Descontos Exclusivos
-                              </Text>
-                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
-                                Economize em farmácias, cinemas e parceiros comerciais por ser assinante ativo.
-                              </Text>
-                              <TouchableOpacity
-                                style={{ backgroundColor: '#8B5CF6', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                                onPress={() => setActiveTab('CLUBE_CLIENTE')}
-                                activeOpacity={0.8}
-                              >
-                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Ver Benefícios</Text>
-                                <ChevronRight size={14} color="#FFFFFF" />
-                              </TouchableOpacity>
-                            </View>
-                          </ScrollView>
+                            );
+                          })()}
                         </View>
                         {/* SUSPENDED SERVICE WARNING CARD WITH TRUST UNLOCK */}
                         {statusLower === 'suspenso' ? (
