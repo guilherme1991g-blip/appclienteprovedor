@@ -18,6 +18,7 @@ import {
   AppState,
   StatusBar,
 } from 'react-native';
+import Svg, { Path, Circle, Polyline, LinearGradient as SvgGradient, Stop as SvgStop, Rect as SvgRect } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   ArrowRight,
@@ -384,7 +385,7 @@ interface ContractDisplay {
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
-type TabName = 'HOME' | 'FINANCEIRO' | 'CONEXAO' | 'SUPORTE' | 'PERFIL' | 'PLANO' | 'TESTE' | 'CLUBE' | 'CLUBE_CLIENTE';
+type TabName = 'HOME' | 'FINANCEIRO' | 'CONEXAO' | 'SUPORTE' | 'PERFIL' | 'PLANO' | 'TESTE' | 'CLUBE' | 'CLUBE_CLIENTE' | 'VELOCIDADE';
 async function registerForPushNotificationsAsync() {
   let token = null;
 
@@ -3502,14 +3503,10 @@ export default function LoginScreen() {
                             const limit30 = new Date();
                             limit30.setDate(limit30.getDate() - 30);
                             limit30.setHours(0,0,0,0);
-                            const limit7 = new Date();
-                            limit7.setDate(limit7.getDate() - 7);
-                            limit7.setHours(0,0,0,0);
 
                             let totalDownloadBytes = 0;
                             let totalUploadBytes = 0;
 
-                            // Daily buckets for last 30 days
                             const dailyMap: Record<string, { download: number; upload: number }> = {};
                             for (let i = 29; i >= 0; i--) {
                               const d = new Date();
@@ -3533,16 +3530,43 @@ export default function LoginScreen() {
                               }
                             });
 
-                            const allDays = Object.entries(dailyMap).sort((a, b) => a[0].localeCompare(b[0]));
-                            const last7Days = allDays.slice(-7);
-                            const last30Days = allDays;
+                            const rawDays = Object.entries(dailyMap).sort((a, b) => a[0].localeCompare(b[0]));
 
-                            const chartDays = consumoPeriod === '7' ? last7Days : last30Days;
+                            // Calculate average of days with recorded disconnections
+                            const dlMeasured = rawDays.map(([, v]) => v.download).filter(v => v > 0);
+                            const avgDl = dlMeasured.length > 0 ? (dlMeasured.reduce((a, b) => a + b, 0) / dlMeasured.length) : 0;
+                            
+                            const ulMeasured = rawDays.map(([, v]) => v.upload).filter(v => v > 0);
+                            const avgUl = ulMeasured.length > 0 ? (ulMeasured.reduce((a, b) => a + b, 0) / ulMeasured.length) : 0;
+
+                            // Fill days without disconnection using average/interpolation so chart has continuous lines
+                            const processedDays = rawDays.map(([dateStr, v], idx) => {
+                              let dl = v.download;
+                              let ul = v.upload;
+                              let isEstimated = false;
+
+                              if (dl === 0 && avgDl > 0) {
+                                const prev = rawDays[idx - 1]?.[1].download || 0;
+                                const next = rawDays[idx + 1]?.[1].download || 0;
+                                dl = (prev > 0 && next > 0) ? Math.round((prev + next) / 2) : (prev > 0 ? prev : next > 0 ? next : Math.round(avgDl));
+                                isEstimated = true;
+                              }
+                              if (ul === 0 && avgUl > 0) {
+                                const prev = rawDays[idx - 1]?.[1].upload || 0;
+                                const next = rawDays[idx + 1]?.[1].upload || 0;
+                                ul = (prev > 0 && next > 0) ? Math.round((prev + next) / 2) : (prev > 0 ? prev : next > 0 ? next : Math.round(avgUl));
+                              }
+
+                              return [dateStr, { download: dl, upload: ul, isEstimated }] as const;
+                            });
+
+                            const chartDays = consumoPeriod === '7' ? processedDays.slice(-7) : processedDays;
                             const maxVal = Math.max(...chartDays.map(([, v]) => Math.max(v.download, v.upload)), 1);
 
                             // Period totals
                             const periodDownload = chartDays.reduce((acc, [, v]) => acc + v.download, 0);
                             const periodUpload = chartDays.reduce((acc, [, v]) => acc + v.upload, 0);
+                            const hasEstimatedDays = chartDays.some(([, v]) => v.isEstimated);
 
                             return (
                               <>
@@ -3974,45 +3998,105 @@ export default function LoginScreen() {
                                     </View>
                                   </View>
 
-                                  {/* Bar Chart Visualization */}
-                                  <View style={{ height: 160, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'flex-end' }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 120, width: '100%' }}>
-                                      {chartDays.map(([dateStr, val], index) => {
-                                        const dateObj = new Date(dateStr + 'T00:00:00');
-                                        const dayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-                                        
-                                        const dlHeightPct = Math.max(Math.min(Math.round((val.download / maxVal) * 100), 100), 4);
-                                        const ulHeightPct = Math.max(Math.min(Math.round((val.upload / maxVal) * 100), 100), 4);
+                                  {/* Line Chart Visualization */}
+                                  <View style={{ height: 180, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'center' }}>
+                                    {hasEstimatedDays && (
+                                      <Text style={{ fontSize: 9, color: '#64748B', fontStyle: 'italic', marginBottom: 6, textAlign: 'right' }}>
+                                        * Dias sem desconexão exibem média estimada de tráfego
+                                      </Text>
+                                    )}
 
-                                        // Skip some labels if 30 days view to prevent overcrowding
-                                        const showLabel = consumoPeriod === '7' || index % 5 === 0 || index === chartDays.length - 1;
+                                    <View style={{ height: 130, width: '100%', justifyContent: 'center' }}>
+                                      {(() => {
+                                        const svgWidth = 320;
+                                        const svgHeight = 100;
+                                        const pointsCount = chartDays.length;
+                                        const stepX = pointsCount > 1 ? svgWidth / (pointsCount - 1) : svgWidth;
+
+                                        const dlPoints = chartDays.map(([, v], i) => {
+                                          const x = i * stepX;
+                                          const y = svgHeight - (valToPct(v.download, maxVal) / 100) * (svgHeight - 16) - 8;
+                                          return { x, y, isEstimated: v.isEstimated, val: v.download };
+                                        });
+
+                                        const ulPoints = chartDays.map(([, v], i) => {
+                                          const x = i * stepX;
+                                          const y = svgHeight - (valToPct(v.upload, maxVal) / 100) * (svgHeight - 16) - 8;
+                                          return { x, y, isEstimated: v.isEstimated, val: v.upload };
+                                        });
+
+                                        function valToPct(val: number, max: number) {
+                                          if (max <= 0) return 0;
+                                          return Math.max(Math.min((val / max) * 100, 100), 5);
+                                        }
+
+                                        const dlPath = dlPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+                                        const ulPath = ulPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+
+                                        // Area fill path for download
+                                        const dlAreaPath = `${dlPath} L ${svgWidth} ${svgHeight} L 0 ${svgHeight} Z`;
 
                                         return (
-                                          <View key={dateStr} style={{ flex: 1, alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
-                                            <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: '85%', gap: 2 }}>
-                                              {/* Download Bar */}
-                                              <View style={{
-                                                width: consumoPeriod === '7' ? 12 : 4,
-                                                height: `${dlHeightPct}%`,
-                                                backgroundColor: primaryColor || '#2563EB',
-                                                borderTopLeftRadius: 3,
-                                                borderTopRightRadius: 3,
-                                              }} />
-                                              {/* Upload Bar */}
-                                              <View style={{
-                                                width: consumoPeriod === '7' ? 12 : 4,
-                                                height: `${ulHeightPct}%`,
-                                                backgroundColor: '#10B981',
-                                                borderTopLeftRadius: 3,
-                                                borderTopRightRadius: 3,
-                                              }} />
+                                          <View style={{ flex: 1, width: '100%' }}>
+                                            <Svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 100 }}>
+                                              <SvgGradient id="dlGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <SvgStop offset="0" stopColor={primaryColor || '#2563EB'} stopOpacity="0.35" />
+                                                <SvgStop offset="1" stopColor={primaryColor || '#2563EB'} stopOpacity="0.0" />
+                                              </SvgGradient>
+
+                                              {/* Area Fill */}
+                                              <Path d={dlAreaPath} fill="url(#dlGradient)" />
+
+                                              {/* Upload Line */}
+                                              <Path d={ulPath} fill="none" stroke="#10B981" strokeWidth="2.5" strokeDasharray={consumoPeriod === '30' ? '4 2' : undefined} />
+                                              
+                                              {/* Download Line */}
+                                              <Path d={dlPath} fill="none" stroke={primaryColor || '#2563EB'} strokeWidth="3" />
+
+                                              {/* Download Dots */}
+                                              {dlPoints.map((p, i) => (
+                                                <Circle
+                                                  key={`dl-${i}`}
+                                                  cx={p.x}
+                                                  cy={p.y}
+                                                  r={p.isEstimated ? "3" : "4"}
+                                                  fill={p.isEstimated ? "#60A5FA" : (primaryColor || '#2563EB')}
+                                                  stroke="#020617"
+                                                  strokeWidth="1.5"
+                                                />
+                                              ))}
+
+                                              {/* Upload Dots */}
+                                              {ulPoints.map((p, i) => (
+                                                <Circle
+                                                  key={`ul-${i}`}
+                                                  cx={p.x}
+                                                  cy={p.y}
+                                                  r="3"
+                                                  fill="#10B981"
+                                                  stroke="#020617"
+                                                  strokeWidth="1.5"
+                                                />
+                                              ))}
+                                            </Svg>
+
+                                            {/* Date Labels below chart */}
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+                                              {chartDays.map(([dateStr], idx) => {
+                                                const dateObj = new Date(dateStr + 'T00:00:00');
+                                                const dayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                                                const showLabel = consumoPeriod === '7' || idx % 5 === 0 || idx === chartDays.length - 1;
+
+                                                return (
+                                                  <Text key={dateStr} style={{ fontSize: consumoPeriod === '7' ? 9 : 8, color: '#64748B', opacity: showLabel ? 1 : 0 }}>
+                                                    {dayLabel}
+                                                  </Text>
+                                                );
+                                              })}
                                             </View>
-                                            <Text style={{ fontSize: consumoPeriod === '7' ? 9 : 8, color: '#64748B', marginTop: 4, opacity: showLabel ? 1 : 0 }}>
-                                              {dayLabel}
-                                            </Text>
                                           </View>
                                         );
-                                      })}
+                                      })()}
                                     </View>
                                   </View>
                                 </View>
@@ -4085,6 +4169,41 @@ export default function LoginScreen() {
                           <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 20 }}>
                             Em breve você terá acesso a sorteios mensais, acúmulo de pontos, atendimento prioritário e eventos exclusivos do provedor diretamente por aqui.
                           </Text>
+                        </View>
+                      </View>
+                    )}
+                    {/* TESTE DE VELOCIDADE (FAST.COM) TAB */}
+                    {activeTab === 'VELOCIDADE' && (
+                      <View style={styles.planoTabWrapper}>
+                        <View style={styles.infoCard}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <View style={styles.infoCardHeader}>
+                              <Gauge size={20} color={primaryColor || "#2563EB"} style={{ marginRight: 8 }} />
+                              <Text style={styles.infoCardHeaderTitle}>Teste de Velocidade (Fast.com)</Text>
+                            </View>
+                          </View>
+
+                          <Text style={{ fontSize: 12, color: '#94A3B8', marginBottom: 14, lineHeight: 18 }}>
+                            Medição oficial de velocidade powered by Netflix. O teste iniciará automaticamente no quadro abaixo.
+                          </Text>
+
+                          <View style={{ height: 480, backgroundColor: '#000000', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#1E293B' }}>
+                            <WebView
+                              source={{ uri: 'https://fast.com' }}
+                              style={{ flex: 1, backgroundColor: '#000000' }}
+                              javaScriptEnabled={true}
+                              domStorageEnabled={true}
+                              startInLoadingState={true}
+                              renderLoading={() => (
+                                <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0F172A' }}>
+                                  <ActivityIndicator size="large" color={primaryColor || "#2563EB"} />
+                                  <Text style={{ color: '#94A3B8', marginTop: 12, fontSize: 12, fontWeight: '600' }}>Iniciando teste no Fast.com...</Text>
+                                </View>
+                              )}
+                              originWhitelist={['*']}
+                              mixedContentMode="always"
+                            />
+                          </View>
                         </View>
                       </View>
                     )}
@@ -4271,6 +4390,32 @@ export default function LoginScreen() {
                             <View style={{ flex: 1 }}>
                               <Text style={styles.sideMenuRowTitle}>Declaração de Quitação</Text>
                               <Text style={styles.sideMenuRowSubtitle}>Comprovante anual de débitos</Text>
+                            </View>
+                            <ChevronRight size={16} color="#475569" />
+                          </TouchableOpacity>
+
+                          <View style={styles.sideMenuDivider} />
+
+                          {/* 3. Teste de Velocidade */}
+                          <TouchableOpacity
+                            style={styles.sideMenuRow}
+                            onPress={() => {
+                              setActiveTab('VELOCIDADE');
+                              setIsSideMenuOpen(false);
+                            }}
+                            activeOpacity={0.65}
+                          >
+                            <View style={styles.sideMenuIconWrapper}>
+                              <Gauge size={20} color="#94A3B8" strokeWidth={1.7} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Text style={styles.sideMenuRowTitle}>Teste de Velocidade</Text>
+                                <View style={[styles.sideMenuBadgeTag, { backgroundColor: 'rgba(37, 99, 235, 0.15)' }]}>
+                                  <Text style={[styles.sideMenuBadgeTagText, { color: primaryColor || '#60A5FA' }]}>FAST.COM</Text>
+                                </View>
+                              </View>
+                              <Text style={styles.sideMenuRowSubtitle}>Medir velocidade com Fast.com (Netflix)</Text>
                             </View>
                             <ChevronRight size={16} color="#475569" />
                           </TouchableOpacity>
