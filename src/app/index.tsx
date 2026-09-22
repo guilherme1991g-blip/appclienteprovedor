@@ -700,6 +700,15 @@ export default function LoginScreen() {
   const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
   const [bannerIndex, setBannerIndex] = useState(0);
 
+  // Support Screen UI State
+  const [showSupportForm, setShowSupportForm] = useState(false);
+
+  React.useEffect(() => {
+    if (activeTab !== 'SUPORTE') {
+      setShowSupportForm(false);
+    }
+  }, [activeTab]);
+
   // Network Diagnostic Suite States
   const [diagnosticRunning, setDiagnosticRunning] = useState(false);
   const [diagnosticProgress, setDiagnosticProgress] = useState(0);
@@ -3367,197 +3376,406 @@ export default function LoginScreen() {
                     {activeTab === 'SUPORTE' && (
                       <View style={styles.planoTabWrapper}>
 
-                        {/* A. NEW TICKET FORM (always visible) */}
-                        <View style={styles.infoCard}>
-                          <View style={styles.infoCardHeader}>
-                            <MessageSquare size={18} color="#2563EB" style={{ marginRight: 8 }} />
-                            <Text style={styles.infoCardHeaderTitle}>Abrir Ordem de Serviço</Text>
-                          </View>
-
-                          {/* Phone Number Field */}
-                          <View style={styles.supportFormGroup}>
-                            <Text style={styles.formLabel}>📱 Número do WhatsApp</Text>
-                            <TextInput
-                              style={styles.formInput}
-                              placeholder="(81) 99999-9999"
-                              placeholderTextColor="#64748B"
-                              keyboardType="phone-pad"
-                              value={verificationPhone}
-                              onChangeText={(text) => setVerificationPhone(formatPhoneInput(text))}
-                              editable={!codeSent}
-                              maxLength={15}
-                            />
-                          </View>
-
-                          <View style={styles.supportFormGroup}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
-                              {loadingMotives && (
-                                <ActivityIndicator size="small" color="#2563EB" />
-                              )}
-                            </View>
-                            <TouchableOpacity
-                              style={styles.dropdownSelector}
-                              onPress={() => setIsMotiveDropdownOpen(!isMotiveDropdownOpen)}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.dropdownSelectorText}>
-                                {supportMotivesList.find(item => item.value === supportMotive)?.label || 'Selecione o motivo'}
-                              </Text>
-                              {isMotiveDropdownOpen ? (
-                                <ChevronUp size={20} color="#64748B" />
-                              ) : (
-                                <ChevronDown size={20} color="#64748B" />
-                              )}
-                            </TouchableOpacity>
-
-                            {isMotiveDropdownOpen && (
-                              <View style={styles.dropdownMenu}>
-                                {supportMotivesList.map((item) => {
-                                  const isSelected = supportMotive === item.value;
-                                  return (
-                                    <TouchableOpacity
-                                      key={item.value}
-                                      style={[
-                                        styles.dropdownItem,
-                                        isSelected && styles.dropdownItemActive
-                                      ]}
-                                      onPress={() => {
-                                        setSupportMotive(item.value);
-                                        setIsMotiveDropdownOpen(false);
-                                      }}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Text style={[
-                                        styles.dropdownItemText,
-                                        isSelected && styles.dropdownItemTextActive
-                                      ]}>
-                                        {item.label}
-                                      </Text>
-                                      {isSelected && <Check size={16} color="#2563EB" />}
-                                    </TouchableOpacity>
-                                  );
-                                })}
+                        {!showSupportForm ? (
+                          /* PRE-SUPPORT DIAGNOSTIC CHECKLIST SCREEN */
+                          <View style={styles.infoCard}>
+                            {/* Warning Banner */}
+                            <View style={{
+                              backgroundColor: '#F59E0B15',
+                              borderColor: '#F59E0B40',
+                              borderWidth: 1,
+                              borderRadius: 12,
+                              padding: 14,
+                              marginBottom: 16,
+                              flexDirection: 'row',
+                              alignItems: 'flex-start',
+                            }}>
+                              <AlertTriangle size={20} color="#F59E0B" style={{ marginRight: 10, marginTop: 2 }} />
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#F59E0B', fontWeight: '700', fontSize: 14, marginBottom: 4 }}>
+                                  Aviso Importante
+                                </Text>
+                                <Text style={{ color: '#CBD5E1', fontSize: 13, lineHeight: 19 }}>
+                                  Só abra um chamado caso você já tenha realizado todas as verificações abaixo e o problema realmente não tenha sido resolvido.
+                                </Text>
                               </View>
-                            )}
-                          </View>
+                            </View>
 
-                          <View style={styles.supportFormGroup}>
-                            <Text style={styles.formLabel}>Descrição do Problema</Text>
-                            <TextInput
-                              style={[styles.formInput, styles.formInputTextArea]}
-                              placeholder="Descreva aqui detalhadamente o seu problema..."
-                              placeholderTextColor="#64748B"
-                              multiline={true}
-                              numberOfLines={4}
-                              value={supportContent}
-                              onChangeText={setSupportContent}
-                            />
-                          </View>
+                            {/* Header / Title */}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                              <ShieldCheck size={20} color="#2563EB" style={{ marginRight: 8 }} />
+                              <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>
+                                Passo a Passo de Verificação Inicial
+                              </Text>
+                            </View>
 
-                          {/* Submit Button */}
-                          {!codeSent && (
-                            <TouchableOpacity
-                              style={[
-                                styles.supportSubmitBtn,
-                                { backgroundColor: (sendingCode || submittingSupport) ? '#1E293B' : '#2563EB' }
-                              ]}
-                              onPress={() => {
-                                if (providerConfig.exigir_confirmacao_numero) {
-                                  handleSendVerificationCode();
-                                } else {
-                                  handleSubmitSupport(verificationPhone || selectedContract?.phone);
-                                }
-                              }}
-                              disabled={sendingCode || submittingSupport}
-                              activeOpacity={0.8}
-                            >
-                              {(sendingCode || submittingSupport) ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" />
-                              ) : (
-                                <Text style={styles.supportSubmitBtnText}>Abrir Chamado</Text>
-                              )}
-                            </TouchableOpacity>
-                          )}
-
-                          {/* Verification Code Section (appears after clicking Abrir Chamado) */}
-                          {codeSent && (
-                            <>
+                            {/* Steps List */}
+                            <View style={{ gap: 12, marginBottom: 20 }}>
+                              {/* Step 1 */}
                               <View style={{
-                                backgroundColor: '#F59E0B15',
+                                backgroundColor: '#1E293B',
                                 borderRadius: 12,
                                 padding: 14,
-                                marginTop: 8,
-                                borderWidth: 1,
-                                borderColor: '#F59E0B30',
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#2563EB',
                               }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                                  <ShieldCheck size={16} color="#F59E0B" style={{ marginRight: 8 }} />
-                                  <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '700' }}>
-                                    Código de verificação enviado!
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                  <View style={{
+                                    backgroundColor: '#2563EB20',
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                  }}>
+                                    <Text style={{ color: '#3B82F6', fontWeight: '800', fontSize: 13 }}>1</Text>
+                                  </View>
+                                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, flex: 1 }}>
+                                    Verificar cabos e tomadas
                                   </Text>
                                 </View>
-                                <Text style={{ color: '#94A3B8', fontSize: 12, lineHeight: 18 }}>
-                                  Enviamos um código de 6 dígitos para o WhatsApp {verificationPhone}. Digite abaixo para confirmar e abrir o chamado.
+                                <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 19, paddingLeft: 36 }}>
+                                  Verifique se todos os cabos estão bem conectados e se todos os aparelhos de internet estão ligados na tomada, sem mau contato.
                                 </Text>
                               </View>
 
-                              <View style={[styles.supportFormGroup, { marginTop: 12 }]}>
-                                <Text style={styles.formLabel}>🔑 Código de Verificação</Text>
-                                <TextInput
-                                  style={[styles.formInput, { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontWeight: '800' }]}
-                                  placeholder="000000"
-                                  placeholderTextColor="#64748B"
-                                  keyboardType="number-pad"
-                                  value={verificationCode}
-                                  onChangeText={(text) => setVerificationCode(text.replace(/\D/g, '').slice(0, 6))}
-                                  maxLength={6}
-                                />
+                              {/* Step 2 */}
+                              <View style={{
+                                backgroundColor: '#1E293B',
+                                borderRadius: 12,
+                                padding: 14,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#3B82F6',
+                              }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                  <View style={{
+                                    backgroundColor: '#3B82F620',
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                  }}>
+                                    <Text style={{ color: '#60A5FA', fontWeight: '800', fontSize: 13 }}>2</Text>
+                                  </View>
+                                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, flex: 1 }}>
+                                    Desligar da tomada por 2 minutos
+                                  </Text>
+                                </View>
+                                <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 19, paddingLeft: 36 }}>
+                                  Desligue todos os aparelhos de internet da tomada por 2 minutos. Ligue novamente e aguarde as luzes estabilizarem para testar.
+                                </Text>
                               </View>
 
+                              {/* Step 3 */}
+                              <View style={{
+                                backgroundColor: '#1E293B',
+                                borderRadius: 12,
+                                padding: 14,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#60A5FA',
+                              }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                  <View style={{
+                                    backgroundColor: '#60A5FA20',
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                  }}>
+                                    <Text style={{ color: '#93C5FD', fontWeight: '800', fontSize: 13 }}>3</Text>
+                                  </View>
+                                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, flex: 1 }}>
+                                    Reiniciar os dispositivos sem conexão
+                                  </Text>
+                                </View>
+                                <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 19, paddingLeft: 36 }}>
+                                  Reinicie os dispositivos (celular, computador, TV) que estão sem internet para forçar uma nova reconexão.
+                                </Text>
+                              </View>
+
+                              {/* Step 4 */}
+                              <View style={{
+                                backgroundColor: '#1E293B',
+                                borderRadius: 12,
+                                padding: 14,
+                                borderLeftWidth: 4,
+                                borderLeftColor: '#10B981',
+                              }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                                  <View style={{
+                                    backgroundColor: '#10B98120',
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                  }}>
+                                    <Text style={{ color: '#10B981', fontWeight: '800', fontSize: 13 }}>4</Text>
+                                  </View>
+                                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14, flex: 1 }}>
+                                    Testar próximo ao roteador
+                                  </Text>
+                                </View>
+                                <Text style={{ color: '#94A3B8', fontSize: 13, lineHeight: 19, paddingLeft: 36 }}>
+                                  Chegue bem próximo ao roteador e teste novamente, pois a distância e paredes podem interferir na qualidade do sinal.
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Footer Call to Action */}
+                            <View style={{
+                              backgroundColor: '#0F172A',
+                              padding: 14,
+                              borderRadius: 12,
+                              borderWidth: 1,
+                              borderColor: '#334155',
+                              alignItems: 'center',
+                            }}>
+                              <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginBottom: 14, lineHeight: 19 }}>
+                                Se mesmo assim nada resolver, clique no botão abaixo para iniciar um chamado de suporte.
+                              </Text>
+
                               <TouchableOpacity
-                                style={[
-                                  styles.supportSubmitBtn,
-                                  { backgroundColor: verifyingCode ? '#1E293B' : '#10B981', marginTop: 4 }
-                                ]}
-                                onPress={handleVerifyCode}
-                                disabled={verifyingCode}
+                                style={{
+                                  backgroundColor: '#2563EB',
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  paddingVertical: 14,
+                                  paddingHorizontal: 20,
+                                  borderRadius: 12,
+                                  width: '100%',
+                                }}
+                                onPress={() => setShowSupportForm(true)}
                                 activeOpacity={0.8}
                               >
-                                {verifyingCode ? (
-                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                <Headphones size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={{ color: '#FFFFFF', fontSize: 15, fontWeight: '700' }}>
+                                  Iniciar Chamado de Suporte
+                                </Text>
+                                <ChevronRight size={18} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        ) : (
+                          /* A. NEW TICKET FORM */
+                          <View style={styles.infoCard}>
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: 16,
+                                paddingVertical: 8,
+                                paddingHorizontal: 12,
+                                backgroundColor: '#1E293B',
+                                borderRadius: 8,
+                                alignSelf: 'flex-start',
+                              }}
+                              onPress={() => setShowSupportForm(false)}
+                              activeOpacity={0.7}
+                            >
+                              <ArrowLeft size={16} color="#3B82F6" style={{ marginRight: 6 }} />
+                              <Text style={{ color: '#3B82F6', fontSize: 13, fontWeight: '600' }}>
+                                Voltar às Instruções de Diagnóstico
+                              </Text>
+                            </TouchableOpacity>
+
+                            <View style={styles.infoCardHeader}>
+                              <MessageSquare size={18} color="#2563EB" style={{ marginRight: 8 }} />
+                              <Text style={styles.infoCardHeaderTitle}>Abrir Ordem de Serviço</Text>
+                            </View>
+
+                            {/* Phone Number Field */}
+                            <View style={styles.supportFormGroup}>
+                              <Text style={styles.formLabel}>📱 Número do WhatsApp</Text>
+                              <TextInput
+                                style={styles.formInput}
+                                placeholder="(81) 99999-9999"
+                                placeholderTextColor="#64748B"
+                                keyboardType="phone-pad"
+                                value={verificationPhone}
+                                onChangeText={(text) => setVerificationPhone(formatPhoneInput(text))}
+                                editable={!codeSent}
+                                maxLength={15}
+                              />
+                            </View>
+
+                            <View style={styles.supportFormGroup}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                                <Text style={styles.formLabel}>Motivo da Ocorrência / Chamado</Text>
+                                {loadingMotives && (
+                                  <ActivityIndicator size="small" color="#2563EB" />
+                                )}
+                              </View>
+                              <TouchableOpacity
+                                style={styles.dropdownSelector}
+                                onPress={() => setIsMotiveDropdownOpen(!isMotiveDropdownOpen)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.dropdownSelectorText}>
+                                  {supportMotivesList.find(item => item.value === supportMotive)?.label || 'Selecione o motivo'}
+                                </Text>
+                                {isMotiveDropdownOpen ? (
+                                  <ChevronUp size={20} color="#64748B" />
                                 ) : (
-                                  <Text style={styles.supportSubmitBtnText}>Confirmar e Abrir Chamado</Text>
+                                  <ChevronDown size={20} color="#64748B" />
                                 )}
                               </TouchableOpacity>
 
-                              {/* Resend / Change Number */}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
-                                <TouchableOpacity
-                                  onPress={() => {
-                                    setCodeSent(false);
-                                    setVerificationCode('');
-                                    setVerificationPhone('');
-                                    if (countdownRef.current) clearInterval(countdownRef.current);
-                                    setCodeCountdown(0);
-                                  }}
-                                  activeOpacity={0.7}
-                                >
-                                  <Text style={{ color: '#64748B', fontSize: 13 }}>Alterar número</Text>
-                                </TouchableOpacity>
+                              {isMotiveDropdownOpen && (
+                                <View style={styles.dropdownMenu}>
+                                  {supportMotivesList.map((item) => {
+                                    const isSelected = supportMotive === item.value;
+                                    return (
+                                      <TouchableOpacity
+                                        key={item.value}
+                                        style={[
+                                          styles.dropdownItem,
+                                          isSelected && styles.dropdownItemActive
+                                        ]}
+                                        onPress={() => {
+                                          setSupportMotive(item.value);
+                                          setIsMotiveDropdownOpen(false);
+                                        }}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={[
+                                          styles.dropdownItemText,
+                                          isSelected && styles.dropdownItemTextActive
+                                        ]}>
+                                          {item.label}
+                                        </Text>
+                                        {isSelected && <Check size={16} color="#2563EB" />}
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </View>
+                              )}
+                            </View>
+
+                            <View style={styles.supportFormGroup}>
+                              <Text style={styles.formLabel}>Descrição do Problema</Text>
+                              <TextInput
+                                style={[styles.formInput, styles.formInputTextArea]}
+                                placeholder="Descreva aqui detalhadamente o seu problema..."
+                                placeholderTextColor="#64748B"
+                                multiline={true}
+                                numberOfLines={4}
+                                value={supportContent}
+                                onChangeText={setSupportContent}
+                              />
+                            </View>
+
+                            {/* Submit Button */}
+                            {!codeSent && (
+                              <TouchableOpacity
+                                style={[
+                                  styles.supportSubmitBtn,
+                                  { backgroundColor: (sendingCode || submittingSupport) ? '#1E293B' : '#2563EB' }
+                                ]}
+                                onPress={() => {
+                                  if (providerConfig.exigir_confirmacao_numero) {
+                                    handleSendVerificationCode();
+                                  } else {
+                                    handleSubmitSupport(verificationPhone || selectedContract?.phone);
+                                  }
+                                }}
+                                disabled={sendingCode || submittingSupport}
+                                activeOpacity={0.8}
+                              >
+                                {(sendingCode || submittingSupport) ? (
+                                  <ActivityIndicator size="small" color="#FFFFFF" />
+                                ) : (
+                                  <Text style={styles.supportSubmitBtnText}>Abrir Chamado</Text>
+                                )}
+                              </TouchableOpacity>
+                            )}
+
+                            {/* Verification Code Section (appears after clicking Abrir Chamado) */}
+                            {codeSent && (
+                              <>
+                                <View style={{
+                                  backgroundColor: '#F59E0B15',
+                                  borderRadius: 12,
+                                  padding: 14,
+                                  marginTop: 8,
+                                  borderWidth: 1,
+                                  borderColor: '#F59E0B30',
+                                }}>
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                                    <ShieldCheck size={16} color="#F59E0B" style={{ marginRight: 8 }} />
+                                    <Text style={{ color: '#F59E0B', fontSize: 13, fontWeight: '700' }}>
+                                      Código de verificação enviado!
+                                    </Text>
+                                  </View>
+                                  <Text style={{ color: '#94A3B8', fontSize: 12, lineHeight: 18 }}>
+                                    Enviamos um código de 6 dígitos para o WhatsApp {verificationPhone}. Digite abaixo para confirmar e abrir o chamado.
+                                  </Text>
+                                </View>
+
+                                <View style={[styles.supportFormGroup, { marginTop: 12 }]}>
+                                  <Text style={styles.formLabel}>🔑 Código de Verificação</Text>
+                                  <TextInput
+                                    style={[styles.formInput, { fontSize: 24, letterSpacing: 8, textAlign: 'center', fontWeight: '800' }]}
+                                    placeholder="000000"
+                                    placeholderTextColor="#64748B"
+                                    keyboardType="number-pad"
+                                    value={verificationCode}
+                                    onChangeText={(text) => setVerificationCode(text.replace(/\D/g, '').slice(0, 6))}
+                                    maxLength={6}
+                                  />
+                                </View>
 
                                 <TouchableOpacity
-                                  onPress={codeCountdown > 0 ? undefined : handleSendVerificationCode}
-                                  activeOpacity={codeCountdown > 0 ? 1 : 0.7}
+                                  style={[
+                                    styles.supportSubmitBtn,
+                                    { backgroundColor: verifyingCode ? '#1E293B' : '#10B981', marginTop: 4 }
+                                  ]}
+                                  onPress={handleVerifyCode}
+                                  disabled={verifyingCode}
+                                  activeOpacity={0.8}
                                 >
-                                  <Text style={{ color: codeCountdown > 0 ? '#475569' : '#F59E0B', fontSize: 13, fontWeight: '600' }}>
-                                    {codeCountdown > 0 ? `Reenviar em ${codeCountdown}s` : 'Reenviar código'}
-                                  </Text>
+                                  {verifyingCode ? (
+                                    <ActivityIndicator size="small" color="#FFFFFF" />
+                                  ) : (
+                                    <Text style={styles.supportSubmitBtnText}>Confirmar e Abrir Chamado</Text>
+                                  )}
                                 </TouchableOpacity>
-                              </View>
-                            </>
-                          )}
-                        </View>
+
+                                {/* Resend / Change Number */}
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 }}>
+                                  <TouchableOpacity
+                                    onPress={() => {
+                                      setCodeSent(false);
+                                      setVerificationCode('');
+                                      setVerificationPhone('');
+                                      if (countdownRef.current) clearInterval(countdownRef.current);
+                                      setCodeCountdown(0);
+                                    }}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Text style={{ color: '#64748B', fontSize: 13 }}>Alterar número</Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    onPress={codeCountdown > 0 ? undefined : handleSendVerificationCode}
+                                    activeOpacity={codeCountdown > 0 ? 1 : 0.7}
+                                  >
+                                    <Text style={{ color: codeCountdown > 0 ? '#475569' : '#F59E0B', fontSize: 13, fontWeight: '600' }}>
+                                      {codeCountdown > 0 ? `Reenviar em ${codeCountdown}s` : 'Reenviar código'}
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </>
+                            )}
+                          </View>
+                        )}
 
                         {/* B. TICKETS HISTORY */}
                         <View style={[styles.sectionHeaderRow, { marginTop: 12 }]}>
