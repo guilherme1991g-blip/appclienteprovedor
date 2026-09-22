@@ -2749,8 +2749,8 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* 🎬 STORIES AUTO-ROTATING FULL-WIDTH BANNER (FULL PHONE WIDTH & INCREASED HEIGHT) */}
-                        <View style={{ marginHorizontal: -16, marginBottom: 16 }}>
+                        {/* 🎬 STORIES AUTO-ROTATING BANNER (ELEGANT LATERAL MARGIN & EXPANDED HEIGHT) */}
+                        <View style={{ marginBottom: 16 }}>
                           {(() => {
                             const stories = [
                               {
@@ -2803,11 +2803,10 @@ export default function LoginScreen() {
                             return (
                               <View style={{
                                 backgroundColor: '#0F172A',
-                                paddingHorizontal: 18,
+                                borderRadius: 16,
+                                paddingHorizontal: 16,
                                 paddingVertical: 16,
                                 borderWidth: 1,
-                                borderLeftWidth: 0,
-                                borderRightWidth: 0,
                                 borderColor: currentStory.borderColor,
                                 minHeight: 155,
                                 justifyContent: 'space-between',
