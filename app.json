@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "CBR FIBRA",
+    "name": "Web Connect",
     "slug": "isp-client-app",
     "version": "1.0.1",
     "orientation": "default",
-    "icon": "./assets/providers/cbrfibra/icon.png",
+    "icon": "./assets/providers/webconnect/icon.png",
     "scheme": "ispclientapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/providers/cbrfibra/icon.png",
+      "icon": "./assets/providers/webconnect/icon.png",
       "supportsTablet": false,
-      "bundleIdentifier": "br.com.cbrfibra.cliente",
-      "buildNumber": "1",
+      "bundleIdentifier": "br.com.webconnect.cliente",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDevelopmentRegion": "pt_BR",
@@ -19,11 +19,11 @@
       }
     },
     "android": {
-      "package": "br.com.cbrfibra.cliente",
-      "versionCode": 1,
+      "package": "br.com.webconnect.cliente",
+      "versionCode": 4,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/providers/cbrfibra/icon.png"
+        "foregroundImage": "./assets/providers/webconnect/icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -43,7 +43,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#080B11",
-          "image": "./assets/providers/cbrfibra/splash.png",
+          "image": "./assets/providers/webconnect/splash.png",
           "imageWidth": 120
         }
       ],

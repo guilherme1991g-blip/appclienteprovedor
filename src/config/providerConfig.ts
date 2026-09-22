@@ -3,7 +3,7 @@
 
 export const APP_CONFIG = {
   // Código único deste provedor (utilizado para buscar as configurações no Supabase)
-  PROVIDER_CODE: 'cbrfibra',
+  PROVIDER_CODE: 'webconnect',
 
   // Credenciais do Supabase
   SUPABASE_URL: 'https://glzhwqtgaddvuvbbmade.supabase.co',
