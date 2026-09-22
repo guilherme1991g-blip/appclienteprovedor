@@ -640,10 +640,7 @@ export default function LoginScreen() {
 
               setAllTitulos(rawTitulos);
 
-              const validContracts = parsedContracts.filter(c => {
-                const statusLower = (c.status || '').toLowerCase().trim();
-                return statusLower === 'ativo' || statusLower === 'suspenso';
-              });
+              const validContracts = parsedContracts;
 
               if (validContracts.length === 1) {
                 setSelectedContract(validContracts[0]);
@@ -700,6 +697,7 @@ export default function LoginScreen() {
   const [conexaoOnline, setConexaoOnline] = useState<boolean | null>(null);
   const [conexaoSessions, setConexaoSessions] = useState<any[]>([]);
   const [consumoPeriod, setConsumoPeriod] = useState<'7' | '30'>('7');
+  const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
 
   // Network Diagnostic Suite States
   const [diagnosticRunning, setDiagnosticRunning] = useState(false);
@@ -1997,14 +1995,7 @@ export default function LoginScreen() {
 
           setAllTitulos(rawTitulos);
 
-          const validContracts = parsedContracts.filter(c => {
-            const statusLower = (c.status || '').toLowerCase().trim();
-            return statusLower === 'ativo' || statusLower === 'suspenso';
-          });
-          const invalidContracts = parsedContracts.filter(c => {
-            const statusLower = (c.status || '').toLowerCase().trim();
-            return statusLower !== 'ativo' && statusLower !== 'suspenso';
-          });
+          const validContracts = parsedContracts;
 
           if (parsedContracts.length === 0) {
             setErrorMsg('Nenhum contrato localizado no seu documento.');
@@ -2091,6 +2082,9 @@ export default function LoginScreen() {
   const handleTrustUnlock = () => {
     if (!selectedContract) return;
 
+    setPendingStatusContractId(selectedContract.id);
+    setLoadingTrustUnlock(true);
+
     // Calculate promise date: Today + 3 days -> YYYY-MM-DD
     const promiseDate = new Date();
     promiseDate.setDate(promiseDate.getDate() + 3);
@@ -2098,8 +2092,6 @@ export default function LoginScreen() {
     const mm = String(promiseDate.getMonth() + 1).padStart(2, '0');
     const dd = String(promiseDate.getDate()).padStart(2, '0');
     const formattedDate = `${yyyy}-${mm}-${dd}`;
-
-    setLoadingTrustUnlock(true);
 
     fetch(`${providerConfig.api_url}/api/ura/liberacaopromessa/`, {
       method: 'POST',
@@ -2114,15 +2106,15 @@ export default function LoginScreen() {
       }),
     })
       .then(async (res) => {
-        setLoadingTrustUnlock(false);
         const data = await res.json();
         console.log('Trust Unlock Response:', data);
 
         if (res.ok && (data.liberado === true || data.status === 1 || data.sucesso)) {
           const msg = 'Efetue o pagamento o quanto antes para não ter o serviço suspenso novamente.';
           Alert.alert('Serviço liberado!', msg);
-          // Update selected contract status locally to 'Ativo'
+          // Update selected contract status and contracts list to 'Ativo'
           setSelectedContract(prev => prev ? { ...prev, status: 'Ativo' } : null);
+          setContracts(prev => prev.map(c => c.id === selectedContract.id ? { ...c, status: 'Ativo' } : c));
         } else {
           const errorText = (typeof data.msg === 'string' && data.msg.trim()) 
             ? data.msg.trim() 
@@ -2131,9 +2123,12 @@ export default function LoginScreen() {
         }
       })
       .catch((err) => {
-        setLoadingTrustUnlock(false);
         console.error('Trust Unlock Error:', err);
         Alert.alert('Erro de Conexão', 'Falha ao comunicar com o servidor. Tente novamente.');
+      })
+      .finally(() => {
+        setLoadingTrustUnlock(false);
+        setPendingStatusContractId(null);
       });
   };
 
@@ -3560,13 +3555,33 @@ export default function LoginScreen() {
                               return [dateStr, { download: dl, upload: ul, isEstimated }] as const;
                             });
 
-                            const chartDays = consumoPeriod === '7' ? processedDays.slice(-7) : processedDays;
+                            let chartDays: [string, { download: number; upload: number }][];
+
+                            if (consumoPeriod === '7') {
+                              chartDays = processedDays.slice(-7).map(([dateStr, v]) => [dateStr, { download: v.download, upload: v.upload }]);
+                            } else {
+                              // Group 30 days into 4 weeks for cleaner weekly view
+                              const weeks: [string, { download: number; upload: number }][] = [
+                                ['Sem 1', { download: 0, upload: 0 }],
+                                ['Sem 2', { download: 0, upload: 0 }],
+                                ['Sem 3', { download: 0, upload: 0 }],
+                                ['Sem 4', { download: 0, upload: 0 }],
+                              ];
+
+                              processedDays.forEach(([dateStr, v], idx) => {
+                                const weekIdx = Math.min(Math.floor(idx / 7.5), 3);
+                                weeks[weekIdx][1].download += v.download;
+                                weeks[weekIdx][1].upload += v.upload;
+                              });
+
+                              chartDays = weeks;
+                            }
+
                             const maxVal = Math.max(...chartDays.map(([, v]) => Math.max(v.download, v.upload)), 1);
 
                             // Period totals
                             const periodDownload = chartDays.reduce((acc, [, v]) => acc + v.download, 0);
                             const periodUpload = chartDays.reduce((acc, [, v]) => acc + v.upload, 0);
-                            const hasEstimatedDays = chartDays.some(([, v]) => v.isEstimated);
 
                             return (
                               <>
@@ -3999,30 +4014,24 @@ export default function LoginScreen() {
                                   </View>
 
                                   {/* Line Chart Visualization */}
-                                  <View style={{ height: 180, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'center' }}>
-                                    {hasEstimatedDays && (
-                                      <Text style={{ fontSize: 9, color: '#64748B', fontStyle: 'italic', marginBottom: 6, textAlign: 'right' }}>
-                                        * Dias sem desconexão exibem média estimada de tráfego
-                                      </Text>
-                                    )}
-
+                                  <View style={{ height: 160, backgroundColor: '#020617', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1E293B', justifyContent: 'center' }}>
                                     <View style={{ height: 130, width: '100%', justifyContent: 'center' }}>
                                       {(() => {
-                                        const svgWidth = 320;
-                                        const svgHeight = 100;
+                                        const svgWidth = 300;
+                                        const svgHeight = 95;
                                         const pointsCount = chartDays.length;
                                         const stepX = pointsCount > 1 ? svgWidth / (pointsCount - 1) : svgWidth;
 
                                         const dlPoints = chartDays.map(([, v], i) => {
                                           const x = i * stepX;
                                           const y = svgHeight - (valToPct(v.download, maxVal) / 100) * (svgHeight - 16) - 8;
-                                          return { x, y, isEstimated: v.isEstimated, val: v.download };
+                                          return { x, y };
                                         });
 
                                         const ulPoints = chartDays.map(([, v], i) => {
                                           const x = i * stepX;
                                           const y = svgHeight - (valToPct(v.upload, maxVal) / 100) * (svgHeight - 16) - 8;
-                                          return { x, y, isEstimated: v.isEstimated, val: v.upload };
+                                          return { x, y };
                                         });
 
                                         function valToPct(val: number, max: number) {
@@ -4030,66 +4039,59 @@ export default function LoginScreen() {
                                           return Math.max(Math.min((val / max) * 100, 100), 5);
                                         }
 
-                                        const dlPath = dlPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
-                                        const ulPath = ulPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+                                        // Smooth Cubic Bezier Curves
+                                        function getCurvedPath(pts: { x: number; y: number }[]): string {
+                                          if (pts.length === 0) return '';
+                                          if (pts.length === 1) return `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+                                          let pathStr = `M ${pts[0].x.toFixed(1)} ${pts[0].y.toFixed(1)}`;
+                                          for (let i = 0; i < pts.length - 1; i++) {
+                                            const p0 = pts[i];
+                                            const p1 = pts[i + 1];
+                                            const cx1 = p0.x + (p1.x - p0.x) / 2;
+                                            const cy1 = p0.y;
+                                            const cx2 = p0.x + (p1.x - p0.x) / 2;
+                                            const cy2 = p1.y;
+                                            pathStr += ` C ${cx1.toFixed(1)} ${cy1.toFixed(1)}, ${cx2.toFixed(1)} ${cy2.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
+                                          }
+                                          return pathStr;
+                                        }
 
-                                        // Area fill path for download
+                                        const dlPath = getCurvedPath(dlPoints);
+                                        const ulPath = getCurvedPath(ulPoints);
+
+                                        // Area fill path under Download curve
                                         const dlAreaPath = `${dlPath} L ${svgWidth} ${svgHeight} L 0 ${svgHeight} Z`;
 
                                         return (
                                           <View style={{ flex: 1, width: '100%' }}>
-                                            <Svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 100 }}>
+                                            <Svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: 95 }}>
                                               <SvgGradient id="dlGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <SvgStop offset="0" stopColor={primaryColor || '#2563EB'} stopOpacity="0.35" />
+                                                <SvgStop offset="0" stopColor={primaryColor || '#2563EB'} stopOpacity="0.30" />
                                                 <SvgStop offset="1" stopColor={primaryColor || '#2563EB'} stopOpacity="0.0" />
                                               </SvgGradient>
 
                                               {/* Area Fill */}
                                               <Path d={dlAreaPath} fill="url(#dlGradient)" />
 
-                                              {/* Upload Line */}
-                                              <Path d={ulPath} fill="none" stroke="#10B981" strokeWidth="2.5" strokeDasharray={consumoPeriod === '30' ? '4 2' : undefined} />
+                                              {/* Upload Curve */}
+                                              <Path d={ulPath} fill="none" stroke="#10B981" strokeWidth="2.5" />
                                               
-                                              {/* Download Line */}
+                                              {/* Download Curve */}
                                               <Path d={dlPath} fill="none" stroke={primaryColor || '#2563EB'} strokeWidth="3" />
-
-                                              {/* Download Dots */}
-                                              {dlPoints.map((p, i) => (
-                                                <Circle
-                                                  key={`dl-${i}`}
-                                                  cx={p.x}
-                                                  cy={p.y}
-                                                  r={p.isEstimated ? "3" : "4"}
-                                                  fill={p.isEstimated ? "#60A5FA" : (primaryColor || '#2563EB')}
-                                                  stroke="#020617"
-                                                  strokeWidth="1.5"
-                                                />
-                                              ))}
-
-                                              {/* Upload Dots */}
-                                              {ulPoints.map((p, i) => (
-                                                <Circle
-                                                  key={`ul-${i}`}
-                                                  cx={p.x}
-                                                  cy={p.y}
-                                                  r="3"
-                                                  fill="#10B981"
-                                                  stroke="#020617"
-                                                  strokeWidth="1.5"
-                                                />
-                                              ))}
                                             </Svg>
 
-                                            {/* Date Labels below chart */}
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                                              {chartDays.map(([dateStr], idx) => {
-                                                const dateObj = new Date(dateStr + 'T00:00:00');
-                                                const dayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
-                                                const showLabel = consumoPeriod === '7' || idx % 5 === 0 || idx === chartDays.length - 1;
+                                            {/* Labels below chart */}
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingHorizontal: 4 }}>
+                                              {chartDays.map(([label]) => {
+                                                let displayLabel = label;
+                                                if (consumoPeriod === '7') {
+                                                  const dateObj = new Date(label + 'T00:00:00');
+                                                  displayLabel = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}`;
+                                                }
 
                                                 return (
-                                                  <Text key={dateStr} style={{ fontSize: consumoPeriod === '7' ? 9 : 8, color: '#64748B', opacity: showLabel ? 1 : 0 }}>
-                                                    {dayLabel}
+                                                  <Text key={label} style={{ fontSize: 10, fontWeight: '600', color: '#64748B' }}>
+                                                    {displayLabel}
                                                   </Text>
                                                 );
                                               })}
@@ -5002,17 +5004,34 @@ export default function LoginScreen() {
                             <Text style={styles.contractPlanTitle}>{String(item.planName || '').toUpperCase()}</Text>
                             <Text style={styles.contractIdText}>Contrato #{item.id}</Text>
                           </View>
-                          <View style={[
-                            styles.statusBadge, 
-                            { backgroundColor: item.status.toLowerCase() === 'ativo' ? '#10B98120' : '#EF444420' }
-                          ]}>
-                            <Text style={[
-                              styles.statusBadgeText,
-                              { color: item.status.toLowerCase() === 'ativo' ? '#10B981' : '#EF4444' }
+                          {statusPendingContractId === item.id ? (
+                            <View style={[styles.statusBadge, { backgroundColor: '#F59E0B20', flexDirection: 'row', alignItems: 'center' }]}>
+                              <ActivityIndicator size="small" color="#F59E0B" style={{ marginRight: 4 }} />
+                              <Text style={[styles.statusBadgeText, { color: '#F59E0B', fontSize: 10 }]}>
+                                Aguardando novo status...
+                              </Text>
+                            </View>
+                          ) : (
+                            <View style={[
+                              styles.statusBadge, 
+                              { 
+                                backgroundColor: item.status.toLowerCase() === 'ativo' ? '#10B98120' : 
+                                                 item.status.toLowerCase() === 'suspenso' ? '#F59E0B20' : 
+                                                 item.status.toLowerCase() === 'bloqueado' ? '#EF444420' : '#64748B20' 
+                              }
                             ]}>
-                              {item.status}
-                            </Text>
-                          </View>
+                              <Text style={[
+                                styles.statusBadgeText,
+                                { 
+                                  color: item.status.toLowerCase() === 'ativo' ? '#10B981' : 
+                                         item.status.toLowerCase() === 'suspenso' ? '#F59E0B' : 
+                                         item.status.toLowerCase() === 'bloqueado' ? '#EF4444' : '#94A3B8' 
+                                }
+                              ]}>
+                                {item.status.toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
                         </View>
 
                         <View style={styles.contractAddressRow}>
