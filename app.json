@@ -4,11 +4,11 @@
     "slug": "isp-client-app",
     "version": "1.0.1",
     "orientation": "default",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/providers/cbrfibra/icon.png",
     "scheme": "ispclientapp",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/providers/cbrfibra/icon.png",
       "supportsTablet": false,
       "bundleIdentifier": "br.com.cbrfibra.cliente",
       "buildNumber": "1",
@@ -23,7 +23,7 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/icon.png"
+        "foregroundImage": "./assets/providers/cbrfibra/icon.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
@@ -43,7 +43,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#080B11",
-          "image": "./assets/images/icon.png",
+          "image": "./assets/providers/cbrfibra/splash.png",
           "imageWidth": 120
         }
       ],
