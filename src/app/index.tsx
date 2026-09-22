@@ -2686,6 +2686,146 @@ export default function LoginScreen() {
                   >
                     {activeTab === 'HOME' && (
                       <View style={styles.planoTabWrapper}>
+
+                        {/* ⚡ QUICK ACTIONS GRID */}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
+                            onPress={() => setActiveTab('CONEXAO')}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${primaryColor || '#2563EB'}20`, justifyContent: 'center', alignItems: 'center', marginBottom: 6 }}>
+                              <Zap size={18} color={primaryColor || '#2563EB'} />
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' }}>Diagnóstico</Text>
+                            <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>Status Wi-Fi</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
+                            onPress={() => setActiveTab('VELOCIDADE')}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F59E0B20', justifyContent: 'center', alignItems: 'center', marginBottom: 6 }}>
+                              <Gauge size={18} color="#F59E0B" />
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' }}>Velocidade</Text>
+                            <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>Fast.com</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
+                            onPress={() => setActiveTab('FINANCEIRO')}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#10B98120', justifyContent: 'center', alignItems: 'center', marginBottom: 6 }}>
+                              <Receipt size={18} color="#10B981" />
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' }}>Segunda Via</Text>
+                            <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>Pagar Pix</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
+                            onPress={handleOpenWhatsApp}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#25D36620', justifyContent: 'center', alignItems: 'center', marginBottom: 6 }}>
+                              <MessageCircle size={18} color="#25D366" />
+                            </View>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' }}>Suporte</Text>
+                            <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>WhatsApp</Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* 🎨 HORIZONTAL TEST PROMO BANNERS CAROUSEL */}
+                        <View style={{ marginBottom: 16 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#F8FAFC' }}>Novidades & Destaques</Text>
+                            <Text style={{ fontSize: 10, color: '#64748B', fontWeight: '600' }}>Arraste para ver mais ➔</Text>
+                          </View>
+
+                          <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{ gap: 12 }}
+                          >
+                            {/* Banner 1: Upgrade Turbo Fibra */}
+                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: `${primaryColor || '#2563EB'}40` }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <View style={{ backgroundColor: `${primaryColor || '#2563EB'}25`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: primaryColor || '#60A5FA' }}>UPGRADE FIBRA</Text>
+                                </View>
+                                <Zap size={16} color={primaryColor || '#2563EB'} />
+                              </View>
+                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
+                                Turbine sua Velocidade!
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
+                                Conheça os novos planos de 600 Mega com Wi-Fi 6 e latência ultra baixa.
+                              </Text>
+                              <TouchableOpacity
+                                style={{ backgroundColor: primaryColor || '#2563EB', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                onPress={handleOpenWhatsApp}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Turbinar meu Plano</Text>
+                                <ChevronRight size={14} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Banner 2: Indique e Ganhe */}
+                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#10B98140' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <View style={{ backgroundColor: '#10B98125', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#34D399' }}>INDIQUE E GANHE</Text>
+                                </View>
+                                <Gift size={16} color="#10B981" />
+                              </View>
+                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
+                                Ganhe 50% na Fatura!
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
+                                Indique vizinhos e amigos. Para cada contrato fechado você ganha desconto na mensalidade.
+                              </Text>
+                              <TouchableOpacity
+                                style={{ backgroundColor: '#10B981', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                onPress={() => {
+                                  Clipboard.setString(`Estou usando a ${providerConfig.nome || 'WebConnect'} e recomendo! Contrate com meu link de indicação.`);
+                                  Alert.alert('Link Copiado!', 'Texto de indicação copiado para sua área de transferência.');
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Copiar Convite</Text>
+                                <ChevronRight size={14} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            </View>
+
+                            {/* Banner 3: Clube do Cliente */}
+                            <View style={{ width: 280, backgroundColor: '#0F172A', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#8B5CF640' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <View style={{ backgroundColor: '#8B5CF625', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#C084FC' }}>VANTAGENS VIP</Text>
+                                </View>
+                                <Sparkles size={16} color="#C084FC" />
+                              </View>
+                              <Text style={{ fontSize: 15, fontWeight: '800', color: '#FFFFFF', marginBottom: 4 }}>
+                                Descontos Exclusivos
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#94A3B8', lineHeight: 16, marginBottom: 12 }}>
+                                Economize em farmácias, cinemas e parceiros comerciais por ser assinante ativo.
+                              </Text>
+                              <TouchableOpacity
+                                style={{ backgroundColor: '#8B5CF6', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                                onPress={() => setActiveTab('CLUBE_CLIENTE')}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Ver Benefícios</Text>
+                                <ChevronRight size={14} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            </View>
+                          </ScrollView>
+                        </View>
                         {/* SUSPENDED SERVICE WARNING CARD WITH TRUST UNLOCK */}
                         {statusLower === 'suspenso' ? (
                           <View style={styles.suspendedWarningCard}>
