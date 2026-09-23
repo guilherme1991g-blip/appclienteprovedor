@@ -17,6 +17,7 @@ import {
   Alert,
   AppState,
   StatusBar,
+  LogBox,
 } from 'react-native';
 import Svg, { Path, Circle, Polyline, LinearGradient as SvgGradient, Stop as SvgStop, Rect as SvgRect, Text as SvgText } from 'react-native-svg';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -96,6 +97,40 @@ import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
 import { getDetailedWifiInfo } from '@/services/wifiDiagnostic';
+
+// Silencia caixas de erro do LogBox para manter a experiência do usuário limpa
+LogBox.ignoreAllLogs(true);
+
+// Mensagens padronizadas e amigáveis para o cliente
+function getUserFriendlyErrorMessage(err: any): string {
+  if (!err) return 'Ocorreu um erro no sistema. Tente novamente mais tarde.';
+  const str = (
+    typeof err === 'string'
+      ? err
+      : err?.message || err?.error || err?.detail || err?.statusText || JSON.stringify(err)
+  ).toLowerCase();
+
+  if (
+    str.includes('offline') ||
+    str.includes('internet') ||
+    str.includes('network') ||
+    str.includes('rede') ||
+    str.includes('conexão') ||
+    str.includes('conexao') ||
+    str.includes('timeout') ||
+    str.includes('timed out') ||
+    str.includes('failed to fetch') ||
+    str.includes('fetch failed') ||
+    str.includes('econnrefused') ||
+    str.includes('enotfound') ||
+    str.includes('socket') ||
+    str.includes('unreachable')
+  ) {
+    return 'Sem conexão com a internet. Verifique sua rede e tente novamente.';
+  }
+
+  return 'Ocorreu um erro no sistema. Tente novamente mais tarde.';
+}
 
 // Helper function to compare semantic versions (e.g. '1.0.1' vs '1.1.0')
 function compareSemVer(v1: string, v2: string): number {
@@ -1465,7 +1500,7 @@ export default function LoginScreen() {
       })
       .catch((err) => {
         setLoadingSuporte(false);
-        console.error('Fetch support tickets error:', err);
+        console.warn('Fetch support tickets warning:', getUserFriendlyErrorMessage(err));
         setSuporteTickets([]);
       });
   };
@@ -1621,13 +1656,13 @@ export default function LoginScreen() {
             fetchSupportTickets();
           }
         } else {
-          alert('Erro de comunicação com o servidor.');
+          Alert.alert('Suporte', 'Ocorreu um erro no sistema. Tente novamente mais tarde.');
         }
       })
       .catch((err) => {
         setSubmittingSupport(false);
-        console.error('Submit ticket error detail:', err);
-        alert('Erro ao enviar sua solicitação. Tente novamente.');
+        console.warn('Submit ticket warning:', err?.message || err);
+        Alert.alert('Suporte', getUserFriendlyErrorMessage(err));
       });
   };
 
@@ -1840,7 +1875,7 @@ export default function LoginScreen() {
       })
       .catch((err) => {
         setLoadingFinanceiro(false);
-        console.error('Fetch finance data error:', err);
+        console.warn('Fetch finance data warning:', getUserFriendlyErrorMessage(err));
       });
   };
 
@@ -1874,7 +1909,7 @@ export default function LoginScreen() {
       })
       .catch((err) => {
         setLoadingNotasFiscais(false);
-        console.error('Fetch notas fiscais error:', err);
+        console.warn('Fetch notas fiscais warning:', getUserFriendlyErrorMessage(err));
       });
   };
 
@@ -1933,8 +1968,8 @@ export default function LoginScreen() {
         Alert.alert('Sucesso', `Arquivo salvo em: ${fileUri}`);
       }
     } catch (err: any) {
-      console.error('Erro ao baixar DANFE da NFCom:', err);
-      Alert.alert('Erro', 'Ocorreu uma falha ao tentar baixar a nota fiscal: ' + (err?.message || 'Tente novamente.'));
+      console.warn('Erro ao baixar DANFE da NFCom:', err);
+      Alert.alert('Nota Fiscal', getUserFriendlyErrorMessage(err));
     } finally {
       setDownloadingNfcomId(null);
     }
@@ -2072,10 +2107,10 @@ export default function LoginScreen() {
         Alert.alert('Sucesso', `Documento salvo em: ${fileUri}`);
       }
     } catch (err: any) {
-      console.error('Erro ao baixar contrato:', err);
+      console.warn('Erro ao baixar contrato:', err);
       Alert.alert(
-        'Download do Contrato',
-        err?.message || 'Não foi possível baixar o contrato no momento. Tente novamente mais tarde.'
+        'Contrato',
+        getUserFriendlyErrorMessage(err)
       );
     } finally {
       setDownloadingContratoTipo(null);
@@ -2722,8 +2757,8 @@ export default function LoginScreen() {
       })
       .catch((err) => {
         setLoading(false);
-        console.error('API Connect Error:', err);
-        setErrorMsg('Erro de conexão. Verifique sua rede e tente novamente.');
+        console.warn('API Connect Warning:', err);
+        setErrorMsg(getUserFriendlyErrorMessage(err));
       });
   };
 
@@ -2817,8 +2852,8 @@ export default function LoginScreen() {
         }
       })
       .catch((err) => {
-        console.error('Trust Unlock Error:', err);
-        Alert.alert('Erro de Conexão', 'Falha ao comunicar com o servidor. Tente novamente.');
+        console.warn('Trust Unlock Warning:', err);
+        Alert.alert('Desbloqueio', getUserFriendlyErrorMessage(err));
       })
       .finally(() => {
         setLoadingTrustUnlock(false);
@@ -3127,8 +3162,8 @@ export default function LoginScreen() {
         await Print.printAsync({ html: pdfModalData.html });
       }
     } catch (err) {
-      console.error('Erro ao baixar/imprimir PDF:', err);
-      Alert.alert('Erro', 'Não foi possível baixar o documento PDF no momento.');
+      console.warn('Erro ao baixar/imprimir PDF:', err);
+      Alert.alert('Declaração', getUserFriendlyErrorMessage(err));
     } finally {
       setDownloadingPdf(false);
     }
@@ -3537,9 +3572,12 @@ export default function LoginScreen() {
                                   <TouchableOpacity
                                     style={{
                                       width: '100%',
-                                      height: 165,
+                                      aspectRatio: 16 / 9,
                                       position: 'relative',
                                       backgroundColor: '#0F172A',
+                                      justifyContent: 'center',
+                                      alignItems: 'center',
+                                      overflow: 'hidden',
                                     }}
                                     onPress={handlePressBanner}
                                     activeOpacity={currentBanner.link_url ? 0.85 : 1}
@@ -3551,7 +3589,7 @@ export default function LoginScreen() {
                                         width: '100%',
                                         height: '100%',
                                       }}
-                                      resizeMode="cover"
+                                      resizeMode="contain"
                                     />
 
                                     {/* Link Badge if banner has action URL */}
@@ -3584,7 +3622,7 @@ export default function LoginScreen() {
                                         style={{
                                           position: 'absolute',
                                           left: 8,
-                                          top: '55%',
+                                          top: '50%',
                                           marginTop: -16,
                                           width: 32,
                                           height: 32,
@@ -3607,7 +3645,7 @@ export default function LoginScreen() {
                                         style={{
                                           position: 'absolute',
                                           right: 8,
-                                          top: '55%',
+                                          top: '50%',
                                           marginTop: -16,
                                           width: 32,
                                           height: 32,
