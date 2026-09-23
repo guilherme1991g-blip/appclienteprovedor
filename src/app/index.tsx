@@ -85,6 +85,7 @@ import * as Network from 'expo-network';
 import * as WebBrowser from 'expo-web-browser';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { WebView } from 'react-native-webview';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
@@ -947,12 +948,7 @@ export default function LoginScreen() {
   const [financeiroSubTab, setFinanceiroSubTab] = useState<'FATURAS' | 'NOTAS'>('FATURAS');
   const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
   const [loadingNotasFiscais, setLoadingNotasFiscais] = useState(false);
-  const [nfcomModalData, setNfcomModalData] = useState<{
-    visible: boolean;
-    nota: any | null;
-    base64: string | null;
-    loading: boolean;
-  } | null>(null);
+  const [downloadingNfcomId, setDownloadingNfcomId] = useState<number | null>(null);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -1884,12 +1880,7 @@ export default function LoginScreen() {
   const handleOpenNfcomPdf = async (nota: any) => {
     if (!selectedContract || !providerConfig.api_url) return;
 
-    setNfcomModalData({
-      visible: true,
-      nota,
-      base64: null,
-      loading: true,
-    });
+    setDownloadingNfcomId(nota.id);
 
     try {
       const formData = new FormData();
@@ -1902,30 +1893,49 @@ export default function LoginScreen() {
         body: formData,
       });
 
-      if (response.ok) {
-        const buffer = await response.arrayBuffer();
-        let binary = '';
-        const bytes = new Uint8Array(buffer);
-        const len = bytes.byteLength;
-        for (let i = 0; i < len; i++) {
-          binary += String.fromCharCode(bytes[i]);
-        }
-        const base64 = btoa(binary);
+      if (!response.ok) {
+        Alert.alert('Aviso', 'Não foi possível obter o DANFE desta nota fiscal no momento.');
+        return;
+      }
 
-        setNfcomModalData({
-          visible: true,
-          nota,
-          base64,
-          loading: false,
+      // Convert blob to base64 using FileReader (runs in native C++, safe for binary PDFs)
+      const blob = await response.blob();
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          if (typeof reader.result === 'string') {
+            const parts = reader.result.split(',');
+            resolve(parts[1] || parts[0]);
+          } else {
+            reject(new Error('Falha ao decodificar arquivo PDF'));
+          }
+        };
+        reader.onerror = () => reject(new Error('Erro ao ler dados do PDF'));
+        reader.readAsDataURL(blob);
+      });
+
+      const fileName = `NFCom_${nota.numero || nota.id}_Serie_${nota.serie || '1'}.pdf`;
+      const fileDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
+      const fileUri = `${fileDir}${fileName}`;
+
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          UTI: 'com.adobe.pdf',
+          mimeType: 'application/pdf',
+          dialogTitle: `NFCom Nº ${nota.numero || nota.id}`,
         });
       } else {
-        Alert.alert('Aviso', 'Não foi possível carregar o DANFE em PDF desta nota fiscal.');
-        setNfcomModalData(null);
+        Alert.alert('Sucesso', `Arquivo salvo em: ${fileUri}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao baixar DANFE da NFCom:', err);
-      Alert.alert('Erro', 'Ocorreu uma falha ao tentar visualizar a nota fiscal.');
-      setNfcomModalData(null);
+      Alert.alert('Erro', 'Ocorreu uma falha ao tentar baixar a nota fiscal: ' + (err?.message || 'Tente novamente.'));
+    } finally {
+      setDownloadingNfcomId(null);
     }
   };
 
@@ -4120,12 +4130,25 @@ export default function LoginScreen() {
                                   ) : null}
 
                                   <TouchableOpacity
-                                    style={[styles.nfcomActionBtnPrimary, { backgroundColor: primaryColor }]}
+                                    style={[
+                                      styles.nfcomActionBtnPrimary,
+                                      { backgroundColor: primaryColor, opacity: downloadingNfcomId === nota.id ? 0.7 : 1 }
+                                    ]}
                                     onPress={() => handleOpenNfcomPdf(nota)}
+                                    disabled={downloadingNfcomId === nota.id}
                                     activeOpacity={0.8}
                                   >
-                                    <Download size={13} color="#FFFFFF" />
-                                    <Text style={styles.nfcomActionBtnPrimaryText}>Visualizar DANFE</Text>
+                                    {downloadingNfcomId === nota.id ? (
+                                      <>
+                                        <ActivityIndicator size="small" color="#FFFFFF" />
+                                        <Text style={styles.nfcomActionBtnPrimaryText}>Baixando...</Text>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download size={13} color="#FFFFFF" />
+                                        <Text style={styles.nfcomActionBtnPrimaryText}>Baixar DANFE (PDF)</Text>
+                                      </>
+                                    )}
                                   </TouchableOpacity>
                                 </View>
                               </View>
@@ -5995,122 +6018,7 @@ export default function LoginScreen() {
                     </View>
                   </Modal>
 
-                  {/* NFCOM DANFE PDF POPUP MODAL */}
-                  <Modal
-                    visible={nfcomModalData !== null && nfcomModalData.visible}
-                    transparent={false}
-                    animationType="slide"
-                    onRequestClose={() => setNfcomModalData(null)}
-                  >
-                    <View style={{
-                      flex: 1,
-                      backgroundColor: '#0B0F19',
-                      paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44),
-                    }}>
-                      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
-                      <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderBottomWidth: 1,
-                        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-                        backgroundColor: '#0F172A'
-                      }}>
-                        <View style={{ flex: 1, marginRight: 10 }}>
-                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC' }} numberOfLines={1}>
-                            NFCom Nº {nfcomModalData?.nota?.numero || ''} • Série {nfcomModalData?.nota?.serie || '1'}
-                          </Text>
-                          <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 1 }}>
-                            Documento Auxiliar da NFCom (DANFE-COM)
-                          </Text>
-                        </View>
 
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          {nfcomModalData?.nota?.chave && (
-                            <TouchableOpacity
-                              onPress={() => {
-                                if (nfcomModalData?.nota?.chave) {
-                                  Clipboard.setString(nfcomModalData.nota.chave);
-                                  Alert.alert('Sucesso', 'Chave de acesso copiada para a área de transferência!');
-                                }
-                              }}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                backgroundColor: `${primaryColor}22`,
-                                borderWidth: 1,
-                                borderColor: `${primaryColor}55`,
-                                paddingHorizontal: 10,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <Copy size={13} color={primaryColor} />
-                              <Text style={{ color: primaryColor, fontWeight: '700', fontSize: 12 }}>Copiar Chave</Text>
-                            </TouchableOpacity>
-                          )}
-
-                          <TouchableOpacity
-                            onPress={() => setNfcomModalData(null)}
-                            style={{
-                              padding: 7,
-                              borderRadius: 20,
-                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                            }}
-                            activeOpacity={0.7}
-                          >
-                            <X size={18} color="#CBD5E1" />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-
-                      <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
-                        {nfcomModalData?.loading ? (
-                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                            <ActivityIndicator size="large" color={primaryColor} />
-                            <Text style={{ color: '#94A3B8', marginTop: 12, fontSize: 13 }}>Carregando DANFE oficial...</Text>
-                          </View>
-                        ) : nfcomModalData?.base64 ? (
-                          <WebView
-                            originWhitelist={['*']}
-                            source={{ uri: `data:application/pdf;base64,${nfcomModalData.base64}` }}
-                            style={{ flex: 1, backgroundColor: '#0F172A' }}
-                            javaScriptEnabled={true}
-                            domStorageEnabled={true}
-                            startInLoadingState={true}
-                            renderLoading={() => (
-                              <View style={{
-                                position: 'absolute',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                backgroundColor: '#0F172A'
-                              }}>
-                                <ActivityIndicator size="large" color={primaryColor} />
-                              </View>
-                            )}
-                          />
-                        ) : (
-                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-                            <AlertTriangle size={36} color="#EF4444" />
-                            <Text style={{ color: '#F8FAFC', fontWeight: '700', fontSize: 15, marginTop: 12 }}>
-                              Não foi possível abrir o PDF
-                            </Text>
-                            <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 4 }}>
-                              O servidor do provedor não retornou o documento para impressão no momento.
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </Modal>
 
                   {/* PIX QR CODE POPUP MODAL */}
                   <Modal
