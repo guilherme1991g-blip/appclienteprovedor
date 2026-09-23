@@ -58,6 +58,7 @@ import {
   Menu,
   Gift,
   Sparkles,
+  ChevronLeft,
   ChevronRight,
   Percent,
   ShoppingBag,
@@ -382,6 +383,234 @@ interface ContractDisplay {
   city?: string;
   state?: string;
   cep?: string;
+  // Raw SGP objects for advanced matching (maintenance, etc.)
+  rawContrato?: any;
+  rawServico?: any;
+}
+
+// 🛠️ INTERFACE PARA MANUTENÇÃO NA REDE DA API URA SGP
+interface MaintenanceItem {
+  id: number;
+  descricao: string;
+  data_inicial: string;
+  data_final: string;
+  observacoes?: string;
+  mensagem_central?: string;
+  mensagem_ura?: string;
+  enviar_sms?: boolean | number;
+  ativa?: boolean | number;
+  severidade?: string;
+  status?: string;
+  pops?: Array<{ id?: number | string; cidade?: string; uf?: string }>;
+  nas?: Array<{ id?: number | string; descricao?: string; nome?: string }>;
+  aps?: Array<{ id?: number | string; descricao?: string }>;
+  sources?: Array<{ id?: number | string; descricao?: string }>;
+  switches?: Array<{ id?: number | string; descricao?: string }>;
+  olts?: Array<{ id?: number | string; nome?: string }>;
+  oltpons?: Array<{ id?: number | string; olt_id?: number | string; olt_nome?: string; descricao?: string; slot?: number | string; pon?: number | string }>;
+  ctos?: Array<{ id?: number | string; nome?: string }>;
+  vlans?: any[];
+}
+
+// Formata data da manutenção para exibição amigável
+function formatMaintenanceDate(dateStr?: string): string {
+  if (!dateStr) return 'Não informada';
+  try {
+    const clean = dateStr.replace(' ', 'T');
+    const d = new Date(clean);
+    if (isNaN(d.getTime())) return dateStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} às ${hours}:${minutes}`;
+  } catch {
+    return dateStr;
+  }
+}
+
+// Verifica se os parâmetros do contrato do cliente batem com a manutenção ativa
+function checkContractMaintenanceMatch(
+  maintenance: MaintenanceItem,
+  contract: ContractDisplay
+): { matches: boolean; reason?: string } {
+  // Se a manutenção não estiver ativa, ignora
+  if (maintenance.ativa !== true && maintenance.ativa !== 1 && String(maintenance.ativa) !== 'true') {
+    return { matches: false };
+  }
+
+  const rawC = contract.rawContrato || {};
+  const rawS = contract.rawServico || (rawC.servicos && rawC.servicos[0]) || {};
+  const addr = rawC.endereco || {};
+
+  const contractCity = (contract.city || addr.cidade || '').trim().toLowerCase();
+  const contractState = (contract.state || addr.uf || '').trim().toLowerCase();
+  const contractPopId = String(contract.popId || rawC.pop_id || '').trim();
+
+  const norm = (s: any) => String(s || '').trim().toLowerCase();
+
+  let hasAnyFilter = false;
+
+  // 1. POPs (Cidade / UF ou ID do POP)
+  if (Array.isArray(maintenance.pops) && maintenance.pops.length > 0) {
+    hasAnyFilter = true;
+    for (const pop of maintenance.pops) {
+      const popId = String(pop.id || '').trim();
+      const popCity = norm(pop.cidade);
+      const popUf = norm(pop.uf);
+
+      if (popId && contractPopId && popId === contractPopId) {
+        return { matches: true, reason: pop.cidade ? `${pop.cidade} (POP ${popId})` : `POP ${popId}` };
+      }
+      if (popCity && contractCity && (popCity === contractCity || contractCity.includes(popCity) || popCity.includes(contractCity))) {
+        if (!popUf || !contractState || popUf === contractState) {
+          return { matches: true, reason: `Região de ${pop.cidade || contract.city}` };
+        }
+      }
+    }
+  }
+
+  // 2. OLTs (Equipamentos de Fibra)
+  if (Array.isArray(maintenance.olts) && maintenance.olts.length > 0) {
+    hasAnyFilter = true;
+    const contractOlt = norm(rawS.olt || rawS.olt_nome || rawC.olt || rawC.olt_nome);
+    const contractOltId = String(rawS.olt_id || rawC.olt_id || '').trim();
+
+    for (const olt of maintenance.olts) {
+      const oltId = String(olt.id || '').trim();
+      const oltNome = norm(olt.nome);
+
+      if (oltId && contractOltId && oltId === contractOltId) {
+        return { matches: true, reason: `Equipamento de Rede (OLT ${olt.nome || oltId})` };
+      }
+      if (oltNome && contractOlt && (contractOlt === oltNome || contractOlt.includes(oltNome))) {
+        return { matches: true, reason: `Equipamento de Rede (OLT ${olt.nome})` };
+      }
+    }
+  }
+
+  // 3. OLTPONs (Slot / PON)
+  if (Array.isArray(maintenance.oltpons) && maintenance.oltpons.length > 0) {
+    hasAnyFilter = true;
+    const contractSlot = String(rawS.slot || rawC.slot || '').trim();
+    const contractPon = String(rawS.pon || rawC.pon || '').trim();
+    const contractOltId = String(rawS.olt_id || rawC.olt_id || '').trim();
+
+    for (const ponItem of maintenance.oltpons) {
+      const ponSlot = String(ponItem.slot || '').trim();
+      const ponNum = String(ponItem.pon || '').trim();
+      const ponOltId = String(ponItem.olt_id || '').trim();
+
+      if (ponSlot && ponNum && contractSlot === ponSlot && contractPon === ponNum) {
+        if (!ponOltId || !contractOltId || ponOltId === contractOltId) {
+          return { matches: true, reason: `Porta PON da Fibra (Slot ${ponSlot} / PON ${ponNum})` };
+        }
+      }
+    }
+  }
+
+  // 4. CTOs (Caixa de Atendimento)
+  if (Array.isArray(maintenance.ctos) && maintenance.ctos.length > 0) {
+    hasAnyFilter = true;
+    const contractCto = norm(rawS.cto || rawS.cto_nome || rawC.cto || rawC.cto_nome);
+    const contractCtoId = String(rawS.cto_id || rawC.cto_id || '').trim();
+
+    for (const cto of maintenance.ctos) {
+      const ctoId = String(cto.id || '').trim();
+      const ctoNome = norm(cto.nome);
+
+      if (ctoId && contractCtoId && ctoId === contractCtoId) {
+        return { matches: true, reason: `Caixa de Atendimento (CTO ${cto.nome || ctoId})` };
+      }
+      if (ctoNome && contractCto && (contractCto === ctoNome || contractCto.includes(ctoNome))) {
+        return { matches: true, reason: `Caixa de Atendimento (CTO ${cto.nome})` };
+      }
+    }
+  }
+
+  // 5. NAS (Servidores de Conexão / Concentradores)
+  if (Array.isArray(maintenance.nas) && maintenance.nas.length > 0) {
+    hasAnyFilter = true;
+    const contractNas = norm(rawS.nas || rawS.nas_nome || rawS.nas_descricao || rawC.nas || rawC.nas_nome);
+    const contractNasId = String(rawS.nas_id || rawC.nas_id || '').trim();
+
+    for (const nasItem of maintenance.nas) {
+      const nasId = String(nasItem.id || '').trim();
+      const nasNome = norm(nasItem.nome || nasItem.descricao);
+
+      if (nasId && contractNasId && nasId === contractNasId) {
+        return { matches: true, reason: `Servidor de Conexão (${nasItem.nome || nasId})` };
+      }
+      if (nasNome && contractNas && (contractNas === nasNome || contractNas.includes(nasNome))) {
+        return { matches: true, reason: `Servidor de Conexão (${nasItem.nome || nasItem.descricao})` };
+      }
+    }
+  }
+
+  // 6. Switches
+  if (Array.isArray(maintenance.switches) && maintenance.switches.length > 0) {
+    hasAnyFilter = true;
+    const contractSw = norm(rawS.switch || rawS.switch_descricao || rawC.switch);
+    const contractSwId = String(rawS.switch_id || rawC.switch_id || '').trim();
+
+    for (const sw of maintenance.switches) {
+      const swId = String(sw.id || '').trim();
+      const swDesc = norm(sw.descricao);
+
+      if (swId && contractSwId && swId === contractSwId) {
+        return { matches: true, reason: `Switch de Distribuição (${sw.descricao || swId})` };
+      }
+      if (swDesc && contractSw && (contractSw === swDesc || contractSw.includes(swDesc))) {
+        return { matches: true, reason: `Switch de Distribuição (${sw.descricao})` };
+      }
+    }
+  }
+
+  // 7. APs (Pontos de Transmissão Wi-Fi / Rádio)
+  if (Array.isArray(maintenance.aps) && maintenance.aps.length > 0) {
+    hasAnyFilter = true;
+    const contractAp = norm(rawS.ap || rawS.ap_descricao || rawC.ap);
+    const contractApId = String(rawS.ap_id || rawC.ap_id || '').trim();
+
+    for (const ap of maintenance.aps) {
+      const apId = String(ap.id || '').trim();
+      const apDesc = norm(ap.descricao);
+
+      if (apId && contractApId && apId === contractApId) {
+        return { matches: true, reason: `Ponto de Transmissão (${ap.descricao || apId})` };
+      }
+      if (apDesc && contractAp && (contractAp === apDesc || contractAp.includes(apDesc))) {
+        return { matches: true, reason: `Ponto de Transmissão (${ap.descricao})` };
+      }
+    }
+  }
+
+  // 8. Sources
+  if (Array.isArray(maintenance.sources) && maintenance.sources.length > 0) {
+    hasAnyFilter = true;
+    const contractSrc = norm(rawS.source || rawC.source);
+    const contractSrcId = String(rawS.source_id || rawC.source_id || '').trim();
+
+    for (const src of maintenance.sources) {
+      const srcId = String(src.id || '').trim();
+      const srcDesc = norm(src.descricao);
+
+      if (srcId && contractSrcId && srcId === contractSrcId) {
+        return { matches: true, reason: `Fonte de Alimentação / Link (${src.descricao || srcId})` };
+      }
+      if (srcDesc && contractSrc && (contractSrc === srcDesc || contractSrc.includes(srcDesc))) {
+        return { matches: true, reason: `Fonte de Alimentação / Link (${src.descricao})` };
+      }
+    }
+  }
+
+  // 9. Se nenhum filtro específico de rede estiver preenchido, é uma Manutenção Geral da Operadora
+  if (!hasAnyFilter) {
+    return { matches: true, reason: 'Rede Geral do Provedor' };
+  }
+
+  return { matches: false };
 }
 
 type ScreenState = 'LOGIN' | 'SELECT_CONTRACT' | 'DASHBOARD';
@@ -481,7 +710,7 @@ export default function LoginScreen() {
             const isMandatory = (minStoreVersion && compareSemVer(minStoreVersion, currentAppVersion) > 0) || !!config.forcar_atualizacao;
             const storeUrl = Platform.OS === 'ios'
               ? (config.url_appstore || 'https://apps.apple.com')
-              : (config.url_playstore || 'https://play.google.com/store/apps/details?id=br.com.webconnect.cliente');
+              : (config.url_playstore || (Constants.expoConfig?.android?.package ? `https://play.google.com/store/apps/details?id=${Constants.expoConfig.android.package}` : 'https://play.google.com'));
 
             setStoreUpdateInfo({
               isMandatory,
@@ -587,23 +816,30 @@ export default function LoginScreen() {
                   const addr = contrato.endereco || client.endereco;
                   if (addr) {
                     if (typeof addr === 'object') {
-                      street = addr.logradouro || '';
+                      street = addr.logradouro || addr.rua || '';
                       num = addr.numero || '';
-                      neighborhood = addr.bairro || '';
-                      city = addr.cidade || '';
-                      state = addr.uf || '';
+                      neighborhood = addr.bairro || addr.bairro_nome || addr.neighborhood || '';
+                      city = addr.cidade || addr.cidade_nome || addr.city || '';
+                      state = addr.uf || addr.estado || '';
                       cep = addr.cep || '';
 
                       const parts = [];
-                      if (addr.logradouro) parts.push(addr.logradouro);
-                      if (addr.numero) parts.push(addr.numero);
-                      if (addr.bairro) parts.push(addr.bairro);
-                      if (addr.cidade) parts.push(addr.cidade);
-                      if (addr.uf) parts.push(addr.uf);
+                      if (street) parts.push(street);
+                      if (num) parts.push(num);
+                      if (neighborhood) parts.push(neighborhood);
+                      if (city) parts.push(city);
+                      if (state) parts.push(state);
                       addressStr = parts.join(', ');
                     } else if (typeof addr === 'string') {
                       addressStr = addr;
                     }
+                  }
+
+                  if (!neighborhood) {
+                    neighborhood = contrato.bairro || client.bairro || contrato.bairro_nome || client.bairro_nome || contrato.pop || client.pop || '';
+                  }
+                  if (!city) {
+                    city = contrato.cidade || client.cidade || contrato.cidade_nome || client.cidade_nome || '';
                   }
 
                   parsedContracts.push({
@@ -634,6 +870,8 @@ export default function LoginScreen() {
                     city,
                     state,
                     cep,
+                    rawContrato: contrato,
+                    rawServico: contrato.servicos && contrato.servicos[0] ? contrato.servicos[0] : undefined,
                   });
                 });
               });
@@ -700,6 +938,14 @@ export default function LoginScreen() {
   const [selectedChartIndex, setSelectedChartIndex] = useState<number | null>(null);
   const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
   const [bannerIndex, setBannerIndex] = useState(0);
+
+  // Active Network Maintenance State
+  const [activeMaintenance, setActiveMaintenance] = useState<{
+    item: MaintenanceItem;
+    matchReason?: string;
+  } | null>(null);
+  const [isMaintenanceModalOpen, setIsMaintenanceModalOpen] = useState(false);
+  const [dismissedMaintenanceIds, setDismissedMaintenanceIds] = useState<number[]>([]);
 
   // Support Screen UI State
   const [showSupportForm, setShowSupportForm] = useState(false);
@@ -830,7 +1076,14 @@ export default function LoginScreen() {
         phoneWith55 = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
       }
 
-      const primaryPhoneKey = phoneWithout55 || cleanCpf || (contractObj ? `contract_${contractObj.id}` : '');
+      const basePhoneKey = phoneWithout55 || cleanCpf;
+      if (!basePhoneKey && !contractObj?.id) return;
+
+      // Cria uma chave única combinando (Telefone/CPF + ID do Contrato) para salvar múltiplos contratos/bairros sem sobrespcrever
+      const primaryPhoneKey = contractObj?.id 
+        ? `${basePhoneKey}_${contractObj.id}` 
+        : (basePhoneKey || `contract_${contractObj?.id}`);
+
       if (!primaryPhoneKey) return;
 
       console.log('Sincronizando Push Token no Supabase:', {
@@ -868,10 +1121,14 @@ export default function LoginScreen() {
   };
 
   React.useEffect(() => {
-    if (selectedContract && expoPushToken) {
+    if (contracts.length > 0 && expoPushToken) {
+      contracts.forEach(contract => {
+        syncPushTokenToSupabase(contract, documentInput);
+      });
+    } else if (selectedContract && expoPushToken) {
       syncPushTokenToSupabase(selectedContract, documentInput);
     }
-  }, [selectedContract, expoPushToken]);
+  }, [contracts, selectedContract, expoPushToken]);
 
   const sendTestPushNotification = async () => {
     try {
@@ -963,28 +1220,108 @@ export default function LoginScreen() {
     try {
       const rawPhone = (selectedContract?.phone || '').replace(/\D/g, '');
       const cleanCpf = (documentInput || '').replace(/\D/g, '');
-      const phoneWithout55 = rawPhone.startsWith('55') && rawPhone.length >= 12 ? rawPhone.substring(2) : rawPhone;
+      const currentBairro = (selectedContract?.neighborhood || '').trim();
+      const currentContractId = selectedContract?.id ? String(selectedContract.id) : '';
 
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      let query = supabase.from('notificacoes_historico').select('*').gte('created_at', sevenDaysAgo);
-      
-      const filterConditions = [];
-      if (phoneWithout55) filterConditions.push(`telefone.eq.${phoneWithout55}`);
-      if (rawPhone) filterConditions.push(`telefone_completo.eq.${rawPhone}`);
-      if (cleanCpf) filterConditions.push(`telefone.eq.${cleanCpf}`);
-
-      if (filterConditions.length > 0) {
-        query = query.or(filterConditions.join(','));
+      let phoneWithout55 = rawPhone;
+      let phoneWith55 = rawPhone;
+      if (rawPhone) {
+        phoneWithout55 = rawPhone.startsWith('55') && rawPhone.length >= 12 ? rawPhone.substring(2) : rawPhone;
+        phoneWith55 = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false }).limit(30);
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      let combinedList: any[] = [];
 
-      if (error) {
-        console.log('Aviso ao carregar histórico de notificações:', error.message);
-        return [];
-      } else {
-        const list = data || [];
-        setNotificationHistory(list);
+      // 1. Notificações individuais por telefone/CPF (SGP)
+      try {
+        let queryHist = supabase.from('notificacoes_historico').select('*').gte('created_at', sevenDaysAgo);
+        const histConditions = [];
+        if (phoneWithout55) {
+          histConditions.push(`telefone.eq.${phoneWithout55}`);
+          histConditions.push(`telefone.ilike.${phoneWithout55}_%`);
+        }
+        if (phoneWith55) {
+          histConditions.push(`telefone_completo.eq.${phoneWith55}`);
+        }
+        if (cleanCpf) {
+          histConditions.push(`telefone.eq.${cleanCpf}`);
+          histConditions.push(`telefone.ilike.${cleanCpf}_%`);
+        }
+        if (histConditions.length > 0) {
+          queryHist = queryHist.or(histConditions.join(','));
+        }
+        const { data: histData } = await queryHist.order('created_at', { ascending: false }).limit(30);
+        if (histData && Array.isArray(histData)) {
+          combinedList = combinedList.concat(histData);
+        }
+      } catch (e) {
+        console.log('Aviso notificacoes_historico:', e);
+      }
+
+      // 2. Notificações do Vega Manage (filtradas pelo Bairro/Contrato ativo)
+      try {
+        let queryVega = supabase.from('notificacoes_vega').select('*').gte('created_at', sevenDaysAgo);
+        const vegaConditions = [];
+        if (currentContractId) {
+          vegaConditions.push(`contrato_id.eq.${currentContractId}`);
+        }
+        if (currentBairro) {
+          vegaConditions.push(`bairro.ilike.*${currentBairro}*`);
+        }
+        vegaConditions.push(`bairro.ilike.*Geral*`);
+        vegaConditions.push(`bairro.is.null`);
+
+        if (vegaConditions.length > 0) {
+          queryVega = queryVega.or(vegaConditions.join(','));
+        }
+
+        const { data: vegaData } = await queryVega.order('created_at', { ascending: false }).limit(30);
+        if (vegaData && Array.isArray(vegaData)) {
+          const currentProviderCode = (APP_CONFIG.PROVIDER_CODE || providerConfig.codigo || 'cbrfibra').toLowerCase();
+          const filteredVega = vegaData.filter((item: any) => {
+            // Garante isolamento estrito por provedor no mesmo bairro
+            if (item.provedor_code) {
+              const itemProv = String(item.provedor_code).toLowerCase();
+              if (itemProv !== currentProviderCode && !itemProv.includes(currentProviderCode)) {
+                return false;
+              }
+            }
+
+            if (currentContractId && item.contrato_id && String(item.contrato_id) === currentContractId) {
+              return true;
+            }
+            if (currentBairro && item.bairro) {
+              const itemBairro = item.bairro.toLowerCase();
+              if (itemBairro.includes('geral') || itemBairro.includes(currentBairro.toLowerCase())) {
+                return true;
+              }
+              return false;
+            }
+            return true;
+          });
+          combinedList = combinedList.concat(filteredVega);
+        }
+      } catch (e) {
+        console.log('Aviso notificacoes_vega (tabela ainda não criada):', e);
+      }
+
+      // Combina, ordena e remove duplicados por ID ou Título + Mensagem
+      const uniqueMap = new Map();
+      combinedList.forEach(item => {
+        const key = item.id || `${item.titulo}_${item.mensagem}_${(item.created_at || '').substring(0, 16)}`;
+        if (!uniqueMap.has(key)) {
+          uniqueMap.set(key, item);
+        }
+      });
+
+      const list = Array.from(uniqueMap.values()).sort((a, b) => {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return timeB - timeA;
+      });
+
+      setNotificationHistory(list);
 
         // Calculate unread count persistently based on last viewed timestamp
         try {
@@ -1005,7 +1342,6 @@ export default function LoginScreen() {
         }
 
         return list;
-      }
     } catch (err) {
       console.log('Exceção ao buscar notificações:', err);
       return [];
@@ -1316,7 +1652,7 @@ export default function LoginScreen() {
           phone: fullPhone,
           code: code,
           cpf_cnpj: documentInput.replace(/\D/g, ''),
-          provider_code: providerConfig.codigo || 'webconnect',
+          provider_code: providerConfig.codigo || APP_CONFIG.PROVIDER_CODE || 'cbrfibra',
           expires_at: expiresAt,
           used: false,
         });
@@ -1539,12 +1875,72 @@ export default function LoginScreen() {
   // Auto-rotate Stories Banner on Home Screen
   useEffect(() => {
     if (activeTab === 'HOME' && screenState === 'DASHBOARD') {
-      const timer = setInterval(() => {
-        setBannerIndex(prev => (prev + 1) % 3);
-      }, 4500);
-      return () => clearInterval(timer);
+      const bannerCount = providerConfig.banners?.length || 0;
+      if (bannerCount > 1) {
+        const timer = setInterval(() => {
+          setBannerIndex(prev => (prev + 1) % bannerCount);
+        }, 5000);
+        return () => clearInterval(timer);
+      }
     }
-  }, [activeTab, screenState]);
+  }, [activeTab, screenState, providerConfig.banners]);
+
+  // Consulta se há manutenção ativa na rede da operadora que afeta o contrato do cliente
+  const checkNetworkMaintenance = async (targetContract?: ContractDisplay | null) => {
+    const c = targetContract || selectedContract;
+    if (!c || !providerConfig.api_url) return;
+
+    try {
+      const url = `${providerConfig.api_url}/api/ura/manutencao/list/?app=${encodeURIComponent(providerConfig.api_app)}&token=${encodeURIComponent(providerConfig.api_token)}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!res.ok) {
+        console.log('Consulta de manutenção na rede status:', res.status);
+        return;
+      }
+
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        setActiveMaintenance(null);
+        return;
+      }
+
+      console.log('Manutenções recebidas da API URA SGP:', data.length);
+
+      // Percorre manutenções e verifica se alguma bate com os dados do contrato/serviço
+      for (const m of data) {
+        const check = checkContractMaintenanceMatch(m, c);
+        if (check.matches) {
+          console.log('⚠️ Manutenção ativa encontrada afetando o cliente:', m.descricao, 'Motivo:', check.reason);
+          setActiveMaintenance({ item: m, matchReason: check.reason });
+
+          // Abre o modal de aviso se o cliente ainda não fechou esta manutenção na sessão
+          if (!dismissedMaintenanceIds.includes(m.id)) {
+            setIsMaintenanceModalOpen(true);
+          }
+          return;
+        }
+      }
+
+      // Nenhuma manutenção afeta este contrato
+      setActiveMaintenance(null);
+    } catch (err) {
+      console.warn('Erro ao consultar manutenção de rede:', err);
+    }
+  };
+
+  // Efeito disparado para verificar manutenção assim que o contrato selecionado e a tela estiverem ativos
+  useEffect(() => {
+    if (screenState === 'DASHBOARD' && selectedContract) {
+      checkNetworkMaintenance(selectedContract);
+    }
+  }, [screenState, selectedContract?.id]);
 
   // Network Probing Engine with ICMP-equivalent transport calibration
   const probeEndpoint = async (url: string, timeoutMs: number = 2500): Promise<{ ok: boolean; latencyMs: number }> => {
@@ -1971,23 +2367,30 @@ export default function LoginScreen() {
               const addr = contrato.endereco || client.endereco;
               if (addr) {
                 if (typeof addr === 'object') {
-                  street = addr.logradouro || '';
+                  street = addr.logradouro || addr.rua || '';
                   num = addr.numero || '';
-                  neighborhood = addr.bairro || '';
-                  city = addr.cidade || '';
-                  state = addr.uf || '';
+                  neighborhood = addr.bairro || addr.bairro_nome || addr.neighborhood || '';
+                  city = addr.cidade || addr.cidade_nome || addr.city || '';
+                  state = addr.uf || addr.estado || '';
                   cep = addr.cep || '';
 
                   const parts = [];
-                  if (addr.logradouro) parts.push(addr.logradouro);
-                  if (addr.numero) parts.push(addr.numero);
-                  if (addr.bairro) parts.push(addr.bairro);
-                  if (addr.cidade) parts.push(addr.cidade);
-                  if (addr.uf) parts.push(addr.uf);
+                  if (street) parts.push(street);
+                  if (num) parts.push(num);
+                  if (neighborhood) parts.push(neighborhood);
+                  if (city) parts.push(city);
+                  if (state) parts.push(state);
                   addressStr = parts.join(', ');
                 } else if (typeof addr === 'string') {
                   addressStr = addr;
                 }
+              }
+
+              if (!neighborhood) {
+                neighborhood = contrato.bairro || client.bairro || contrato.bairro_nome || client.bairro_nome || contrato.pop || client.pop || '';
+              }
+              if (!city) {
+                city = contrato.cidade || client.cidade || contrato.cidade_nome || client.cidade_nome || '';
               }
               
               parsedContracts.push({
@@ -2018,6 +2421,8 @@ export default function LoginScreen() {
                 city,
                 state,
                 cep,
+                rawContrato: contrato,
+                rawServico: contrato.servicos && contrato.servicos[0] ? contrato.servicos[0] : undefined,
               });
             });
           });
@@ -2170,7 +2575,7 @@ export default function LoginScreen() {
     setIsSideMenuOpen(false);
 
     const yearToFetch = targetYear || new Date().getFullYear();
-    const providerName = providerConfig.nome || 'WebConnect Telecom';
+    const providerName = providerConfig.nome || 'CBR FIBRA';
     const clientName = selectedContract.clientName || 'Cliente';
     const cpfCnpj = documentInput || selectedContract.centralLogin || 'Não informado';
     const contractId = selectedContract.id;
@@ -2547,23 +2952,30 @@ export default function LoginScreen() {
                 const addr = contrato.endereco || client.endereco;
                 if (addr) {
                   if (typeof addr === 'object') {
-                    street = addr.logradouro || '';
+                    street = addr.logradouro || addr.rua || '';
                     num = addr.numero || '';
-                    neighborhood = addr.bairro || '';
-                    city = addr.cidade || '';
-                    state = addr.uf || '';
+                    neighborhood = addr.bairro || addr.bairro_nome || addr.neighborhood || '';
+                    city = addr.cidade || addr.cidade_nome || addr.city || '';
+                    state = addr.uf || addr.estado || '';
                     cep = addr.cep || '';
 
                     const parts = [];
-                    if (addr.logradouro) parts.push(addr.logradouro);
-                    if (addr.numero) parts.push(addr.numero);
-                    if (addr.bairro) parts.push(addr.bairro);
-                    if (addr.cidade) parts.push(addr.cidade);
-                    if (addr.uf) parts.push(addr.uf);
+                    if (street) parts.push(street);
+                    if (num) parts.push(num);
+                    if (neighborhood) parts.push(neighborhood);
+                    if (city) parts.push(city);
+                    if (state) parts.push(state);
                     addressStr = parts.join(', ');
                   } else if (typeof addr === 'string') {
                     addressStr = addr;
                   }
+                }
+
+                if (!neighborhood) {
+                  neighborhood = contrato.bairro || client.bairro || contrato.bairro_nome || client.bairro_nome || contrato.pop || client.pop || '';
+                }
+                if (!city) {
+                  city = contrato.cidade || client.cidade || contrato.cidade_nome || client.cidade_nome || '';
                 }
 
                 updatedContract = {
@@ -2593,6 +3005,8 @@ export default function LoginScreen() {
                   city,
                   state,
                   cep,
+                  rawContrato: contrato,
+                  rawServico: contrato.servicos && contrato.servicos[0] ? contrato.servicos[0] : undefined,
                 };
               }
             });
@@ -2716,8 +3130,58 @@ export default function LoginScreen() {
                     {activeTab === 'HOME' && (
                       <View style={styles.planoTabWrapper}>
 
+                        {/* ⚠️ AVISO DE MANUTENÇÃO ATIVA NA REDE */}
+                        {activeMaintenance && (
+                          <TouchableOpacity
+                            style={{
+                              width: '100%',
+                              maxWidth: 400,
+                              alignSelf: 'stretch',
+                              backgroundColor: '#7F1D1D25',
+                              borderWidth: 1.5,
+                              borderColor: '#EF444480',
+                              borderRadius: 16,
+                              padding: 14,
+                              marginBottom: 16,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                            onPress={() => setIsMaintenanceModalOpen(true)}
+                            activeOpacity={0.8}
+                          >
+                            <View style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              backgroundColor: '#EF444425',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            }}>
+                              <AlertTriangle size={22} color="#EF4444" />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FCA5A5', textTransform: 'uppercase' }}>
+                                  Manutenção na Rede
+                                </Text>
+                                <View style={{ backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 10 }}>
+                                  <Text style={{ fontSize: 9, fontWeight: '800', color: '#FFFFFF' }}>EM ANDAMENTO</Text>
+                                </View>
+                              </View>
+                              <Text style={{ fontSize: 12, color: '#FEE2E2', fontWeight: '600' }} numberOfLines={1}>
+                                {activeMaintenance.item.descricao || 'Serviços técnicos em andamento na região'}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#F87171', marginTop: 2 }}>
+                                Toque para ver detalhes e previsão de conclusão
+                              </Text>
+                            </View>
+                            <ChevronRight size={18} color="#FCA5A5" />
+                          </TouchableOpacity>
+                        )}
+
                         {/* ⚡ QUICK ACTIONS GRID (3 Buttons) */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8, width: '100%', maxWidth: 400, alignSelf: 'stretch' }}>
                           <TouchableOpacity
                             style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
                             onPress={() => setActiveTab('VELOCIDADE')}
@@ -2757,7 +3221,7 @@ export default function LoginScreen() {
 
                         {/* 🎬 DYNAMIC IMAGE BANNERS FROM SUPABASE (MAX 3 - ONLY RENDER IF REGISTERED) */}
                         {providerConfig.banners && providerConfig.banners.length > 0 && (
-                          <View style={{ marginBottom: 16 }}>
+                          <View style={{ width: '100%', maxWidth: 400, alignSelf: 'stretch', marginBottom: 16 }}>
                             {(() => {
                               const activeBanners = providerConfig.banners!.slice(0, 3);
                               const currentBanner = activeBanners[bannerIndex % activeBanners.length];
@@ -2776,11 +3240,19 @@ export default function LoginScreen() {
 
                               return (
                                 <View style={{
+                                  width: '100%',
+                                  alignSelf: 'stretch',
                                   backgroundColor: '#0F172A',
                                   borderRadius: 16,
                                   borderWidth: 1,
                                   borderColor: '#1E293B',
                                   overflow: 'hidden',
+                                  position: 'relative',
+                                  shadowColor: '#000',
+                                  shadowOffset: { width: 0, height: 4 },
+                                  shadowOpacity: 0.25,
+                                  shadowRadius: 8,
+                                  elevation: 4,
                                 }}>
                                   {/* Stories Top Progress Bar if multiple banners */}
                                   {activeBanners.length > 1 && (
@@ -2789,11 +3261,12 @@ export default function LoginScreen() {
                                         <TouchableOpacity
                                           key={b.id || idx}
                                           onPress={() => setBannerIndex(idx)}
+                                          hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
                                           style={{
                                             flex: 1,
                                             height: 4,
                                             borderRadius: 2,
-                                            backgroundColor: idx === (bannerIndex % activeBanners.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.2)',
+                                            backgroundColor: idx === (bannerIndex % activeBanners.length) ? (primaryColor || '#60A5FA') : 'rgba(255, 255, 255, 0.25)',
                                           }}
                                         />
                                       ))}
@@ -2802,6 +3275,12 @@ export default function LoginScreen() {
 
                                   {/* Banner Image Component */}
                                   <TouchableOpacity
+                                    style={{
+                                      width: '100%',
+                                      height: 165,
+                                      position: 'relative',
+                                      backgroundColor: '#0F172A',
+                                    }}
                                     onPress={handlePressBanner}
                                     activeOpacity={currentBanner.link_url ? 0.85 : 1}
                                     disabled={!currentBanner.link_url}
@@ -2810,11 +3289,83 @@ export default function LoginScreen() {
                                       source={{ uri: currentBanner.imagem_url }}
                                       style={{
                                         width: '100%',
-                                        height: 160,
+                                        height: '100%',
                                       }}
                                       resizeMode="cover"
                                     />
+
+                                    {/* Link Badge if banner has action URL */}
+                                    {Boolean(currentBanner.link_url && currentBanner.link_url.trim()) && (
+                                      <View style={{
+                                        position: 'absolute',
+                                        bottom: 10,
+                                        right: 10,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                                        paddingHorizontal: 10,
+                                        paddingVertical: 5,
+                                        borderRadius: 8,
+                                        borderWidth: 1,
+                                        borderColor: 'rgba(255, 255, 255, 0.2)',
+                                      }}>
+                                        <ExternalLink size={12} color="#60A5FA" />
+                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>Saiba mais</Text>
+                                      </View>
+                                    )}
                                   </TouchableOpacity>
+
+                                  {/* Prev / Next Chevron Navigation Arrows if multiple banners */}
+                                  {activeBanners.length > 1 && (
+                                    <>
+                                      <TouchableOpacity
+                                        onPress={() => setBannerIndex(prev => (prev - 1 + activeBanners.length) % activeBanners.length)}
+                                        style={{
+                                          position: 'absolute',
+                                          left: 8,
+                                          top: '55%',
+                                          marginTop: -16,
+                                          width: 32,
+                                          height: 32,
+                                          borderRadius: 16,
+                                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                          borderWidth: 1,
+                                          borderColor: 'rgba(255, 255, 255, 0.2)',
+                                          justifyContent: 'center',
+                                          alignItems: 'center',
+                                          zIndex: 10,
+                                        }}
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                      >
+                                        <ChevronLeft size={18} color="#FFFFFF" />
+                                      </TouchableOpacity>
+
+                                      <TouchableOpacity
+                                        onPress={() => setBannerIndex(prev => (prev + 1) % activeBanners.length)}
+                                        style={{
+                                          position: 'absolute',
+                                          right: 8,
+                                          top: '55%',
+                                          marginTop: -16,
+                                          width: 32,
+                                          height: 32,
+                                          borderRadius: 16,
+                                          backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                                          borderWidth: 1,
+                                          borderColor: 'rgba(255, 255, 255, 0.2)',
+                                          justifyContent: 'center',
+                                          alignItems: 'center',
+                                          zIndex: 10,
+                                        }}
+                                        activeOpacity={0.8}
+                                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                      >
+                                        <ChevronRight size={18} color="#FFFFFF" />
+                                      </TouchableOpacity>
+                                    </>
+                                  )}
                                 </View>
                               );
                             })()}
@@ -5734,6 +6285,183 @@ export default function LoginScreen() {
                     {Platform.OS === 'ios' ? 'Atualizar na App Store' : 'Atualizar na Play Store'}
                   </Text>
                 </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* POPUP MODAL: AVISO DE MANUTENÇÃO NA REDE */}
+      <Modal
+        visible={isMaintenanceModalOpen && activeMaintenance !== null}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          if (activeMaintenance) {
+            setDismissedMaintenanceIds(prev => [...prev, activeMaintenance.item.id]);
+          }
+          setIsMaintenanceModalOpen(false);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContainer, { width: '92%', maxWidth: 400, padding: 22, borderColor: '#EF444470' }]}>
+            {/* Top close button */}
+            <TouchableOpacity
+              onPress={() => {
+                if (activeMaintenance) {
+                  setDismissedMaintenanceIds(prev => [...prev, activeMaintenance.item.id]);
+                }
+                setIsMaintenanceModalOpen(false);
+              }}
+              style={{
+                position: 'absolute',
+                top: 14,
+                right: 14,
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: '#1E293B',
+                justifyContent: 'center',
+                alignItems: 'center',
+                zIndex: 10,
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <X size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {/* Glowing Alert Icon */}
+            <View style={{
+              width: 58,
+              height: 58,
+              borderRadius: 29,
+              backgroundColor: '#EF444420',
+              borderWidth: 1.5,
+              borderColor: '#EF444460',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 14,
+            }}>
+              <AlertTriangle size={28} color="#EF4444" />
+            </View>
+
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 4, fontSize: 18 }]}>
+              {activeMaintenance?.item.descricao || 'Manutenção na Rede'}
+            </Text>
+
+            <Text style={{ color: '#94A3B8', fontSize: 12.5, textAlign: 'center', marginBottom: 14 }}>
+              Identificamos serviços técnicos afetando a conexão do seu contrato.
+            </Text>
+
+            {/* Badges de Status e Severidade */}
+            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+              {activeMaintenance?.item.status ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EF444425', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: '#EF444450' }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#EF4444' }} />
+                  <Text style={{ color: '#FCA5A5', fontSize: 11, fontWeight: '700' }}>
+                    Status: {activeMaintenance.item.status}
+                  </Text>
+                </View>
+              ) : null}
+
+              {activeMaintenance?.item.severidade ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#F59E0B25', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: '#F59E0B50' }}>
+                  <Text style={{ color: '#FCD34D', fontSize: 11, fontWeight: '700' }}>
+                    Severidade: {activeMaintenance.item.severidade}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Info Card com detalhes técnicos */}
+            <View style={{
+              width: '100%',
+              backgroundColor: '#0B101D',
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: '#1E293B',
+              padding: 14,
+              marginBottom: 16,
+              gap: 10,
+            }}>
+              {/* Data Inicial e Previsão de Término */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                <Clock size={16} color="#F59E0B" style={{ marginTop: 2 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                    Período da Manutenção
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#CBD5E1', marginTop: 1 }}>
+                    Início: <Text style={{ fontWeight: '700', color: '#FFFFFF' }}>{formatMaintenanceDate(activeMaintenance?.item.data_inicial)}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#CBD5E1', marginTop: 2 }}>
+                    Previsão: <Text style={{ fontWeight: '700', color: '#10B981' }}>{formatMaintenanceDate(activeMaintenance?.item.data_final)}</Text>
+                  </Text>
+                </View>
+              </View>
+
+              {/* Mensagem da Central / URA / Observações */}
+              {(activeMaintenance?.item.mensagem_central || activeMaintenance?.item.mensagem_ura || activeMaintenance?.item.observacoes) ? (
+                <View style={{
+                  backgroundColor: '#111625',
+                  borderRadius: 10,
+                  padding: 10,
+                  marginTop: 4,
+                  borderLeftWidth: 3,
+                  borderLeftColor: '#F59E0B',
+                }}>
+                  <Text style={{ fontSize: 12, color: '#CBD5E1', lineHeight: 18, fontStyle: 'italic' }}>
+                    "{activeMaintenance.item.mensagem_central || activeMaintenance.item.mensagem_ura || activeMaintenance.item.observacoes}"
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            <Text style={{ color: '#64748B', fontSize: 11, textAlign: 'center', lineHeight: 16, marginBottom: 18 }}>
+              Nossos técnicos já estão atuando para restabelecer os serviços com a máxima agilidade e qualidade.
+            </Text>
+
+            {/* Ações */}
+            <View style={{ width: '100%', gap: 8 }}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#2563EB',
+                  width: '100%',
+                  paddingVertical: 13,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => {
+                  if (activeMaintenance) {
+                    setDismissedMaintenanceIds(prev => [...prev, activeMaintenance.item.id]);
+                  }
+                  setIsMaintenanceModalOpen(false);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>Entendido</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#1E293B',
+                  width: '100%',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 6,
+                }}
+                onPress={() => {
+                  setIsMaintenanceModalOpen(false);
+                  handleOpenWhatsApp();
+                }}
+                activeOpacity={0.8}
+              >
+                <MessageCircle size={16} color="#25D366" />
+                <Text style={{ color: '#F8FAFC', fontWeight: '600', fontSize: 13 }}>Falar com Suporte</Text>
               </TouchableOpacity>
             </View>
           </View>
