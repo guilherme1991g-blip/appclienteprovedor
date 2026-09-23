@@ -86,6 +86,7 @@ import {
   Smartphone,
   Tv,
 } from 'lucide-react-native';
+import { Image as ExpoImage } from 'expo-image';
 import * as Network from 'expo-network';
 import * as WebBrowser from 'expo-web-browser';
 import * as Print from 'expo-print';
@@ -5724,8 +5725,14 @@ export default function LoginScreen() {
                                     {cat.icon === 'Ticket' && <Ticket size={14} color={isActive ? '#FFFFFF' : '#FFE600'} style={{ marginRight: 5 }} />}
                                     {cat.icon === 'Smartphone' && <Smartphone size={14} color={isActive ? '#FFFFFF' : '#60A5FA'} style={{ marginRight: 5 }} />}
                                     {cat.icon === 'Wifi' && <Wifi size={14} color={isActive ? '#FFFFFF' : '#10B981'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Home' && <Home size={14} color={isActive ? '#FFFFFF' : '#F59E0B'} style={{ marginRight: 5 }} />}
                                     {cat.icon === 'Tv' && <Tv size={14} color={isActive ? '#FFFFFF' : '#A855F7'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Zap' && <Zap size={14} color={isActive ? '#FFFFFF' : '#F59E0B'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Home' && <Home size={14} color={isActive ? '#FFFFFF' : '#EC4899'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'ShieldCheck' && <ShieldCheck size={14} color={isActive ? '#FFFFFF' : '#14B8A6'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'ShoppingBag' && <ShoppingBag size={14} color={isActive ? '#FFFFFF' : '#F97316'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Radio' && <Radio size={14} color={isActive ? '#FFFFFF' : '#8B5CF6'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Activity' && <Activity size={14} color={isActive ? '#FFFFFF' : '#06B6D4'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Sparkles' && <Sparkles size={14} color={isActive ? '#FFFFFF' : '#EAB308'} style={{ marginRight: 5 }} />}
                                     <Text style={[styles.mlCatPillText, isActive && styles.mlCatPillTextActive]}>
                                       {cat.label}
                                     </Text>
@@ -5791,17 +5798,21 @@ export default function LoginScreen() {
                                 <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
                                   <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
                                   <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
-                                    Nenhum produto encontrado nesta categoria
+                                    Nenhum produto cadastrado nesta categoria
                                   </Text>
                                   <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
-                                    Pesquise diretamente no Mercado Livre para encontrar o que procura com as melhores ofertas.
+                                    Acesse o Mercado Livre para encontrar milhares de ofertas desta categoria com a garantia do Clube.
                                   </Text>
                                   <TouchableOpacity
                                     style={[styles.mlHeroBtn, { backgroundColor: primaryColor || '#2563EB' }]}
-                                    onPress={() => handleOpenMlUrl(buildSearchAffiliateUrl(mlSearchQuery || 'ofertas'))}
+                                    onPress={() => {
+                                      const currentCatObj = ML_CATEGORIES.find(c => c.id === mlCategory);
+                                      const catUrl = currentCatObj?.categoryUrl || 'https://www.mercadolivre.com.br/ofertas';
+                                      handleOpenMlUrl(formatAffiliateUrl(catUrl));
+                                    }}
                                     activeOpacity={0.8}
                                   >
-                                    <Text style={styles.mlHeroBtnText}>Buscar no Mercado Livre</Text>
+                                    <Text style={styles.mlHeroBtnText}>Buscar nesta Categoria no Mercado Livre</Text>
                                     <ExternalLink size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
                                   </TouchableOpacity>
                                 </View>
@@ -5814,10 +5825,12 @@ export default function LoginScreen() {
                                     activeOpacity={0.85}
                                   >
                                     <View style={styles.mlProductImageContainer}>
-                                      <Image
+                                      <ExpoImage
                                         source={{ uri: product.image }}
                                         style={styles.mlProductImage}
-                                        resizeMode="cover"
+                                        contentFit="contain"
+                                        transition={200}
+                                        cachePolicy="memory-disk"
                                       />
                                       {product.discount && (
                                         <View style={styles.mlProductDiscountTag}>
@@ -5873,6 +5886,26 @@ export default function LoginScreen() {
                                   </TouchableOpacity>
                                 ))
                               )}
+
+                              {/* BOTÃO PARA VER TODAS AS OFERTAS DA CATEGORIA NO MERCADO LIVRE */}
+                              {(() => {
+                                const currentCatObj = ML_CATEGORIES.find(c => c.id === mlCategory);
+                                const catUrl = currentCatObj?.categoryUrl || 'https://www.mercadolivre.com.br/ofertas';
+                                const catLabel = currentCatObj?.label || 'desta Categoria';
+                                return (
+                                  <TouchableOpacity
+                                    style={[styles.mlCatExploreBtn, { borderColor: primaryColor || '#2563EB' }]}
+                                    onPress={() => handleOpenMlUrl(formatAffiliateUrl(catUrl))}
+                                    activeOpacity={0.8}
+                                  >
+                                    <ShoppingBag size={16} color={primaryColor || '#60A5FA'} style={{ marginRight: 8 }} />
+                                    <Text style={[styles.mlCatExploreBtnText, { color: primaryColor || '#60A5FA' }]}>
+                                      Ver todas as ofertas de {catLabel} no Mercado Livre
+                                    </Text>
+                                    <ExternalLink size={14} color={primaryColor || '#60A5FA'} style={{ marginLeft: 6 }} />
+                                  </TouchableOpacity>
+                                );
+                              })()}
                             </View>
                           )}
 
@@ -9460,5 +9493,22 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  mlCatExploreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0F172A',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  mlCatExploreBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });
