@@ -59,18 +59,8 @@
       "reactCompiler": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "51c594bd-bf04-4140-ad43-04f31a6662f9"
-      }
+      "router": {}
     },
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/51c594bd-bf04-4140-ad43-04f31a6662f9",
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 5000
-    }
+    "owner": "guilherme1991g"
   }
 }

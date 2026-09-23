@@ -1,9 +1,14 @@
-// Arquivo de configuração por provedor
-// Para compilar o app para um novo provedor, basta alterar o PROVIDER_CODE
+import Constants from 'expo-constants';
+
+// Código do provedor determinado dinamicamente pelo APP_PROVIDER no build/update
+const activeProviderCode =
+  (Constants.expoConfig?.extra as any)?.providerCode ||
+  process.env.EXPO_PUBLIC_PROVIDER_CODE ||
+  'cbrfibra';
 
 export const APP_CONFIG = {
   // Código único deste provedor (utilizado para buscar as configurações no Supabase)
-  PROVIDER_CODE: 'cbrfibra',
+  PROVIDER_CODE: activeProviderCode,
 
   // Credenciais do Supabase
   SUPABASE_URL: 'https://glzhwqtgaddvuvbbmade.supabase.co',
