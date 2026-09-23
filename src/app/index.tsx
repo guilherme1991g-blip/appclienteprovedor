@@ -226,6 +226,18 @@ function formatDateBR(dateStr: string): string {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+// Helper to format Date string to DD/MM/YYYY às HH:mm
+function formatDateTimeBR(dateStr: string): string {
+  if (!dateStr) return '';
+  const [datePart, timePart] = dateStr.split(' ');
+  if (!datePart) return dateStr;
+  const parts = datePart.split('-');
+  const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : datePart;
+  if (!timePart) return formattedDate;
+  const timeSub = timePart.substring(0, 5);
+  return `${formattedDate} às ${timeSub}`;
+}
+
 // Parses DD/MM/AAAA HH:MM:SS or ISO 8601 format to timestamp for mathematical sorting
 function parseOcorrenciaDate(dateStr: string): number {
   if (!dateStr) return 0;
@@ -639,7 +651,8 @@ async function registerForPushNotificationsAsync() {
       return null;
     }
     try {
-      const tokenData = await Notifications.getExpoPushTokenAsync();
+      const targetProjectId = (Constants.expoConfig?.extra as any)?.eas?.projectId;
+      const tokenData = await Notifications.getExpoPushTokenAsync(targetProjectId ? { projectId: targetProjectId } : undefined);
       token = tokenData.data;
     } catch (e) {
       console.log('Aviso Expo Push Token:', e);
@@ -929,6 +942,17 @@ export default function LoginScreen() {
   // Invoices (Titulos) State
   const [allTitulos, setAllTitulos] = useState<any[]>([]);
   const [loadingFinanceiro, setLoadingFinanceiro] = useState(false);
+
+  // Notas Fiscais (NFCom) State
+  const [financeiroSubTab, setFinanceiroSubTab] = useState<'FATURAS' | 'NOTAS'>('FATURAS');
+  const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
+  const [loadingNotasFiscais, setLoadingNotasFiscais] = useState(false);
+  const [nfcomModalData, setNfcomModalData] = useState<{
+    visible: boolean;
+    nota: any | null;
+    base64: string | null;
+    loading: boolean;
+  } | null>(null);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -1823,9 +1847,92 @@ export default function LoginScreen() {
       });
   };
 
+  const fetchNotasFiscais = (customContractId?: number) => {
+    const contractToUse = customContractId || selectedContract?.id;
+    if (!contractToUse || !providerConfig.api_url) return;
+
+    setLoadingNotasFiscais(true);
+    const formData = new FormData();
+    formData.append('app', providerConfig.api_app || 'App');
+    formData.append('token', providerConfig.api_token || '');
+    formData.append('contrato', String(contractToUse));
+
+    fetch(`${providerConfig.api_url}/api/central/nfcom/list`, {
+      method: 'POST',
+      body: formData,
+    })
+      .then(async (response) => {
+        setLoadingNotasFiscais(false);
+        if (response.ok) {
+          const data = await response.json();
+          if (data && data.success && Array.isArray(data.results)) {
+            const sorted = [...data.results].sort((a: any, b: any) => (b.numero || b.id || 0) - (a.numero || a.id || 0));
+            setNotasFiscais(sorted);
+          } else {
+            setNotasFiscais([]);
+          }
+        } else {
+          setNotasFiscais([]);
+        }
+      })
+      .catch((err) => {
+        setLoadingNotasFiscais(false);
+        console.error('Fetch notas fiscais error:', err);
+      });
+  };
+
+  const handleOpenNfcomPdf = async (nota: any) => {
+    if (!selectedContract || !providerConfig.api_url) return;
+
+    setNfcomModalData({
+      visible: true,
+      nota,
+      base64: null,
+      loading: true,
+    });
+
+    try {
+      const formData = new FormData();
+      formData.append('app', providerConfig.api_app || 'App');
+      formData.append('token', providerConfig.api_token || '');
+      formData.append('contrato', String(selectedContract.id));
+
+      const response = await fetch(`${providerConfig.api_url}/api/central/nfcom/print/${nota.id}`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const buffer = await response.arrayBuffer();
+        let binary = '';
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const base64 = btoa(binary);
+
+        setNfcomModalData({
+          visible: true,
+          nota,
+          base64,
+          loading: false,
+        });
+      } else {
+        Alert.alert('Aviso', 'Não foi possível carregar o DANFE em PDF desta nota fiscal.');
+        setNfcomModalData(null);
+      }
+    } catch (err) {
+      console.error('Erro ao baixar DANFE da NFCom:', err);
+      Alert.alert('Erro', 'Ocorreu uma falha ao tentar visualizar a nota fiscal.');
+      setNfcomModalData(null);
+    }
+  };
+
   React.useEffect(() => {
     if (screenState === 'DASHBOARD' && selectedContract) {
       fetchFinanceData();
+      fetchNotasFiscais();
     }
   }, [screenState, selectedContract]);
 
@@ -3654,14 +3761,71 @@ export default function LoginScreen() {
 
                     {activeTab === 'FINANCEIRO' && (
                       <View style={styles.financeiroTabWrapper}>
-                        {loadingFinanceiro ? (
-                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
-                            <ActivityIndicator size="large" color="#2563EB" />
-                            <Text style={[styles.noBillsTitle, { marginTop: 16 }]}>Atualizando faturas...</Text>
-                            <Text style={styles.noBillsDesc}>Buscando dados financeiros mais recentes no SGP.</Text>
-                          </View>
-                        ) : (
+                        {/* SUB-TABS: BOLETOS / NOTAS FISCAIS */}
+                        <View style={styles.financeiroSubTabContainer}>
+                          <TouchableOpacity
+                            style={[
+                              styles.financeiroSubTabBtn,
+                              financeiroSubTab === 'FATURAS' && [styles.financeiroSubTabBtnActive, { backgroundColor: primaryColor }]
+                            ]}
+                            onPress={() => setFinanceiroSubTab('FATURAS')}
+                            activeOpacity={0.8}
+                          >
+                            <Receipt size={15} color={financeiroSubTab === 'FATURAS' ? '#FFFFFF' : '#94A3B8'} />
+                            <Text style={[
+                              styles.financeiroSubTabBtnText,
+                              financeiroSubTab === 'FATURAS' && styles.financeiroSubTabBtnTextActive
+                            ]}>
+                              Boletos e Faturas
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={[
+                              styles.financeiroSubTabBtn,
+                              financeiroSubTab === 'NOTAS' && [styles.financeiroSubTabBtnActive, { backgroundColor: primaryColor }]
+                            ]}
+                            onPress={() => {
+                              setFinanceiroSubTab('NOTAS');
+                              if (notasFiscais.length === 0) {
+                                fetchNotasFiscais();
+                              }
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <FileText size={15} color={financeiroSubTab === 'NOTAS' ? '#FFFFFF' : '#94A3B8'} />
+                            <Text style={[
+                              styles.financeiroSubTabBtnText,
+                              financeiroSubTab === 'NOTAS' && styles.financeiroSubTabBtnTextActive
+                            ]}>
+                              Notas Fiscais
+                            </Text>
+                            {notasFiscais.length > 0 && (
+                              <View style={[
+                                styles.financeiroBadgeCount,
+                                { backgroundColor: financeiroSubTab === 'NOTAS' ? 'rgba(255,255,255,0.25)' : `${primaryColor}25` }
+                              ]}>
+                                <Text style={[
+                                  styles.financeiroBadgeCountText,
+                                  { color: financeiroSubTab === 'NOTAS' ? '#FFFFFF' : primaryColor }
+                                ]}>
+                                  {notasFiscais.length}
+                                </Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {financeiroSubTab === 'FATURAS' && (
                           <>
+                            {loadingFinanceiro ? (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                                <ActivityIndicator size="large" color="#2563EB" />
+                                <Text style={[styles.noBillsTitle, { marginTop: 16 }]}>Atualizando faturas...</Text>
+                                <Text style={styles.noBillsDesc}>Buscando dados financeiros mais recentes no SGP.</Text>
+                              </View>
+                            ) : (
+                              <>
                             {/* SECTION 1: OPEN / OVERDUE INVOICES */}
                             <View style={styles.sectionHeaderRow}>
                               <AlertTriangle size={16} color="#EF4444" style={{ marginRight: 6 }} />
@@ -3861,8 +4025,117 @@ export default function LoginScreen() {
                             })()}
                           </>
                         )}
+                      </>
+                    )}
+
+                    {financeiroSubTab === 'NOTAS' && (
+                      <View style={{ width: '100%', alignItems: 'center' }}>
+                        <View style={styles.sectionHeaderRow}>
+                          <FileText size={16} color={primaryColor} style={{ marginRight: 6 }} />
+                          <Text style={styles.sectionTitle}>Notas Fiscais Emitidas (NFCom)</Text>
+                          <TouchableOpacity
+                            onPress={() => fetchNotasFiscais()}
+                            disabled={loadingNotasFiscais}
+                            style={{ marginLeft: 'auto', padding: 4 }}
+                            activeOpacity={0.7}
+                          >
+                            <RefreshCw size={15} color={loadingNotasFiscais ? primaryColor : '#64748B'} />
+                          </TouchableOpacity>
+                        </View>
+
+                        {loadingNotasFiscais ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                            <ActivityIndicator size="large" color={primaryColor} />
+                            <Text style={[styles.noBillsTitle, { marginTop: 16 }]}>Buscando notas fiscais...</Text>
+                            <Text style={styles.noBillsDesc}>Consultando os registros da NFCom no SGP.</Text>
+                          </View>
+                        ) : notasFiscais.length === 0 ? (
+                          <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
+                            <FileText size={38} color="#64748B" style={{ marginBottom: 12, opacity: 0.7 }} />
+                            <Text style={styles.noBillsTitle}>Nenhuma nota fiscal encontrada</Text>
+                            <Text style={styles.noBillsDesc}>Não há notas fiscais emitidas para este contrato até o momento.</Text>
+                          </View>
+                        ) : (
+                          notasFiscais.map((nota: any) => {
+                            const isAutorizada = String(nota.status) === '1';
+                            const isCancelada = String(nota.status) === '3';
+                            const isInutilizada = String(nota.status) === '5';
+
+                            let statusBadgeText = 'AUTORIZADA';
+                            let statusColor = '#10B981';
+                            if (isCancelada) {
+                              statusBadgeText = 'CANCELADA';
+                              statusColor = '#EF4444';
+                            } else if (isInutilizada) {
+                              statusBadgeText = 'INUTILIZADA';
+                              statusColor = '#F59E0B';
+                            } else if (!isAutorizada) {
+                              statusBadgeText = `STATUS ${nota.status}`;
+                              statusColor = '#94A3B8';
+                            }
+
+                            return (
+                              <View key={nota.id || String(nota.numero)} style={styles.nfcomCard}>
+                                <View style={styles.nfcomHeader}>
+                                  <View style={{ flex: 1 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <Text style={styles.nfcomNumero}>NFCom Nº {nota.numero}</Text>
+                                      <Text style={styles.nfcomSerie}>Série {nota.serie || '1'}</Text>
+                                    </View>
+                                    <Text style={styles.nfcomData}>
+                                      Emissão: {formatDateTimeBR(nota.data_emissao)}
+                                    </Text>
+                                  </View>
+
+                                  <View style={[styles.nfcomStatusBadge, { backgroundColor: `${statusColor}18` }]}>
+                                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                                    <Text style={[styles.nfcomStatusText, { color: statusColor }]}>
+                                      {statusBadgeText}
+                                    </Text>
+                                  </View>
+                                </View>
+
+                                {nota.chave ? (
+                                  <View style={styles.nfcomChaveBox}>
+                                    <Text style={styles.nfcomChaveLabel}>CHAVE DE ACESSO</Text>
+                                    <Text style={styles.nfcomChaveValue} numberOfLines={2}>
+                                      {nota.chave}
+                                    </Text>
+                                  </View>
+                                ) : null}
+
+                                <View style={styles.nfcomActionsRow}>
+                                  {nota.chave ? (
+                                    <TouchableOpacity
+                                      style={styles.nfcomActionBtn}
+                                      onPress={() => {
+                                        Clipboard.setString(nota.chave);
+                                        Alert.alert('Sucesso', 'Chave de acesso copiada para a área de transferência!');
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Copy size={13} color="#94A3B8" />
+                                      <Text style={styles.nfcomActionBtnText}>Copiar Chave</Text>
+                                    </TouchableOpacity>
+                                  ) : null}
+
+                                  <TouchableOpacity
+                                    style={[styles.nfcomActionBtnPrimary, { backgroundColor: primaryColor }]}
+                                    onPress={() => handleOpenNfcomPdf(nota)}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Download size={13} color="#FFFFFF" />
+                                    <Text style={styles.nfcomActionBtnPrimaryText}>Visualizar DANFE</Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
+                            );
+                          })
+                        )}
                       </View>
                     )}
+                  </View>
+                )}
 
                     {activeTab === 'SUPORTE' && (
                       <View style={styles.planoTabWrapper}>
@@ -5722,6 +5995,123 @@ export default function LoginScreen() {
                     </View>
                   </Modal>
 
+                  {/* NFCOM DANFE PDF POPUP MODAL */}
+                  <Modal
+                    visible={nfcomModalData !== null && nfcomModalData.visible}
+                    transparent={false}
+                    animationType="slide"
+                    onRequestClose={() => setNfcomModalData(null)}
+                  >
+                    <View style={{
+                      flex: 1,
+                      backgroundColor: '#0B0F19',
+                      paddingTop: Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 44),
+                    }}>
+                      <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+                        backgroundColor: '#0F172A'
+                      }}>
+                        <View style={{ flex: 1, marginRight: 10 }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC' }} numberOfLines={1}>
+                            NFCom Nº {nfcomModalData?.nota?.numero || ''} • Série {nfcomModalData?.nota?.serie || '1'}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 1 }}>
+                            Documento Auxiliar da NFCom (DANFE-COM)
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          {nfcomModalData?.nota?.chave && (
+                            <TouchableOpacity
+                              onPress={() => {
+                                if (nfcomModalData?.nota?.chave) {
+                                  Clipboard.setString(nfcomModalData.nota.chave);
+                                  Alert.alert('Sucesso', 'Chave de acesso copiada para a área de transferência!');
+                                }
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: `${primaryColor}22`,
+                                borderWidth: 1,
+                                borderColor: `${primaryColor}55`,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <Copy size={13} color={primaryColor} />
+                              <Text style={{ color: primaryColor, fontWeight: '700', fontSize: 12 }}>Copiar Chave</Text>
+                            </TouchableOpacity>
+                          )}
+
+                          <TouchableOpacity
+                            onPress={() => setNfcomModalData(null)}
+                            style={{
+                              padding: 7,
+                              borderRadius: 20,
+                              backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <X size={18} color="#CBD5E1" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+
+                      <View style={{ flex: 1, backgroundColor: '#0F172A' }}>
+                        {nfcomModalData?.loading ? (
+                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                            <ActivityIndicator size="large" color={primaryColor} />
+                            <Text style={{ color: '#94A3B8', marginTop: 12, fontSize: 13 }}>Carregando DANFE oficial...</Text>
+                          </View>
+                        ) : nfcomModalData?.base64 ? (
+                          <WebView
+                            originWhitelist={['*']}
+                            source={{ uri: `data:application/pdf;base64,${nfcomModalData.base64}` }}
+                            style={{ flex: 1, backgroundColor: '#0F172A' }}
+                            javaScriptEnabled={true}
+                            domStorageEnabled={true}
+                            startInLoadingState={true}
+                            renderLoading={() => (
+                              <View style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                justifyContent: 'center',
+                                alignItems: 'center',
+                                backgroundColor: '#0F172A'
+                              }}>
+                                <ActivityIndicator size="large" color={primaryColor} />
+                              </View>
+                            )}
+                          />
+                        ) : (
+                          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                            <AlertTriangle size={36} color="#EF4444" />
+                            <Text style={{ color: '#F8FAFC', fontWeight: '700', fontSize: 15, marginTop: 12 }}>
+                              Não foi possível abrir o PDF
+                            </Text>
+                            <Text style={{ color: '#94A3B8', fontSize: 13, textAlign: 'center', marginTop: 4 }}>
+                              O servidor do provedor não retornou o documento para impressão no momento.
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </Modal>
+
                   {/* PIX QR CODE POPUP MODAL */}
                   <Modal
                     visible={selectedPixCode !== null}
@@ -7274,6 +7664,171 @@ const styles = StyleSheet.create({
   financeiroTabWrapper: {
     width: '100%',
     alignItems: 'center',
+  },
+  financeiroSubTabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    borderRadius: 14,
+    padding: 4,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    maxWidth: 400,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  financeiroSubTabBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  financeiroSubTabBtnActive: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  financeiroSubTabBtnText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  financeiroSubTabBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  financeiroBadgeCount: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+    marginLeft: 2,
+  },
+  financeiroBadgeCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+
+  /* NOTAS FISCAIS (NFCOM) STYLES */
+  nfcomCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#111625',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  nfcomHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  nfcomNumero: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  nfcomSerie: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  nfcomData: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 4,
+  },
+  nfcomStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    gap: 4,
+  },
+  nfcomStatusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  nfcomChaveBox: {
+    backgroundColor: '#0A0F1D',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  nfcomChaveLabel: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  nfcomChaveValue: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#CBD5E1',
+    letterSpacing: 0.8,
+    lineHeight: 16,
+  },
+  nfcomActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  nfcomActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E293B',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    gap: 6,
+  },
+  nfcomActionBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#E2E8F0',
+  },
+  nfcomActionBtnPrimary: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  nfcomActionBtnPrimaryText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   sectionHeaderRow: {
     flexDirection: 'row',
