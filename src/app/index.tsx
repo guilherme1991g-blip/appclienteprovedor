@@ -5654,7 +5654,8 @@ export default function LoginScreen() {
                             <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={{ paddingHorizontal: 2, gap: 10, paddingBottom: 6 }}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 10, paddingBottom: 6, alignItems: 'flex-start' }}
+                              style={{ flexGrow: 0 }}
                             >
                               {ML_COUPONS.map(coupon => {
                                 const isCopied = mlCopiedCouponId === coupon.id;
@@ -5703,11 +5704,12 @@ export default function LoginScreen() {
                           </View>
 
                           {/* 4. CATEGORIAS / ABAS */}
-                          <View style={{ marginTop: 14, marginBottom: 12 }}>
+                          <View style={{ marginTop: 14, marginBottom: 12, width: '100%', maxWidth: 400 }}>
                             <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8 }}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
+                              style={{ flexGrow: 0 }}
                             >
                               {ML_CATEGORIES.map(cat => {
                                 const isActive = mlCategory === cat.id;
@@ -5744,7 +5746,7 @@ export default function LoginScreen() {
 
                           {/* 5. LISTA DE PRODUTOS OU CUPONS DETALHADOS */}
                           {mlCategory === 'cupons' ? (
-                            <View style={{ gap: 12, marginTop: 4 }}>
+                            <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
                               {ML_COUPONS.map(coupon => {
                                 const isCopied = mlCopiedCouponId === coupon.id;
                                 return (
@@ -5793,7 +5795,7 @@ export default function LoginScreen() {
                               })}
                             </View>
                           ) : (
-                            <View style={{ gap: 12, marginTop: 4 }}>
+                            <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
                               {filteredProducts.length === 0 ? (
                                 <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
                                   <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
@@ -9102,6 +9104,8 @@ const styles = StyleSheet.create({
 
   /* MERCADO LIVRE CLUBE DE DESCONTOS STYLES */
   mlHeroCard: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#374151',
@@ -9174,6 +9178,8 @@ const styles = StyleSheet.create({
 
   /* BUSCA */
   mlSearchContainer: {
+    width: '100%',
+    maxWidth: 400,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -9205,6 +9211,8 @@ const styles = StyleSheet.create({
 
   /* SEÇÕES E CUPONS */
   mlSectionContainer: {
+    width: '100%',
+    maxWidth: 400,
     marginBottom: 10,
   },
   mlSectionHeader: {
@@ -9225,6 +9233,7 @@ const styles = StyleSheet.create({
   },
   mlCouponCard: {
     width: 220,
+    height: 142,
     backgroundColor: '#0F172A',
     borderWidth: 1.2,
     borderColor: '#1E293B',
@@ -9305,6 +9314,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   mlCouponDetailedCard: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: '#0F172A',
     borderWidth: 1.2,
     borderColor: '#1E293B',
@@ -9338,6 +9349,8 @@ const styles = StyleSheet.create({
 
   /* CARDS DE PRODUTOS */
   mlProductCard: {
+    width: '100%',
+    maxWidth: 400,
     flexDirection: 'row',
     backgroundColor: '#0F172A',
     borderWidth: 1.2,
@@ -9445,6 +9458,8 @@ const styles = StyleSheet.create({
 
   /* FOOTER */
   mlFooterBanner: {
+    width: '100%',
+    maxWidth: 400,
     backgroundColor: '#111827',
     borderWidth: 1,
     borderColor: '#1E293B',
@@ -9495,6 +9510,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   mlCatExploreBtn: {
+    width: '100%',
+    maxWidth: 400,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
