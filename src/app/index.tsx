@@ -3537,21 +3537,14 @@ export default function LoginScreen() {
                                 <View style={{
                                   width: '100%',
                                   alignSelf: 'stretch',
-                                  backgroundColor: '#0F172A',
+                                  backgroundColor: 'transparent',
                                   borderRadius: 16,
-                                  borderWidth: 1,
-                                  borderColor: '#1E293B',
                                   overflow: 'hidden',
                                   position: 'relative',
-                                  shadowColor: '#000',
-                                  shadowOffset: { width: 0, height: 4 },
-                                  shadowOpacity: 0.25,
-                                  shadowRadius: 8,
-                                  elevation: 4,
                                 }}>
                                   {/* Stories Top Progress Bar if multiple banners */}
                                   {activeBanners.length > 1 && (
-                                    <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, backgroundColor: '#0F172A' }}>
+                                    <View style={{ flexDirection: 'row', gap: 6, paddingHorizontal: 12, paddingTop: 4, paddingBottom: 8, backgroundColor: 'transparent' }}>
                                       {activeBanners.map((b, idx) => (
                                         <TouchableOpacity
                                           key={b.id || idx}
@@ -3574,9 +3567,10 @@ export default function LoginScreen() {
                                       width: '100%',
                                       aspectRatio: 16 / 9,
                                       position: 'relative',
-                                      backgroundColor: '#0F172A',
+                                      backgroundColor: 'transparent',
                                       justifyContent: 'center',
                                       alignItems: 'center',
+                                      borderRadius: 16,
                                       overflow: 'hidden',
                                     }}
                                     onPress={handlePressBanner}
@@ -3588,6 +3582,7 @@ export default function LoginScreen() {
                                       style={{
                                         width: '100%',
                                         height: '100%',
+                                        borderRadius: 16,
                                       }}
                                       resizeMode="contain"
                                     />
