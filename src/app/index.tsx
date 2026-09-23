@@ -81,6 +81,10 @@ import {
   FileCheck,
   Download,
   Share2,
+  Search,
+  Flame,
+  Smartphone,
+  Tv,
 } from 'lucide-react-native';
 import * as Network from 'expo-network';
 import * as WebBrowser from 'expo-web-browser';
@@ -97,6 +101,16 @@ import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
 import { getDetailedWifiInfo } from '@/services/wifiDiagnostic';
+import {
+  ML_CATEGORIES,
+  ML_COUPONS,
+  ML_PRODUCTS,
+  MLCategory,
+  MLProduct,
+  MLCoupon,
+  formatAffiliateUrl,
+  buildSearchAffiliateUrl,
+} from '@/services/mercadoLivre';
 
 // Silencia caixas de erro do LogBox para manter a experiência do usuário limpa
 LogBox.ignoreAllLogs(true);
@@ -984,6 +998,11 @@ export default function LoginScreen() {
   const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
   const [loadingNotasFiscais, setLoadingNotasFiscais] = useState(false);
   const [downloadingNfcomId, setDownloadingNfcomId] = useState<number | null>(null);
+
+  // Mercado Livre Clube de Descontos State
+  const [mlCategory, setMlCategory] = useState<MLCategory>('todas');
+  const [mlSearchQuery, setMlSearchQuery] = useState('');
+  const [mlCopiedCouponId, setMlCopiedCouponId] = useState<string | null>(null);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -2036,6 +2055,34 @@ export default function LoginScreen() {
       }
     }
   }, [activeTab, screenState, providerConfig.banners]);
+
+  // Manipuladores do Clube de Descontos (Mercado Livre Afiliados)
+  const handleOpenMlUrl = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch {
+      Linking.openURL(url).catch(() => {});
+    }
+  };
+
+  const handleCopyMlCoupon = (code: string, couponId: string) => {
+    Clipboard.setString(code);
+    setMlCopiedCouponId(couponId);
+    setTimeout(() => {
+      setMlCopiedCouponId(null);
+    }, 2500);
+  };
+
+  const handleSearchMlSubmit = () => {
+    if (!mlSearchQuery.trim()) return;
+    const url = buildSearchAffiliateUrl(mlSearchQuery.trim());
+    handleOpenMlUrl(url);
+  };
 
   // Consulta se há manutenção ativa na rede da operadora que afeta o contrato do cliente
   const checkNetworkMaintenance = async (targetContract?: ContractDisplay | null) => {
@@ -5516,20 +5563,340 @@ export default function LoginScreen() {
                       </View>
                     )}
 
-                    {/* CLUBE DE DESCONTOS TAB */}
-                    {activeTab === 'CLUBE' && (
-                      <View style={styles.planoTabWrapper}>
-                        <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40, marginTop: 8 }]}>
-                          <Ticket size={36} color="#64748B" style={{ marginBottom: 12 }} />
-                          <Text style={{ fontSize: 16, fontWeight: '700', color: '#F8FAFC', marginBottom: 6 }}>
-                            Clube de Descontos
-                          </Text>
-                          <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', lineHeight: 18 }}>
-                            Em breve novos parceiros e benefícios para assinantes.
-                          </Text>
+                    {/* CLUBE DE DESCONTOS (MERCADO LIVRE AFILIADOS) */}
+                    {activeTab === 'CLUBE' && (() => {
+                      // Filtragem dos produtos
+                      const filteredProducts = ML_PRODUCTS.filter(p => {
+                        const matchesCategory = mlCategory === 'todas' || p.category === mlCategory;
+                        const matchesSearch = !mlSearchQuery.trim() || 
+                          p.title.toLowerCase().includes(mlSearchQuery.toLowerCase()) ||
+                          p.category.toLowerCase().includes(mlSearchQuery.toLowerCase());
+                        return matchesCategory && matchesSearch;
+                      });
+
+                      return (
+                        <View style={styles.planoTabWrapper}>
+                          {/* 1. HEADER HERO BANNER MERCADO LIVRE */}
+                          <View style={styles.mlHeroCard}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                              <View style={styles.mlPartnerBadge}>
+                                <ShoppingBag size={12} color="#0F172A" />
+                                <Text style={styles.mlPartnerBadgeText}>PARCERIA OFICIAL</Text>
+                              </View>
+                              <Text style={styles.mlMeliText}>MERCADO LIVRE</Text>
+                            </View>
+
+                            <Text style={styles.mlHeroTitle}>Clube de Ofertas & Cupons</Text>
+                            <Text style={styles.mlHeroSubtitle}>
+                              Aproveite descontos exclusivos selecionados para clientes {providerConfig.nome || 'do Provedor'} com entrega rápida e garantia.
+                            </Text>
+
+                            <View style={styles.mlBadgesRow}>
+                              <View style={styles.mlBadgeItem}>
+                                <Zap size={13} color="#FFE600" />
+                                <Text style={styles.mlBadgeText}>Até 50% OFF</Text>
+                              </View>
+                              <View style={styles.mlBadgeItem}>
+                                <CheckCircle size={13} color="#10B981" />
+                                <Text style={styles.mlBadgeText}>Compra Segura</Text>
+                              </View>
+                              <View style={styles.mlBadgeItem}>
+                                <Wifi size={13} color="#60A5FA" />
+                                <Text style={styles.mlBadgeText}>Entrega Rápida</Text>
+                              </View>
+                            </View>
+                          </View>
+
+                          {/* 2. SEARCH BAR */}
+                          <View style={styles.mlSearchContainer}>
+                            <View style={styles.mlSearchInputWrapper}>
+                              <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
+                              <TextInput
+                                style={styles.mlSearchInput}
+                                placeholder="Buscar produto no Mercado Livre..."
+                                placeholderTextColor="#64748B"
+                                value={mlSearchQuery}
+                                onChangeText={setMlSearchQuery}
+                                returnKeyType="search"
+                                onSubmitEditing={handleSearchMlSubmit}
+                              />
+                              {mlSearchQuery.length > 0 && (
+                                <TouchableOpacity
+                                  onPress={() => setMlSearchQuery('')}
+                                  style={{ padding: 6, marginRight: 6 }}
+                                >
+                                  <X size={16} color="#94A3B8" />
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                            {mlSearchQuery.trim().length > 0 && (
+                              <TouchableOpacity
+                                style={[styles.mlSearchSubmitBtn, { backgroundColor: primaryColor || '#2563EB' }]}
+                                onPress={handleSearchMlSubmit}
+                                activeOpacity={0.8}
+                              >
+                                <ExternalLink size={16} color="#FFFFFF" />
+                              </TouchableOpacity>
+                            )}
+                          </View>
+
+                          {/* 3. CUPONS EM DESTAQUE (CARROSSEL) */}
+                          <View style={styles.mlSectionContainer}>
+                            <View style={styles.mlSectionHeader}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <Ticket size={18} color="#FFE600" />
+                                <Text style={styles.mlSectionTitle}>Cupons de Desconto</Text>
+                              </View>
+                              <Text style={styles.mlSectionSubtitle}>Toque para copiar o código</Text>
+                            </View>
+
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 10, paddingBottom: 6 }}
+                            >
+                              {ML_COUPONS.map(coupon => {
+                                const isCopied = mlCopiedCouponId === coupon.id;
+                                return (
+                                  <View key={coupon.id} style={styles.mlCouponCard}>
+                                    <View style={styles.mlCouponTopRow}>
+                                      <View style={styles.mlCouponDiscountPill}>
+                                        <Text style={styles.mlCouponDiscountText}>{coupon.discountTag}</Text>
+                                      </View>
+                                      {coupon.minPurchase && (
+                                        <Text style={styles.mlCouponMinPurchase}>{coupon.minPurchase}</Text>
+                                      )}
+                                    </View>
+
+                                    <Text style={styles.mlCouponTitle} numberOfLines={1}>{coupon.title}</Text>
+                                    <Text style={styles.mlCouponDesc} numberOfLines={2}>{coupon.description}</Text>
+
+                                    <View style={styles.mlCouponBottomRow}>
+                                      <TouchableOpacity
+                                        style={[
+                                          styles.mlCouponCodeBtn,
+                                          isCopied && { backgroundColor: '#10B98120', borderColor: '#10B981' }
+                                        ]}
+                                        onPress={() => handleCopyMlCoupon(coupon.code, coupon.id)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={[styles.mlCouponCodeText, isCopied && { color: '#10B981' }]}>
+                                          {isCopied ? 'COPIADO! ✓' : coupon.code}
+                                        </Text>
+                                        {!isCopied && <Copy size={13} color="#94A3B8" style={{ marginLeft: 6 }} />}
+                                      </TouchableOpacity>
+
+                                      <TouchableOpacity
+                                        style={[styles.mlCouponUseBtn, { backgroundColor: primaryColor || '#2563EB' }]}
+                                        onPress={() => handleOpenMlUrl(coupon.affiliateUrl)}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Text style={styles.mlCouponUseBtnText}>Usar</Text>
+                                        <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+
+                          {/* 4. CATEGORIAS / ABAS */}
+                          <View style={{ marginTop: 14, marginBottom: 12 }}>
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8 }}
+                            >
+                              {ML_CATEGORIES.map(cat => {
+                                const isActive = mlCategory === cat.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={cat.id}
+                                    style={[
+                                      styles.mlCatPill,
+                                      isActive && [styles.mlCatPillActive, { backgroundColor: primaryColor || '#2563EB', borderColor: primaryColor || '#2563EB' }]
+                                    ]}
+                                    onPress={() => setMlCategory(cat.id)}
+                                    activeOpacity={0.75}
+                                  >
+                                    {cat.icon === 'Flame' && <Flame size={14} color={isActive ? '#FFFFFF' : '#EF4444'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Ticket' && <Ticket size={14} color={isActive ? '#FFFFFF' : '#FFE600'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Smartphone' && <Smartphone size={14} color={isActive ? '#FFFFFF' : '#60A5FA'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Wifi' && <Wifi size={14} color={isActive ? '#FFFFFF' : '#10B981'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Home' && <Home size={14} color={isActive ? '#FFFFFF' : '#F59E0B'} style={{ marginRight: 5 }} />}
+                                    {cat.icon === 'Tv' && <Tv size={14} color={isActive ? '#FFFFFF' : '#A855F7'} style={{ marginRight: 5 }} />}
+                                    <Text style={[styles.mlCatPillText, isActive && styles.mlCatPillTextActive]}>
+                                      {cat.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+
+                          {/* 5. LISTA DE PRODUTOS OU CUPONS DETALHADOS */}
+                          {mlCategory === 'cupons' ? (
+                            <View style={{ gap: 12, marginTop: 4 }}>
+                              {ML_COUPONS.map(coupon => {
+                                const isCopied = mlCopiedCouponId === coupon.id;
+                                return (
+                                  <View key={coupon.id} style={styles.mlCouponDetailedCard}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                                      <View style={{ flex: 1, paddingRight: 8 }}>
+                                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginBottom: 4 }}>
+                                          {coupon.title}
+                                        </Text>
+                                        <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18 }}>
+                                          {coupon.description}
+                                        </Text>
+                                      </View>
+                                      <View style={styles.mlCouponDiscountPill}>
+                                        <Text style={styles.mlCouponDiscountText}>{coupon.discountTag}</Text>
+                                      </View>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#33415550' }}>
+                                      <TouchableOpacity
+                                        style={[
+                                          styles.mlCouponCodeBtn,
+                                          { flex: 1, marginRight: 10 },
+                                          isCopied && { backgroundColor: '#10B98120', borderColor: '#10B981' }
+                                        ]}
+                                        onPress={() => handleCopyMlCoupon(coupon.code, coupon.id)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Text style={[styles.mlCouponCodeText, isCopied && { color: '#10B981' }]}>
+                                          {isCopied ? 'CÓDIGO COPIADO! ✓' : `CUPOM: ${coupon.code}`}
+                                        </Text>
+                                        {!isCopied && <Copy size={14} color="#94A3B8" style={{ marginLeft: 6 }} />}
+                                      </TouchableOpacity>
+
+                                      <TouchableOpacity
+                                        style={[styles.mlCouponUseBtn, { paddingHorizontal: 16, backgroundColor: primaryColor || '#2563EB' }]}
+                                        onPress={() => handleOpenMlUrl(coupon.affiliateUrl)}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Text style={styles.mlCouponUseBtnText}>Abrir no Mercado Livre</Text>
+                                        <ExternalLink size={13} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                );
+                              })}
+                            </View>
+                          ) : (
+                            <View style={{ gap: 12, marginTop: 4 }}>
+                              {filteredProducts.length === 0 ? (
+                                <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
+                                  <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
+                                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                                    Nenhum produto encontrado nesta categoria
+                                  </Text>
+                                  <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
+                                    Pesquise diretamente no Mercado Livre para encontrar o que procura com as melhores ofertas.
+                                  </Text>
+                                  <TouchableOpacity
+                                    style={[styles.mlHeroBtn, { backgroundColor: primaryColor || '#2563EB' }]}
+                                    onPress={() => handleOpenMlUrl(buildSearchAffiliateUrl(mlSearchQuery || 'ofertas'))}
+                                    activeOpacity={0.8}
+                                  >
+                                    <Text style={styles.mlHeroBtnText}>Buscar no Mercado Livre</Text>
+                                    <ExternalLink size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
+                                filteredProducts.map(product => (
+                                  <TouchableOpacity
+                                    key={product.id}
+                                    style={styles.mlProductCard}
+                                    onPress={() => handleOpenMlUrl(product.url)}
+                                    activeOpacity={0.85}
+                                  >
+                                    <View style={styles.mlProductImageContainer}>
+                                      <Image
+                                        source={{ uri: product.image }}
+                                        style={styles.mlProductImage}
+                                        resizeMode="cover"
+                                      />
+                                      {product.discount && (
+                                        <View style={styles.mlProductDiscountTag}>
+                                          <Text style={styles.mlProductDiscountTagText}>{product.discount}</Text>
+                                        </View>
+                                      )}
+                                      {product.badge && (
+                                        <View style={styles.mlProductHighlightBadge}>
+                                          <Text style={styles.mlProductHighlightBadgeText}>{product.badge}</Text>
+                                        </View>
+                                      )}
+                                    </View>
+
+                                    <View style={styles.mlProductBody}>
+                                      <Text style={styles.mlProductTitle} numberOfLines={2}>
+                                        {product.title}
+                                      </Text>
+
+                                      <View style={{ marginTop: 6 }}>
+                                        {product.originalPrice && (
+                                          <Text style={styles.mlProductOriginalPrice}>
+                                            {product.originalPrice}
+                                          </Text>
+                                        )}
+                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                                          <Text style={styles.mlProductPrice}>
+                                            {product.price}
+                                          </Text>
+                                        </View>
+                                        {product.installments && (
+                                          <Text style={styles.mlProductInstallments}>
+                                            {product.installments}
+                                          </Text>
+                                        )}
+                                      </View>
+
+                                      <View style={styles.mlProductFooterRow}>
+                                        {product.freeShipping ? (
+                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                            <CheckCircle size={12} color="#10B981" />
+                                            <Text style={styles.mlProductShippingText}>Frete Grátis</Text>
+                                          </View>
+                                        ) : (
+                                          <View />
+                                        )}
+
+                                        <View style={[styles.mlProductBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
+                                          <Text style={styles.mlProductBuyBtnText}>Ver no Mercado Livre</Text>
+                                          <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                                        </View>
+                                      </View>
+                                    </View>
+                                  </TouchableOpacity>
+                                ))
+                              )}
+                            </View>
+                          )}
+
+                          {/* 6. BANNER INFORMATIVO / MAIS OFERTAS */}
+                          <View style={styles.mlFooterBanner}>
+                            <ShoppingBag size={22} color="#FFE600" style={{ marginBottom: 6 }} />
+                            <Text style={styles.mlFooterBannerTitle}>
+                              Procurando outro produto ou promoção?
+                            </Text>
+                            <Text style={styles.mlFooterBannerSubtitle}>
+                              Acesse o Mercado Livre com todos os benefícios do nosso Clube de Descontos e encontre milhares de ofertas diárias.
+                            </Text>
+                            <TouchableOpacity
+                              style={[styles.mlFooterBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}
+                              onPress={() => handleOpenMlUrl(formatAffiliateUrl('https://www.mercadolivre.com.br/ofertas'))}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.mlFooterBannerBtnText}>Ver Todas as Ofertas do Dia</Text>
+                              <ExternalLink size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
-                      </View>
-                    )}
+                      );
+                    })()}
 
                     {/* CLUBE DO CLIENTE TAB */}
                     {activeTab === 'CLUBE_CLIENTE' && (
@@ -8698,5 +9065,400 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '800',
+  },
+
+  /* MERCADO LIVRE CLUBE DE DESCONTOS STYLES */
+  mlHeroCard: {
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#374151',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  mlPartnerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFE600',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  mlPartnerBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  mlMeliText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 1,
+  },
+  mlHeroTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  mlHeroSubtitle: {
+    fontSize: 12.5,
+    color: '#94A3B8',
+    lineHeight: 17,
+    marginBottom: 12,
+  },
+  mlBadgesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#1F2937',
+    flexWrap: 'wrap',
+  },
+  mlBadgeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E293B',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  mlBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#E2E8F0',
+  },
+
+  /* BUSCA */
+  mlSearchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  mlSearchInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#334155',
+    borderRadius: 12,
+    height: 44,
+  },
+  mlSearchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#F8FAFC',
+    paddingVertical: 0,
+  },
+  mlSearchSubmitBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* SEÇÕES E CUPONS */
+  mlSectionContainer: {
+    marginBottom: 10,
+  },
+  mlSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  mlSectionTitle: {
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  mlSectionSubtitle: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  mlCouponCard: {
+    width: 220,
+    backgroundColor: '#0F172A',
+    borderWidth: 1.2,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  mlCouponTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  mlCouponDiscountPill: {
+    backgroundColor: '#FFE60025',
+    borderWidth: 1,
+    borderColor: '#FFE60050',
+    paddingVertical: 2,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  mlCouponDiscountText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#FFE600',
+  },
+  mlCouponMinPurchase: {
+    fontSize: 10,
+    color: '#64748B',
+  },
+  mlCouponTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    marginBottom: 2,
+  },
+  mlCouponDesc: {
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 15,
+    marginBottom: 10,
+  },
+  mlCouponBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  mlCouponCodeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E293B',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: '#475569',
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+  },
+  mlCouponCodeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: 0.5,
+  },
+  mlCouponUseBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  mlCouponUseBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  mlCouponDetailedCard: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1.2,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    padding: 14,
+  },
+
+  /* CATEGORIAS */
+  mlCatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  mlCatPillActive: {
+    borderWidth: 1,
+  },
+  mlCatPillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  mlCatPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+  },
+
+  /* CARDS DE PRODUTOS */
+  mlProductCard: {
+    flexDirection: 'row',
+    backgroundColor: '#0F172A',
+    borderWidth: 1.2,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    overflow: 'hidden',
+    padding: 12,
+    gap: 12,
+  },
+  mlProductImageContainer: {
+    width: 105,
+    height: 115,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mlProductImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mlProductDiscountTag: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: '#00A650',
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 4,
+  },
+  mlProductDiscountTagText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  mlProductHighlightBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: '#2563EB',
+    paddingVertical: 1.5,
+    paddingHorizontal: 5,
+    borderRadius: 4,
+  },
+  mlProductHighlightBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  mlProductBody: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  mlProductTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    lineHeight: 17,
+  },
+  mlProductOriginalPrice: {
+    fontSize: 11,
+    color: '#64748B',
+    textDecorationLine: 'line-through',
+    marginBottom: 1,
+  },
+  mlProductPrice: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#F8FAFC',
+  },
+  mlProductInstallments: {
+    fontSize: 10.5,
+    color: '#10B981',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  mlProductFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+  },
+  mlProductShippingText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  mlProductBuyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+  },
+  mlProductBuyBtnText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  /* FOOTER */
+  mlFooterBanner: {
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 20,
+  },
+  mlFooterBannerTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  mlFooterBannerSubtitle: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 12,
+  },
+  mlFooterBannerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  mlFooterBannerBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  mlHeroBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+  },
+  mlHeroBtnText: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 });
