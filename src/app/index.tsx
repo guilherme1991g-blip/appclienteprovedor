@@ -984,7 +984,6 @@ export default function LoginScreen() {
   const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
   const [loadingNotasFiscais, setLoadingNotasFiscais] = useState(false);
   const [downloadingNfcomId, setDownloadingNfcomId] = useState<number | null>(null);
-  const [downloadingContratoTipo, setDownloadingContratoTipo] = useState<'contrato' | 'termoadesao' | null>(null);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -1972,148 +1971,6 @@ export default function LoginScreen() {
       Alert.alert('Nota Fiscal', getUserFriendlyErrorMessage(err));
     } finally {
       setDownloadingNfcomId(null);
-    }
-  };
-
-  const handleDownloadContrato = async (tipo: 'contrato' | 'termoadesao' = 'contrato') => {
-    if (!selectedContract) {
-      Alert.alert('Atenção', 'Selecione um contrato para efetuar o download.');
-      return;
-    }
-
-    if (!providerConfig.api_url) {
-      Alert.alert('Erro', 'URL da central do provedor não configurada.');
-      return;
-    }
-
-    const rawLogin = selectedContract.centralLogin || documentInput || selectedContract.pppoeLogin || '';
-    const login = rawLogin.trim();
-    const rawPassword = selectedContract.centralSenha || '1234';
-    const password = rawPassword.trim();
-    const token = (providerConfig.token_central_assinante || providerConfig.api_token || '').trim();
-
-    if (!token) {
-      Alert.alert('Aviso', 'Token de autenticação da central não configurado.');
-      return;
-    }
-
-    setDownloadingContratoTipo(tipo);
-
-    try {
-      const targetUrl = `${providerConfig.api_url}/api/centralapp/contrato/print/${tipo}/`;
-
-      const result = await new Promise<{
-        base64Data: string;
-        contentType: string;
-        contentDisposition: string;
-      }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', targetUrl, true);
-        xhr.responseType = 'blob';
-
-        xhr.onload = async () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const blob = xhr.response;
-            const contentType = xhr.getResponseHeader('Content-Type') || '';
-            const contentDisposition = xhr.getResponseHeader('Content-Disposition') || '';
-
-            try {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                if (typeof reader.result === 'string') {
-                  const parts = reader.result.split(',');
-                  resolve({
-                    base64Data: parts[1] || parts[0],
-                    contentType,
-                    contentDisposition,
-                  });
-                } else {
-                  reject(new Error('Falha ao decodificar arquivo do contrato.'));
-                }
-              };
-              reader.onerror = () => reject(new Error('Erro na leitura do arquivo baixado.'));
-              reader.readAsDataURL(blob);
-            } catch (convErr: any) {
-              reject(convErr);
-            }
-          } else {
-            try {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                try {
-                  const text = reader.result as string;
-                  const parsed = JSON.parse(text);
-                  reject(new Error(parsed.detail || parsed.message || `Erro ${xhr.status} ao emitir contrato.`));
-                } catch {
-                  reject(new Error(`O servidor retornou status ${xhr.status}.`));
-                }
-              };
-              reader.readAsText(xhr.response);
-            } catch {
-              reject(new Error(`O servidor retornou status ${xhr.status}.`));
-            }
-          }
-        };
-
-        xhr.onerror = () => {
-          reject(new Error('Falha de conexão com a central do provedor. Verifique sua internet.'));
-        };
-
-        xhr.ontimeout = () => {
-          reject(new Error('Tempo limite excedido ao buscar contrato no servidor.'));
-        };
-
-        xhr.timeout = 30000;
-
-        const formData = new FormData();
-        formData.append('login', login);
-        formData.append('password', password);
-        formData.append('token', token);
-
-        xhr.send(formData);
-      });
-
-      // Check whether SGP returned docx or pdf
-      let ext = 'docx';
-      let mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      let uti = 'org.openxmlformats.wordprocessingml.document';
-
-      const isPdf =
-        result.contentType.toLowerCase().includes('pdf') ||
-        result.contentDisposition.toLowerCase().includes('.pdf');
-
-      if (isPdf) {
-        ext = 'pdf';
-        mimeType = 'application/pdf';
-        uti = 'com.adobe.pdf';
-      }
-
-      const label = tipo === 'termoadesao' ? 'Termo_Adesao' : 'Contrato';
-      const fileName = `${label}_${selectedContract.id}.${ext}`;
-      const fileDir = FileSystem.cacheDirectory || FileSystem.documentDirectory;
-      const fileUri = `${fileDir}${fileName}`;
-
-      await FileSystem.writeAsStringAsync(fileUri, result.base64Data, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          UTI: uti,
-          mimeType: mimeType,
-          dialogTitle: `${label.replace('_', ' ')} - Contrato Nº ${selectedContract.id}`,
-        });
-      } else {
-        Alert.alert('Sucesso', `Documento salvo em: ${fileUri}`);
-      }
-    } catch (err: any) {
-      console.warn('Erro ao baixar contrato:', err);
-      Alert.alert(
-        'Contrato',
-        getUserFriendlyErrorMessage(err)
-      );
-    } finally {
-      setDownloadingContratoTipo(null);
     }
   };
 
@@ -3906,59 +3763,6 @@ export default function LoginScreen() {
                           <View style={styles.infoRow}>
                             <Text style={styles.infoLabel}>Login da Central</Text>
                             <Text style={styles.infoValue}>{selectedContract.centralLogin || 'Não cadastrado'}</Text>
-                          </View>
-                        </View>
-
-                        {/* 4b. DOWNLOAD CONTRATO CARD */}
-                        <View style={styles.infoCard}>
-                          <View style={styles.infoCardHeader}>
-                            <FileText size={18} color={primaryColor || '#2563EB'} style={{ marginRight: 8 }} />
-                            <Text style={styles.infoCardHeaderTitle}>Documentos do Contrato</Text>
-                          </View>
-
-                          <Text style={{ fontSize: 13, color: '#94A3B8', marginBottom: 14, lineHeight: 18 }}>
-                            Obtenha uma via digitalizada do seu contrato de prestação de serviços ou termo de adesão assinado.
-                          </Text>
-
-                          <View style={styles.contratoActionsContainer}>
-                            <TouchableOpacity
-                              style={[
-                                styles.contratoPrimaryBtn,
-                                { backgroundColor: primaryColor || '#2563EB' },
-                                downloadingContratoTipo === 'contrato' && { opacity: 0.7 }
-                              ]}
-                              onPress={() => handleDownloadContrato('contrato')}
-                              disabled={downloadingContratoTipo !== null}
-                              activeOpacity={0.75}
-                            >
-                              {downloadingContratoTipo === 'contrato' ? (
-                                <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 8 }} />
-                              ) : (
-                                <Download size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
-                              )}
-                              <Text style={styles.contratoPrimaryBtnText}>
-                                {downloadingContratoTipo === 'contrato' ? 'Baixando Contrato...' : 'Baixar Contrato'}
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[
-                                styles.contratoSecondaryBtn,
-                                downloadingContratoTipo === 'termoadesao' && { opacity: 0.7 }
-                              ]}
-                              onPress={() => handleDownloadContrato('termoadesao')}
-                              disabled={downloadingContratoTipo !== null}
-                              activeOpacity={0.75}
-                            >
-                              {downloadingContratoTipo === 'termoadesao' ? (
-                                <ActivityIndicator size="small" color={primaryColor || '#60A5FA'} style={{ marginRight: 8 }} />
-                              ) : (
-                                <FileCheck size={18} color={primaryColor || '#60A5FA'} style={{ marginRight: 8 }} />
-                              )}
-                              <Text style={[styles.contratoSecondaryBtnText, { color: primaryColor || '#60A5FA' }]}>
-                                {downloadingContratoTipo === 'termoadesao' ? 'Baixando Termo...' : 'Baixar Termo de Adesão'}
-                              </Text>
-                            </TouchableOpacity>
                           </View>
                         </View>
 
@@ -7797,44 +7601,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
 
-  /* CONTRATO DOWNLOAD STYLES */
-  contratoActionsContainer: {
-    gap: 10,
-    marginTop: 4,
-  },
-  contratoPrimaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  contratoPrimaryBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  contratoSecondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  contratoSecondaryBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-  },
 
   /* FINANCEIRO TAB STYLES */
   financeiroTabWrapper: {
