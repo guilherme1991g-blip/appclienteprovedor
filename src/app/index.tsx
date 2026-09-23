@@ -838,6 +838,10 @@ export default function LoginScreen() {
         telefone_completo: phoneWith55 || cleanCpf,
         contrato_id: contractObj?.id || null,
         cpf: cleanCpf,
+        bairro: contractObj?.neighborhood || null,
+        cidade: contractObj?.city || null,
+        cliente_nome: contractObj?.clientName || null,
+        provedor_code: APP_CONFIG.PROVIDER_CODE || null,
       });
 
       const { error } = await supabase.from('push_tokens').upsert({
@@ -845,6 +849,10 @@ export default function LoginScreen() {
         telefone_completo: phoneWith55 || cleanCpf,
         contrato_id: contractObj?.id || null,
         cpf: cleanCpf,
+        bairro: contractObj?.neighborhood || null,
+        cidade: contractObj?.city || null,
+        cliente_nome: contractObj?.clientName || null,
+        provedor_code: APP_CONFIG.PROVIDER_CODE || null,
         push_token: expoPushToken,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'telefone' });
