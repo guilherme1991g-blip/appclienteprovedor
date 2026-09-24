@@ -35,6 +35,11 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {},
+    "production:webconnect": {
+      "ios": {
+        "ascAppId": "6808270079"
+      }
+    }
   }
 }
