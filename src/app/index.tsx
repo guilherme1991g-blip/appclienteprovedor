@@ -3270,70 +3270,116 @@ export default function LoginScreen() {
               return (
                 <View style={[styles.dashboardWrapper, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF' }]}>
                   
-                  {/* TOP HEADER BAR (Sleek layout with initials avatar and metadata badges) */}
-                  <View style={[styles.dashboardHeader, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
-                    <View style={styles.headerInfoLeft}>
-                      <View style={styles.avatarRow}>
-                        <View style={styles.avatarCircle}>
-                          <Text style={styles.avatarText}>
-                            {firstName.substring(0, 1).toUpperCase()}
-                          </Text>
-                        </View>
-                        <View style={styles.headerGreetingCol}>
-                          <Text style={[styles.headerGreeting, activeTab === 'CLUBE' && { color: '#0F172A' }]}>Olá, {firstName}!</Text>
-                          <Text style={[styles.headerMetaText, activeTab === 'CLUBE' && { color: '#64748B' }]}>Contrato: #{selectedContract.id}</Text>
-                        </View>
+                  {/* TOP HEADER BAR */}
+                  {activeTab === 'CLUBE' ? (
+                    <View style={[styles.dashboardHeader, { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingVertical: 10 }]}>
+                      {/* Botão de Voltar */}
+                      <TouchableOpacity
+                        style={[styles.logoutButton, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
+                        onPress={handleGoHome}
+                        activeOpacity={0.7}
+                      >
+                        <ArrowLeft size={18} color="#0F172A" />
+                      </TouchableOpacity>
+
+                      <View style={{ flex: 1, marginLeft: 12 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                          Clube de Desconto
+                        </Text>
+                      </View>
+
+                      {/* Sininho e Botão de Sair */}
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity
+                          style={[styles.logoutButton, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
+                          onPress={handleOpenNotificationCenter}
+                          activeOpacity={0.7}
+                        >
+                          <Bell size={16} color={unreadCount > 0 ? "#EF4444" : "#2563EB"} />
+                          {unreadCount > 0 && (
+                            <View style={styles.unreadBadgeDot}>
+                              <Text style={styles.unreadBadgeText}>
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                              </Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.logoutButton, { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
+                          onPress={handleLogout}
+                          activeOpacity={0.7}
+                        >
+                          <LogOut size={16} color="#EF4444" />
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                      <TouchableOpacity
-                        style={[styles.logoutButton, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
-                        onPress={handleOpenNotificationCenter}
-                        activeOpacity={0.7}
-                      >
-                        <Bell size={16} color={unreadCount > 0 ? "#EF4444" : "#2563EB"} />
-                        {unreadCount > 0 && (
-                          <View style={styles.unreadBadgeDot}>
-                            <Text style={styles.unreadBadgeText}>
-                              {unreadCount > 9 ? '9+' : unreadCount}
-                            </Text>
+                  ) : (
+                    <>
+                      <View style={styles.dashboardHeader}>
+                        <View style={styles.headerInfoLeft}>
+                          <View style={styles.avatarRow}>
+                            <View style={styles.avatarCircle}>
+                              <Text style={styles.avatarText}>
+                                {firstName.substring(0, 1).toUpperCase()}
+                              </Text>
+                            </View>
+                            <View style={styles.headerGreetingCol}>
+                              <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
+                              <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
+                            </View>
                           </View>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.logoutButton, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
-                        onPress={handleLogout}
-                        activeOpacity={0.7}
-                      >
-                        <LogOut size={16} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TouchableOpacity
+                            style={styles.logoutButton}
+                            onPress={handleOpenNotificationCenter}
+                            activeOpacity={0.7}
+                          >
+                            <Bell size={16} color={unreadCount > 0 ? "#EF4444" : "#2563EB"} />
+                            {unreadCount > 0 && (
+                              <View style={styles.unreadBadgeDot}>
+                                <Text style={styles.unreadBadgeText}>
+                                  {unreadCount > 9 ? '9+' : unreadCount}
+                                </Text>
+                              </View>
+                            )}
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            style={styles.logoutButton}
+                            onPress={handleLogout}
+                            activeOpacity={0.7}
+                          >
+                            <LogOut size={16} color="#EF4444" />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
 
-                  {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
-                  <View style={[styles.badgesRow, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
-                    <View style={[styles.badgeItem, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
-                      <Wifi size={12} color="#2563EB" style={{ marginRight: 5 }} />
-                      <Text style={[styles.badgeText, activeTab === 'CLUBE' && { color: '#0F172A' }]} numberOfLines={1}>
-                        {selectedContract.planName.toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={[
-                      styles.statusBadgeItem,
-                      { backgroundColor: statusLower === 'ativo' ? '#10B98115' : '#F59E0B15' }
-                    ]}>
-                      <View style={[
-                        styles.statusDot,
-                        { backgroundColor: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
-                      ]} />
-                      <Text style={[
-                        styles.dashStatusBadgeText,
-                        { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
-                      ]}>
-                        {selectedContract.status.toUpperCase()}
-                      </Text>
-                    </View>
-                  </View>
+                      {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
+                      <View style={styles.badgesRow}>
+                        <View style={styles.badgeItem}>
+                          <Wifi size={12} color="#2563EB" style={{ marginRight: 5 }} />
+                          <Text style={styles.badgeText} numberOfLines={1}>
+                            {selectedContract.planName.toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={[
+                          styles.statusBadgeItem,
+                          { backgroundColor: statusLower === 'ativo' ? '#10B98115' : '#F59E0B15' }
+                        ]}>
+                          <View style={[
+                            styles.statusDot,
+                            { backgroundColor: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
+                          ]} />
+                          <Text style={[
+                            styles.dashStatusBadgeText,
+                            { color: statusLower === 'ativo' ? '#10B981' : '#F59E0B' }
+                          ]}>
+                            {selectedContract.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                    </>
+                  )}
 
                   {/* CENTER CONTENT AREA (Scrolls independently inside dashboard) */}
                   <ScrollView 
