@@ -1,5 +1,5 @@
 // src/services/googleSheets.ts
-// Integração dinâmica com Google Sheets para a vitrine do Clube de Desconto
+// Integração dinâmica com Google Sheets para a vitrine do Clube de Desconto (com suporte a múltiplas abas/folhas)
 
 export interface ClubeProduct {
   id: string;
@@ -12,38 +12,98 @@ export interface ClubeProduct {
   category?: string;
   badge?: string;
   description?: string;
+  sheetTab?: string;
+}
+
+export interface SheetTab {
+  name: string;
+  gid: string;
 }
 
 // URL padrão da planilha do Google Sheets configurada pelo usuário
 export const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1x9iANkItmf_GCXzELhd6fbzzevM1tYyVo_JQ3j71PN0/edit?usp=sharing';
 
+// Abas conhecidas da planilha oficial do usuário como fallback seguro
+export const DEFAULT_KNOWN_TABS: SheetTab[] = [
+  { name: 'calcados rolpas e bolsa', gid: '0' },
+  { name: 'celulares', gid: '427205087' },
+  { name: 'Tv', gid: '733253340' },
+  { name: 'Ferramenta', gid: '965243209' },
+];
+
 const ML_AFFILIATE_TOOL = '14392997';
 const ML_AFFILIATE_WORD = 'ge20260720212555432';
 
 /**
+ * Extrai o ID da planilha do Google a partir de qualquer formato de link
+ */
+export function extractSpreadsheetId(inputUrlOrId: string): string {
+  if (!inputUrlOrId) return '';
+  const trimmed = inputUrlOrId.trim();
+  const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (match) return match[1];
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(trimmed)) return trimmed;
+  return '';
+}
+
+/**
+ * Descobre dinamicamente todas as abas (folhas) de uma planilha do Google Sheets
+ */
+export async function discoverSheetTabs(spreadsheetId: string): Promise<SheetTab[]> {
+  if (!spreadsheetId) return DEFAULT_KNOWN_TABS;
+  try {
+    const htmlUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/htmlview`;
+    const res = await fetch(htmlUrl, {
+      headers: {
+        'Cache-Control': 'no-cache',
+      },
+    });
+    if (!res.ok) return DEFAULT_KNOWN_TABS;
+    const html = await res.text();
+    const regex = /items\.push\({\s*name:\s*"([^"]+)"[^}]+gid:\s*"([0-9-]+)"/g;
+    const tabs: SheetTab[] = [];
+    let match;
+    while ((match = regex.exec(html)) !== null) {
+      tabs.push({ name: match[1].trim(), gid: match[2].trim() });
+    }
+    return tabs.length > 0 ? tabs : DEFAULT_KNOWN_TABS;
+  } catch (err) {
+    console.warn('Erro ao descobrir abas da planilha:', err);
+    return DEFAULT_KNOWN_TABS;
+  }
+}
+
+/**
  * Converte qualquer formato de URL do Google Sheets para a URL de exportação pública CSV
  */
-export function getGoogleSheetCsvUrl(inputUrlOrId: string): string {
+export function getGoogleSheetCsvUrl(inputUrlOrId: string, gid?: string): string {
   if (!inputUrlOrId) return '';
   const trimmed = inputUrlOrId.trim();
 
   // Caso seja URL de "Publicar na Web" (pubhtml ou pub)
   if (trimmed.includes('/pubhtml') || trimmed.includes('/pub?')) {
-    return trimmed.replace(/\/pubhtml.*$/, '/pub?output=csv').replace(/output=[^&]+/, 'output=csv');
+    let url = trimmed.replace(/\/pubhtml.*$/, '/pub?output=csv').replace(/output=[^&]+/, 'output=csv');
+    if (gid && !url.includes('gid=')) {
+      url += `&gid=${gid}`;
+    }
+    return url;
   }
 
   // Caso seja link padrão do Google Sheets (ex: https://docs.google.com/spreadsheets/d/ID/edit...)
   const match = trimmed.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
   const gidMatch = trimmed.match(/[#&?]gid=([0-9]+)/);
+  const targetGid = gid !== undefined ? gid : (gidMatch ? gidMatch[1] : undefined);
+
   if (match) {
     const id = match[1];
-    const gid = gidMatch ? `&gid=${gidMatch[1]}` : '';
-    return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv${gid}`;
+    const gidParam = targetGid !== undefined ? `&gid=${targetGid}` : '';
+    return `https://docs.google.com/spreadsheets/d/${id}/export?format=csv${gidParam}`;
   }
 
   // Caso seja apenas o ID bruto da planilha
   if (/^[a-zA-Z0-9-_]{20,}$/.test(trimmed)) {
-    return `https://docs.google.com/spreadsheets/d/${trimmed}/export?format=csv`;
+    const gidParam = targetGid !== undefined ? `?format=csv&gid=${targetGid}` : '?format=csv';
+    return `https://docs.google.com/spreadsheets/d/${trimmed}/export${gidParam}`;
   }
 
   return trimmed;
@@ -244,32 +304,40 @@ export function inferCategory(title: string): string {
     return 'Acessórios';
   }
 
-  return 'Outros';
+  return 'Moda & Vestuário';
 }
 
 /**
- * Busca e converte os produtos da planilha do Google Sheets
+ * Define a categoria principal do produto com base na aba da planilha e título
  */
-export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubeProduct[]> {
-  const targetUrl = (sheetUrlOrId && sheetUrlOrId.trim()) ? sheetUrlOrId.trim() : DEFAULT_GOOGLE_SHEETS_URL;
-  if (!targetUrl || targetUrl.trim().length === 0) {
-    return [];
+export function resolveCategory(tabName: string, title: string, explicitCategory?: string): string {
+  if (explicitCategory && explicitCategory.trim() && explicitCategory.trim() !== 'Geral') {
+    return explicitCategory.trim();
   }
 
-  const csvUrl = getGoogleSheetCsvUrl(targetUrl);
-  const response = await fetch(csvUrl, {
-    headers: {
-      'Cache-Control': 'no-cache',
-    },
-  });
+  const cleanTab = tabName.toLowerCase().trim();
 
-  if (!response.ok) {
-    throw new Error(`Falha ao acessar planilha: HTTP ${response.status}`);
+  if (cleanTab.includes('celular') || cleanTab.includes('smartphone')) {
+    return 'Celulares';
+  }
+  if (cleanTab.includes('tv') || cleanTab.includes('televis')) {
+    return 'Smart TVs';
+  }
+  if (cleanTab.includes('ferramenta')) {
+    return 'Ferramentas';
+  }
+  if (cleanTab.includes('calcado') || cleanTab.includes('roupa') || cleanTab.includes('bolsa')) {
+    return inferCategory(title);
   }
 
-  const csvText = await response.text();
+  return tabName.charAt(0).toUpperCase() + tabName.slice(1);
+}
+
+/**
+ * Processa o CSV de uma aba e converte em produtos tipados
+ */
+function parseSheetCsvRecords(csvText: string, tab: SheetTab): ClubeProduct[] {
   const records = parseCsv(csvText);
-
   const products: ClubeProduct[] = [];
 
   records.forEach((rec, index) => {
@@ -291,9 +359,9 @@ export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubePr
     // 4. Imagem (com fallback posicional da coluna 5)
     const imageRaw = findField(rec, ['imagem', 'image', 'foto', 'foto_url', 'img', 'link_imagem', 'foto_link']) || rec._row[5] || '';
 
-    // 5. Categoria (com inferência automática se não informada)
+    // 5. Categoria (baseada na aba da planilha e título)
     const explicitCategory = findField(rec, ['categoria', 'category', 'departamento', 'secao', 'tipo']);
-    const category = (explicitCategory && explicitCategory !== 'Geral') ? explicitCategory : inferCategory(title);
+    const category = resolveCategory(tab.name, title, explicitCategory);
 
     // 6. Badge em destaque (ex: Oferta imperdível se desconto for alto)
     let badge = findField(rec, ['badge', 'destaque', 'tag', 'selo', 'tipo_destaque']);
@@ -307,14 +375,15 @@ export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubePr
     }
 
     const description = findField(rec, ['descricao', 'description', 'desc', 'detalhes']);
-    const codeId = findField(rec, ['codigo', 'id', 'cod']) || rec._row[0] || `sheet_p_${index + 1}`;
+    const rawId = findField(rec, ['codigo', 'id', 'cod']) || rec._row[0] || `item_${index + 1}`;
+    const uniqueId = `${tab.gid}_${rawId}`;
 
     const discount = discountRaw
       ? (discountRaw.includes('%') || discountRaw.toUpperCase().includes('OFF') ? discountRaw : `${discountRaw}% OFF`)
       : undefined;
 
     products.push({
-      id: codeId,
+      id: uniqueId,
       title: title || 'Oferta Exclusiva',
       price: formatPrice(priceRaw),
       originalPrice: originalPriceRaw ? formatPrice(originalPriceRaw) : undefined,
@@ -324,8 +393,63 @@ export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubePr
       category: category || 'Geral',
       badge: badge || undefined,
       description: description || undefined,
+      sheetTab: tab.name,
     });
   });
 
   return products;
+}
+
+/**
+ * Busca e converte os produtos de TODAS as abas (folhas) da planilha do Google Sheets
+ */
+export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubeProduct[]> {
+  const targetUrl = (sheetUrlOrId && sheetUrlOrId.trim()) ? sheetUrlOrId.trim() : DEFAULT_GOOGLE_SHEETS_URL;
+  if (!targetUrl || targetUrl.trim().length === 0) {
+    return [];
+  }
+
+  const spreadsheetId = extractSpreadsheetId(targetUrl);
+  const gidMatch = targetUrl.match(/[#&?]gid=([0-9]+)/);
+
+  // Se o usuário passou uma URL com um gid específico diferente de 0, carrega somente aquela aba
+  if (gidMatch && gidMatch[1] !== '0') {
+    const specificGid = gidMatch[1];
+    const csvUrl = getGoogleSheetCsvUrl(targetUrl, specificGid);
+    const response = await fetch(csvUrl, { headers: { 'Cache-Control': 'no-cache' } });
+    if (!response.ok) {
+      throw new Error(`Falha ao acessar aba ${specificGid}: HTTP ${response.status}`);
+    }
+    const csvText = await response.text();
+    return parseSheetCsvRecords(csvText, { name: 'Ofertas', gid: specificGid });
+  }
+
+  // Caso contrário, descobre todas as abas (folhas) e carrega os produtos de todas elas
+  const tabs = await discoverSheetTabs(spreadsheetId);
+
+  const fetchPromises = tabs.map(async tab => {
+    try {
+      const csvUrl = getGoogleSheetCsvUrl(targetUrl, tab.gid);
+      const res = await fetch(csvUrl, {
+        headers: { 'Cache-Control': 'no-cache' },
+      });
+      if (!res.ok) {
+        console.warn(`Aba "${tab.name}" (gid: ${tab.gid}) retornou HTTP ${res.status}`);
+        return [];
+      }
+      const csvText = await res.text();
+      return parseSheetCsvRecords(csvText, tab);
+    } catch (err) {
+      console.warn(`Erro ao carregar aba "${tab.name}":`, err);
+      return [];
+    }
+  });
+
+  const results = await Promise.all(fetchPromises);
+  const allProducts: ClubeProduct[] = [];
+  results.forEach(tabProducts => {
+    allProducts.push(...tabProducts);
+  });
+
+  return allProducts;
 }
