@@ -6052,10 +6052,7 @@ export default function LoginScreen() {
                                       ) : null}
                                     </View>
 
-                                    <View style={[styles.clubeProductGridBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
-                                      <Text style={styles.clubeProductGridBuyBtnText}>Ver Oferta</Text>
-                                      <ExternalLink size={10} color="#FFFFFF" style={{ marginLeft: 3 }} />
-                                    </View>
+
                                   </View>
                                 </TouchableOpacity>
                               ))
