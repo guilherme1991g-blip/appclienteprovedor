@@ -6030,11 +6030,7 @@ export default function LoginScreen() {
 
                                   {/* Informações e Preço */}
                                   <View style={styles.clubeProductGridBody}>
-                                    {product.category && product.category !== 'Geral' && (
-                                      <Text style={styles.clubeProductCatLabel} numberOfLines={1}>
-                                        {product.category.toUpperCase()}{product.tvSizeGroup ? ` • ${product.tvSizeGroup}` : ''}
-                                      </Text>
-                                    )}
+
                                     <Text style={styles.clubeProductGridTitle} numberOfLines={2}>
                                       {product.title}
                                     </Text>
