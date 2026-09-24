@@ -9853,10 +9853,11 @@ const styles = StyleSheet.create({
     minHeight: 31,
   },
   clubeProductGridPrice: {
-    fontSize: 14.5,
+    fontSize: 17,
     fontWeight: '900',
-    color: '#00A650',
-    marginTop: 1,
+    color: '#0F172A',
+    letterSpacing: -0.3,
+    marginTop: 2,
   },
   clubeProductGridBuyBtn: {
     flexDirection: 'row',
@@ -9958,9 +9959,10 @@ const styles = StyleSheet.create({
     marginBottom: 1,
   },
   clubeProductPrice: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#00A650',
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
   clubeProductFooterRow: {
     flexDirection: 'row',
