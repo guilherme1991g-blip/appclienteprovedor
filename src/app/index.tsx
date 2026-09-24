@@ -5812,7 +5812,7 @@ export default function LoginScreen() {
                               <TextInput
                                 style={styles.clubeMarketplaceSearchInput}
                                 placeholder="Buscar produtos, marcas..."
-                                placeholderTextColor="#64748B"
+                                placeholderTextColor="#94A3B8"
                                 value={clubeSearchQuery}
                                 onChangeText={setClubeSearchQuery}
                                 returnKeyType="search"
@@ -5822,7 +5822,7 @@ export default function LoginScreen() {
                                   onPress={() => setClubeSearchQuery('')}
                                   style={{ padding: 4, marginRight: 2 }}
                                 >
-                                  <X size={15} color="#94A3B8" />
+                                  <X size={15} color="#64748B" />
                                 </TouchableOpacity>
                               )}
                               <TouchableOpacity
@@ -5830,7 +5830,7 @@ export default function LoginScreen() {
                                 style={{ padding: 6, marginRight: 4 }}
                                 activeOpacity={0.7}
                               >
-                                <RefreshCw size={13} color="#94A3B8" />
+                                <RefreshCw size={13} color="#64748B" />
                               </TouchableOpacity>
                             </View>
 
@@ -5846,10 +5846,10 @@ export default function LoginScreen() {
                               onPress={openFilterModal}
                               activeOpacity={0.8}
                             >
-                              <SlidersHorizontal size={15} color={activeFiltersCount > 0 ? (primaryColor || '#60A5FA') : '#94A3B8'} />
+                              <SlidersHorizontal size={15} color={activeFiltersCount > 0 ? (primaryColor || '#2563EB') : '#475569'} />
                               <Text style={[
                                 styles.clubeMarketplaceFilterBtnText,
-                                activeFiltersCount > 0 && { color: primaryColor || '#60A5FA', fontWeight: '800' }
+                                activeFiltersCount > 0 && { color: primaryColor || '#2563EB', fontWeight: '800' }
                               ]}>
                                 Filtros
                               </Text>
@@ -5945,8 +5945,8 @@ export default function LoginScreen() {
                                 onPress={resetClubeFilters}
                                 activeOpacity={0.7}
                               >
-                                <Text style={styles.clubeMarketplaceClearBtnText}>Limpar filtros</Text>
-                                <X size={11} color="#38BDF8" />
+                                <Text style={[styles.clubeMarketplaceClearBtnText, { color: primaryColor || '#2563EB' }]}>Limpar filtros</Text>
+                                <X size={11} color={primaryColor || '#2563EB'} />
                               </TouchableOpacity>
                             )}
                           </View>
@@ -5954,9 +5954,9 @@ export default function LoginScreen() {
                           {/* 5. LISTA DE PRODUTOS EM GRID (2 POR LINHA) */}
                           <View style={styles.clubeProductGridContainer}>
                             {loadingClubeProducts ? (
-                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 36 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 36, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
                                 <ActivityIndicator size="large" color={primaryColor || '#2563EB'} style={{ marginBottom: 12 }} />
-                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }}>
                                   Carregando as melhores ofertas...
                                 </Text>
                                 <Text style={{ fontSize: 12, color: '#64748B' }}>
@@ -5964,12 +5964,12 @@ export default function LoginScreen() {
                                 </Text>
                               </View>
                             ) : clubeProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
                                 <ShoppingBag size={36} color="#64748B" style={{ marginBottom: 10 }} />
-                                <Text style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginBottom: 4, textAlign: 'center' }}>
+                                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 4, textAlign: 'center' }}>
                                   Nenhuma oferta disponível no momento
                                 </Text>
-                                <Text style={{ fontSize: 12.5, color: '#94A3B8', textAlign: 'center', lineHeight: 18, marginBottom: 14 }}>
+                                <Text style={{ fontSize: 12.5, color: '#64748B', textAlign: 'center', lineHeight: 18, marginBottom: 14 }}>
                                   Novos produtos e promoções exclusivas serão adicionados em breve.
                                 </Text>
                                 <TouchableOpacity
@@ -5982,9 +5982,9 @@ export default function LoginScreen() {
                                 </TouchableOpacity>
                               </View>
                             ) : filteredProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 28 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 28, backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
                                 <ShoppingBag size={28} color="#64748B" style={{ marginBottom: 8 }} />
-                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }}>
                                   Nenhum produto encontrado
                                 </Text>
                                 <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center' }}>
@@ -6566,14 +6566,14 @@ export default function LoginScreen() {
                         {/* Header do Modal */}
                         <View style={styles.clubeModalHeader}>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <SlidersHorizontal size={18} color="#38BDF8" />
+                            <SlidersHorizontal size={18} color={primaryColor || '#2563EB'} />
                             <Text style={styles.clubeModalTitle}>Filtros e Ordenação</Text>
                           </View>
                           <TouchableOpacity
                             onPress={() => setIsClubeFilterModalOpen(false)}
                             style={{ padding: 6 }}
                           >
-                            <X size={20} color="#94A3B8" />
+                            <X size={20} color="#64748B" />
                           </TouchableOpacity>
                         </View>
 
@@ -9482,7 +9482,7 @@ const styles = StyleSheet.create({
     color: '#38BDF8',
   },
 
-  /* MARKETPLACE HEADER & BUSCA */
+  /* MARKETPLACE HEADER & BUSCA - TEMA CLARO */
   clubeMarketplaceHeaderRow: {
     width: '100%',
     maxWidth: 400,
@@ -9495,29 +9495,39 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#CBD5E1',
     borderRadius: 12,
     height: 40,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   clubeMarketplaceSearchInput: {
     flex: 1,
     fontSize: 12.5,
-    color: '#F8FAFC',
+    color: '#0F172A',
     paddingVertical: 0,
   },
   clubeMarketplaceFilterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#CBD5E1',
     height: 40,
     paddingHorizontal: 12,
     borderRadius: 12,
     position: 'relative',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   clubeMarketplaceFilterBtnActive: {
     borderWidth: 1.2,
@@ -9525,7 +9535,7 @@ const styles = StyleSheet.create({
   clubeMarketplaceFilterBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: '#1E293B',
   },
   clubeFilterActiveBadge: {
     width: 16,
@@ -9541,19 +9551,24 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
-  /* CARROSSEL DE CATEGORIAS */
+  /* CARROSSEL DE CATEGORIAS - TEMA CLARO */
   clubeCategoryCarouselWrapper: {
     width: '100%',
     maxWidth: 400,
     marginBottom: 8,
   },
   clubeCarouselCard: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#CBD5E1',
     paddingVertical: 7,
     paddingHorizontal: 14,
     borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1,
   },
   clubeCarouselCardActive: {
     borderWidth: 1,
@@ -9561,40 +9576,41 @@ const styles = StyleSheet.create({
   clubeCarouselCardText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#334155',
   },
   clubeCarouselCardTextActive: {
     color: '#FFFFFF',
     fontWeight: '800',
   },
 
-  /* SUB-CARROSSEL */
+  /* SUB-CARROSSEL - TEMA CLARO */
   clubeSubCarouselWrapper: {
     width: '100%',
     maxWidth: 400,
     marginBottom: 8,
   },
   clubeSubCarouselChip: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#E2E8F0',
     paddingVertical: 4,
     paddingHorizontal: 10,
     borderRadius: 12,
   },
   clubeSubCarouselChipActive: {
-    backgroundColor: '#1E293B',
+    backgroundColor: '#E2E8F0',
   },
   clubeSubCarouselChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#475569',
   },
   clubeSubCarouselChipTextActive: {
+    color: '#0F172A',
     fontWeight: '800',
   },
 
-  /* STATUS BAR */
+  /* STATUS BAR - TEMA CLARO */
   clubeMarketplaceStatusBar: {
     width: '100%',
     maxWidth: 400,
@@ -9607,13 +9623,13 @@ const styles = StyleSheet.create({
   clubeMarketplaceStatusBarText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#475569',
   },
   clubeMarketplaceClearBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#E2E8F0',
     paddingVertical: 2.5,
     paddingHorizontal: 7,
     borderRadius: 6,
@@ -9621,26 +9637,30 @@ const styles = StyleSheet.create({
   clubeMarketplaceClearBtnText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#38BDF8',
   },
 
-  /* MODAL DE FILTROS BOTTOM-SHEET */
+  /* MODAL DE FILTROS BOTTOM-SHEET - TEMA CLARO */
   clubeModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
   clubeModalContent: {
     width: '100%',
     maxWidth: 450,
-    backgroundColor: '#0B0F19',
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#E2E8F0',
     padding: 20,
     paddingBottom: 32,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 8,
   },
   clubeModalHeader: {
     flexDirection: 'row',
@@ -9648,13 +9668,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
+    borderBottomColor: '#E2E8F0',
     marginBottom: 16,
   },
   clubeModalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#0F172A',
   },
   clubeModalSectionTitle: {
     fontSize: 12,
@@ -9671,31 +9691,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#E2E8F0',
     paddingVertical: 11,
     paddingHorizontal: 14,
     borderRadius: 12,
   },
   clubeModalOptionItemSelected: {
-    backgroundColor: '#1E293B',
-    borderColor: '#38BDF8',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#2563EB',
   },
   clubeModalOptionText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#1E293B',
   },
   clubeModalOptionTextSelected: {
-    color: '#FFFFFF',
+    color: '#1D4ED8',
     fontWeight: '800',
   },
   clubeModalRadioDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#38BDF8',
+    backgroundColor: '#2563EB',
   },
   clubeModalChipsWrap: {
     flexDirection: 'row',
@@ -9703,24 +9723,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   clubeModalPriceChip: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#F8FAFC',
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: '#E2E8F0',
     paddingVertical: 8,
     paddingHorizontal: 13,
     borderRadius: 10,
   },
   clubeModalPriceChipSelected: {
-    backgroundColor: '#064E3B',
-    borderColor: '#10B981',
+    backgroundColor: '#ECFDF5',
+    borderColor: '#059669',
   },
   clubeModalPriceChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: '#334155',
   },
   clubeModalPriceChipTextSelected: {
-    color: '#34D399',
+    color: '#059669',
     fontWeight: '800',
   },
   clubeModalActionsRow: {
@@ -9730,19 +9750,19 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingTop: 14,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: '#E2E8F0',
   },
   clubeModalResetBtn: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 12,
-    backgroundColor: '#1E293B',
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
   },
   clubeModalResetBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#94A3B8',
+    color: '#475569',
   },
   clubeModalApplyBtn: {
     flex: 1,
@@ -9761,9 +9781,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 4,
     left: 4,
-    backgroundColor: '#0F172ACC',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#38BDF8',
+    borderColor: '#CBD5E1',
     paddingVertical: 2,
     paddingHorizontal: 5,
     borderRadius: 4,
@@ -9771,10 +9791,10 @@ const styles = StyleSheet.create({
   clubeTvSizeBadgeText: {
     fontSize: 8.5,
     fontWeight: '800',
-    color: '#38BDF8',
+    color: '#0F172A',
   },
 
-  /* GRID DE PRODUTOS (2 POR LINHA) */
+  /* GRID DE PRODUTOS (2 POR LINHA) - TEMA CLARO */
   clubeProductGridContainer: {
     width: '100%',
     maxWidth: 400,
@@ -9786,20 +9806,27 @@ const styles = StyleSheet.create({
   },
   clubeProductGridCard: {
     width: '48.5%',
-    backgroundColor: '#0F172A',
-    borderWidth: 1.2,
-    borderColor: '#1E293B',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     overflow: 'hidden',
     padding: 9,
     marginBottom: 4,
     justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   clubeProductGridImageContainer: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 10,
     backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
     overflow: 'hidden',
     position: 'relative',
     alignItems: 'center',
@@ -9817,14 +9844,14 @@ const styles = StyleSheet.create({
   clubeProductGridTitle: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#F8FAFC',
+    color: '#0F172A',
     lineHeight: 15.5,
     minHeight: 31,
   },
   clubeProductGridPrice: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: '900',
-    color: '#10B981',
+    color: '#00A650',
     marginTop: 1,
   },
   clubeProductGridBuyBtn: {
@@ -9922,14 +9949,14 @@ const styles = StyleSheet.create({
   },
   clubeProductOriginalPrice: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#94A3B8',
     textDecorationLine: 'line-through',
     marginBottom: 1,
   },
   clubeProductPrice: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#10B981',
+    color: '#00A650',
   },
   clubeProductFooterRow: {
     flexDirection: 'row',
