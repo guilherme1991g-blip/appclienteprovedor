@@ -3425,6 +3425,42 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
+                        {/* 🎁 BANNER CLUBE DE DESCONTO NO INÍCIO */}
+                        <TouchableOpacity
+                          style={styles.clubeHomeBanner}
+                          onPress={() => setActiveTab('CLUBE')}
+                          activeOpacity={0.88}
+                        >
+                          <View style={styles.clubeHomeBannerContent}>
+                            <View style={styles.clubeHomeBannerLeft}>
+                              <View style={styles.clubeHomeBannerTag}>
+                                <Flame size={12} color="#EF4444" />
+                                <Text style={styles.clubeHomeBannerTagText}>CLUBE DE DESCONTO</Text>
+                              </View>
+                              <Text style={styles.clubeHomeBannerTitle}>
+                                Economize até <Text style={{ color: '#FFE600' }}>70% OFF</Text>
+                              </Text>
+                              <Text style={styles.clubeHomeBannerSub}>
+                                TVs, Celulares, Ferramentas, Moda e muito mais com ofertas exclusivas.
+                              </Text>
+                              <View style={[styles.clubeHomeBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
+                                <Text style={styles.clubeHomeBannerBtnText}>Explorar Ofertas</Text>
+                                <ChevronRight size={13} color="#FFFFFF" />
+                              </View>
+                            </View>
+                            <View style={styles.clubeHomeBannerRight}>
+                              <View style={[styles.clubeHomeBannerIconCircle, { backgroundColor: '#FFE60020' }]}>
+                                <ShoppingBag size={28} color="#FFE600" />
+                              </View>
+                              {clubeProducts.length > 0 && (
+                                <View style={styles.clubeHomeBannerCountBadge}>
+                                  <Text style={styles.clubeHomeBannerCountText}>+{clubeProducts.length} ofertas</Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+
                         {/* 🎬 DYNAMIC IMAGE BANNERS FROM SUPABASE (MAX 3 - ONLY RENDER IF REGISTERED) */}
                         {providerConfig.banners && providerConfig.banners.length > 0 && (
                           <View style={{ width: '100%', maxWidth: 400, alignSelf: 'stretch', marginBottom: 16 }}>
@@ -3610,41 +3646,7 @@ export default function LoginScreen() {
                           </View>
                         ) : null}
 
-                                                {/* 🎁 BANNER CLUBE DE DESCONTO NO INÍCIO */}
-                        <TouchableOpacity
-                          style={styles.clubeHomeBanner}
-                          onPress={() => setActiveTab('CLUBE')}
-                          activeOpacity={0.88}
-                        >
-                          <View style={styles.clubeHomeBannerContent}>
-                            <View style={styles.clubeHomeBannerLeft}>
-                              <View style={styles.clubeHomeBannerTag}>
-                                <Flame size={12} color="#EF4444" />
-                                <Text style={styles.clubeHomeBannerTagText}>CLUBE DE DESCONTO</Text>
-                              </View>
-                              <Text style={styles.clubeHomeBannerTitle}>
-                                Economize até <Text style={{ color: '#FFE600' }}>70% OFF</Text>
-                              </Text>
-                              <Text style={styles.clubeHomeBannerSub}>
-                                TVs, Celulares, Ferramentas, Moda e muito mais com ofertas exclusivas.
-                              </Text>
-                              <View style={[styles.clubeHomeBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
-                                <Text style={styles.clubeHomeBannerBtnText}>Explorar Ofertas</Text>
-                                <ChevronRight size={13} color="#FFFFFF" />
-                              </View>
-                            </View>
-                            <View style={styles.clubeHomeBannerRight}>
-                              <View style={[styles.clubeHomeBannerIconCircle, { backgroundColor: '#FFE60020' }]}>
-                                <ShoppingBag size={28} color="#FFE600" />
-                              </View>
-                              {clubeProducts.length > 0 && (
-                                <View style={styles.clubeHomeBannerCountBadge}>
-                                  <Text style={styles.clubeHomeBannerCountText}>+{clubeProducts.length} ofertas</Text>
-                                </View>
-                              )}
-                            </View>
-                          </View>
-                        </TouchableOpacity>
+                                                
 
                         {/* 1. NEXT BILL / OVERDUE CARD */}
                         {(() => {
