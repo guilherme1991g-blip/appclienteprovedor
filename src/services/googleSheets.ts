@@ -5,6 +5,7 @@ export interface ClubeProduct {
   id: string;
   title: string;
   price: string;
+  priceNumber?: number;
   originalPrice?: string;
   discount?: string;
   discountNumber?: number;
@@ -12,6 +13,7 @@ export interface ClubeProduct {
   url: string;
   category?: string;
   subcategory?: string;
+  tvSizeGroup?: string;
   badge?: string;
   description?: string;
   sheetTab?: string;
@@ -271,6 +273,40 @@ function formatPrice(value: string): string {
 }
 
 /**
+ * Converte valor de preço textual brasileiro ou numérico para número (ex: "R$ 1.499" -> 1499, "R$ 78,11" -> 78.11)
+ */
+export function parsePriceNumber(priceStr: string | number): number {
+  if (typeof priceStr === 'number') return isNaN(priceStr) ? 0 : priceStr;
+  if (!priceStr) return 0;
+  const clean = String(priceStr).replace(/[^\d.,]/g, '').trim();
+  if (clean.includes(',')) {
+    const parts = clean.split(',');
+    const whole = parts[0].replace(/\./g, '');
+    const decimal = parts[1];
+    return parseFloat(`${whole}.${decimal}`) || 0;
+  }
+  const whole = clean.replace(/\./g, '');
+  return parseFloat(whole) || 0;
+}
+
+/**
+ * Extrai o grupo de tamanho de tela para TVs a partir do título
+ */
+export function extractTvSizeGroup(title: string): string | undefined {
+  if (!title) return undefined;
+  const regexExplicit = /\b(24|32|40|42|43|50|55|58|60|65|70|75|85)\s*(?:''|"|”|polegadas?|pol)?\b/i;
+  const match = title.match(regexExplicit);
+  if (match) {
+    const inches = parseInt(match[1], 10);
+    if (inches <= 32) return 'Até 32"';
+    if (inches <= 43) return '40" a 43"';
+    if (inches <= 55) return '50" a 55"';
+    return '60" ou mais';
+  }
+  return undefined;
+}
+
+/**
  * Infere a categoria do produto com base no título caso a planilha não tenha coluna explícita
  */
 export function inferCategory(title: string): string {
@@ -426,10 +462,15 @@ function parseSheetCsvRecords(csvText: string, tab: SheetTab): ClubeProduct[] {
       ? (discountRaw.includes('%') || discountRaw.toUpperCase().includes('OFF') ? discountRaw : `${discountRaw}% OFF`)
       : undefined;
 
+    const priceNumber = parsePriceNumber(priceRaw);
+    const isTv = tab.name.toLowerCase().includes('tv') || tab.name.toLowerCase().includes('televis') || category === 'Smart TVs';
+    const tvSizeGroup = isTv ? extractTvSizeGroup(title) : undefined;
+
     products.push({
       id: uniqueId,
       title: title || 'Oferta Exclusiva',
       price: formatPrice(priceRaw),
+      priceNumber: priceNumber > 0 ? priceNumber : undefined,
       originalPrice: originalPriceRaw ? formatPrice(originalPriceRaw) : undefined,
       discount: discount,
       discountNumber,
@@ -437,6 +478,7 @@ function parseSheetCsvRecords(csvText: string, tab: SheetTab): ClubeProduct[] {
       url: formatProductLink(urlRaw),
       category: category || 'Geral',
       subcategory: subcategory || 'Geral',
+      tvSizeGroup,
       badge: badge || undefined,
       description: description || undefined,
       sheetTab: tab.name,
