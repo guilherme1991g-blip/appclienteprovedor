@@ -14,8 +14,8 @@ export interface ClubeProduct {
   description?: string;
 }
 
-// URL padrão da planilha do Google Sheets (pode ser sobrescrita pelo link fornecido pelo usuário)
-export const DEFAULT_GOOGLE_SHEETS_URL = '';
+// URL padrão da planilha do Google Sheets configurada pelo usuário
+export const DEFAULT_GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1x9iANkItmf_GCXzELhd6fbzzevM1tYyVo_JQ3j71PN0/edit?usp=sharing';
 
 const ML_AFFILIATE_TOOL = '14392997';
 const ML_AFFILIATE_WORD = 'ge20260720212555432';
@@ -54,23 +54,35 @@ export function getGoogleSheetCsvUrl(inputUrlOrId: string): string {
  */
 export function formatProductLink(url: string): string {
   if (!url) return 'https://www.mercadolivre.com.br';
-  const cleanUrl = url.trim();
+  let cleanUrl = url.trim();
 
   // Se for Mercado Livre e ainda não tiver os parâmetros de afiliado
   if (cleanUrl.includes('mercadolivre.com.br') || cleanUrl.includes('meli.la')) {
     if (!cleanUrl.includes('matt_tool')) {
-      const separator = cleanUrl.includes('?') ? '&' : '?';
-      return `${cleanUrl}${separator}matt_tool=${ML_AFFILIATE_TOOL}&matt_word=${ML_AFFILIATE_WORD}&forceInApp=true`;
+      const hashIndex = cleanUrl.indexOf('#');
+      let base = cleanUrl;
+      let hash = '';
+      if (hashIndex !== -1) {
+        base = cleanUrl.substring(0, hashIndex);
+        hash = cleanUrl.substring(hashIndex);
+      }
+      const separator = base.includes('?') ? '&' : '?';
+      cleanUrl = `${base}${separator}matt_tool=${ML_AFFILIATE_TOOL}&matt_word=${ML_AFFILIATE_WORD}&forceInApp=true${hash}`;
     }
   }
 
   return cleanUrl;
 }
 
+interface CsvParsedRecord {
+  _row: string[];
+  [header: string]: any;
+}
+
 /**
  * Parser de CSV robusto (respeita quebras de linha e vírgulas dentro de aspas)
  */
-function parseCsv(csvText: string): Record<string, string>[] {
+function parseCsv(csvText: string): CsvParsedRecord[] {
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentCell = '';
@@ -130,10 +142,10 @@ function parseCsv(csvText: string): Record<string, string>[] {
       .replace(/^_|_$/g, '')
   );
 
-  const data: Record<string, string>[] = [];
+  const data: CsvParsedRecord[] = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    const record: Record<string, string> = {};
+    const record: CsvParsedRecord = { _row: row };
     for (let c = 0; c < headers.length; c++) {
       record[headers[c]] = row[c] !== undefined ? row[c] : '';
     }
@@ -145,16 +157,39 @@ function parseCsv(csvText: string): Record<string, string>[] {
 
 /**
  * Localiza o valor de um campo a partir de vários nomes possíveis de colunas
+ * Prioriza buscas exatas para evitar colisão entre preco_original e preco_atual.
  */
-function findField(record: Record<string, string>, possibleNames: string[]): string {
+function findField(record: CsvParsedRecord, possibleNames: string[]): string {
+  const keys = Object.keys(record);
+
+  // 1. Busca exata de cabeçalho
   for (const name of possibleNames) {
     const cleanName = name.toLowerCase();
-    // Busca exata ou que contenha o nome
-    const key = Object.keys(record).find(k => k === cleanName || k.includes(cleanName));
-    if (key && record[key]) {
-      return record[key].trim();
+    const exactKey = keys.find(k => k === cleanName);
+    if (exactKey && record[exactKey] && String(record[exactKey]).trim()) {
+      return String(record[exactKey]).trim();
     }
   }
+
+  // 2. Busca parcial segura
+  for (const name of possibleNames) {
+    const cleanName = name.toLowerCase();
+    const partialKey = keys.find(k => {
+      if (!k.includes(cleanName)) return false;
+      // Prevenir colisão: se busca preço atual, não aceitar colunas com 'original', 'antigo' ou 'de'
+      if (
+        (cleanName === 'preco' || cleanName === 'preco_atual' || cleanName === 'price' || cleanName === 'por') &&
+        (k.includes('original') || k.includes('antigo') || k.includes('de'))
+      ) {
+        return false;
+      }
+      return true;
+    });
+    if (partialKey && record[partialKey] && String(record[partialKey]).trim()) {
+      return String(record[partialKey]).trim();
+    }
+  }
+
   return '';
 }
 
@@ -174,10 +209,49 @@ function formatPrice(value: string): string {
 }
 
 /**
+ * Infere a categoria do produto com base no título caso a planilha não tenha coluna explícita
+ */
+export function inferCategory(title: string): string {
+  const t = title.toLowerCase();
+
+  // Calçados
+  if (/(t[eê]nis|sapat[eê]nis|chinelo|botina|bota|sand[aá]lia|sapato|cal[cç]ado|crocs)/i.test(t)) {
+    return 'Calçados';
+  }
+
+  // Mochilas e Bolsas
+  if (/(mochila|bolsa|mala|carteira|pochete|porta[- ]notebook)/i.test(t)) {
+    return 'Mochilas & Bolsas';
+  }
+
+  // Esporte & Fitness
+  if (/(fitness|treino|academia|dry[\s-]?fit|t[eé]rmica|legging|corrida|prote[cç][aã]o uv)/i.test(t)) {
+    return 'Esporte & Fitness';
+  }
+
+  // Moda Feminina
+  if (/(feminina|feminino|mulher|saia|vestido|calcinha|cropped|pantalona|blusinha|flare)/i.test(t)) {
+    return 'Moda Feminina';
+  }
+
+  // Moda Masculina
+  if (/(masculin[oa]|homem|sunga|cueca|bermuda|camisa|camiseta|cal[cç]a|short)/i.test(t)) {
+    return 'Moda Masculina';
+  }
+
+  // Acessórios
+  if (/(meia|meias|[oó]culos|bon[eé]|rel[oó]gio|cinto|roup[aã]o)/i.test(t)) {
+    return 'Acessórios';
+  }
+
+  return 'Outros';
+}
+
+/**
  * Busca e converte os produtos da planilha do Google Sheets
  */
 export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubeProduct[]> {
-  const targetUrl = sheetUrlOrId || DEFAULT_GOOGLE_SHEETS_URL;
+  const targetUrl = (sheetUrlOrId && sheetUrlOrId.trim()) ? sheetUrlOrId.trim() : DEFAULT_GOOGLE_SHEETS_URL;
   if (!targetUrl || targetUrl.trim().length === 0) {
     return [];
   }
@@ -199,27 +273,53 @@ export async function fetchSheetProducts(sheetUrlOrId?: string): Promise<ClubePr
   const products: ClubeProduct[] = [];
 
   records.forEach((rec, index) => {
-    const title = findField(rec, ['titulo', 'title', 'nome', 'produto', 'name', 'item']);
-    const priceRaw = findField(rec, ['preco', 'price', 'valor', 'por', 'preco_atual']);
-    const urlRaw = findField(rec, ['link', 'url', 'link_produto', 'afiliado', 'loja', 'href']);
+    // 1. Título do produto (com fallback posicional da coluna 1)
+    const rawTitle = findField(rec, ['nome', 'titulo', 'title', 'produto', 'name', 'item']) || rec._row[1] || '';
+    const title = rawTitle.replace(/\s+/g, ' ').trim();
+
+    // 2. Link do produto (com fallback posicional da coluna 6)
+    const urlRaw = findField(rec, ['link_do_produto', 'link', 'url', 'link_produto', 'afiliado', 'loja', 'href']) || rec._row[6] || '';
 
     // Só inclui se tiver pelo menos título ou link
     if (!title && !urlRaw) return;
 
-    const originalPriceRaw = findField(rec, ['preco_antigo', 'preco_original', 'original_price', 'de', 'valor_antigo']);
-    const discount = findField(rec, ['desconto', 'discount', 'off', 'pct', 'porcentagem']);
-    const image = findField(rec, ['imagem', 'image', 'foto', 'foto_url', 'img', 'link_imagem', 'foto_link']);
-    const category = findField(rec, ['categoria', 'category', 'departamento', 'secao', 'tipo']);
-    const badge = findField(rec, ['badge', 'destaque', 'tag', 'selo', 'tipo_destaque']);
+    // 3. Preços e Desconto (com fallbacks posicionais das colunas 2, 3 e 4)
+    const originalPriceRaw = findField(rec, ['preco_original', 'preco_antigo', 'original_price', 'de', 'valor_antigo']) || rec._row[2] || '';
+    const priceRaw = findField(rec, ['preco_atual', 'por', 'preco_promocional', 'preco_final', 'valor_atual', 'preco', 'price', 'valor']) || rec._row[3] || '';
+    const discountRaw = findField(rec, ['desconto', 'discount', 'off', 'pct', 'porcentagem']) || rec._row[4] || '';
+
+    // 4. Imagem (com fallback posicional da coluna 5)
+    const imageRaw = findField(rec, ['imagem', 'image', 'foto', 'foto_url', 'img', 'link_imagem', 'foto_link']) || rec._row[5] || '';
+
+    // 5. Categoria (com inferência automática se não informada)
+    const explicitCategory = findField(rec, ['categoria', 'category', 'departamento', 'secao', 'tipo']);
+    const category = (explicitCategory && explicitCategory !== 'Geral') ? explicitCategory : inferCategory(title);
+
+    // 6. Badge em destaque (ex: Oferta imperdível se desconto for alto)
+    let badge = findField(rec, ['badge', 'destaque', 'tag', 'selo', 'tipo_destaque']);
+    if (!badge && discountRaw) {
+      const discountNumber = parseInt(discountRaw.replace(/\D/g, ''), 10);
+      if (discountNumber >= 65) {
+        badge = 'OFERTA IMPERDÍVEL';
+      } else if (discountNumber >= 50) {
+        badge = 'SUPER DESCONTO';
+      }
+    }
+
     const description = findField(rec, ['descricao', 'description', 'desc', 'detalhes']);
+    const codeId = findField(rec, ['codigo', 'id', 'cod']) || rec._row[0] || `sheet_p_${index + 1}`;
+
+    const discount = discountRaw
+      ? (discountRaw.includes('%') || discountRaw.toUpperCase().includes('OFF') ? discountRaw : `${discountRaw}% OFF`)
+      : undefined;
 
     products.push({
-      id: `sheet_p_${index + 1}`,
+      id: codeId,
       title: title || 'Oferta Exclusiva',
       price: formatPrice(priceRaw),
       originalPrice: originalPriceRaw ? formatPrice(originalPriceRaw) : undefined,
-      discount: discount ? (discount.includes('%') || discount.toUpperCase().includes('OFF') ? discount : `${discount}% OFF`) : undefined,
-      image: image || undefined,
+      discount: discount,
+      image: imageRaw || undefined,
       url: formatProductLink(urlRaw),
       category: category || 'Geral',
       badge: badge || undefined,
