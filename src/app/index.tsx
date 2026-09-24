@@ -5698,20 +5698,21 @@ export default function LoginScreen() {
                         { id: 'price_desc', label: 'Maior Preço' },
                       ];
 
-                      // 3. Filtragem dos produtos
+                      // 3. Filtragem dos produtos (Busca global independente de categoria)
+                      const query = clubeSearchQuery.toLowerCase().trim();
+
                       let filteredProducts = clubeProducts.filter(p => {
-                        // Busca textual
-                        const query = clubeSearchQuery.toLowerCase().trim();
+                        // Se houver busca textual, pesquisa em todo o catálogo de produtos independente da categoria
                         if (query) {
                           const matchesSearch =
                             p.title.toLowerCase().includes(query) ||
                             (p.category && p.category.toLowerCase().includes(query)) ||
                             (p.subcategory && p.subcategory.toLowerCase().includes(query)) ||
-                            (p.description && p.description.toLowerCase().includes(query));
+                            (p.description && p.description.toLowerCase().includes(query)) ||
+                            (p.sheetTab && p.sheetTab.toLowerCase().includes(query));
                           if (!matchesSearch) return false;
-                        }
-
-                        // Filtro de Categoria e Subcategoria
+                        } else {
+                          // Sem busca ativa: aplica filtro de Categoria e Subcategoria selecionadas
                         if (clubeCategory === 'destaques') {
                           if (clubeSubcategory === '50_off') {
                             if ((p.discountNumber || 0) < 50) return false;
@@ -5766,6 +5767,8 @@ export default function LoginScreen() {
                           if (clubeSubcategory !== 'todas') {
                             if (p.subcategory?.toLowerCase() !== clubeSubcategory.toLowerCase()) return false;
                           }
+                        }
+
                         }
 
                         // Filtro de Faixa de Preço
