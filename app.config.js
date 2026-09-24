@@ -1,9 +1,24 @@
 const providers = require('./providers.config');
 
 module.exports = ({ config }) => {
-  const providerKey = (process.env.APP_PROVIDER || 'cbrfibra').toLowerCase();
-  const provider = providers[providerKey] || providers['cbrfibra'];
+  let providerKey = (process.env.APP_PROVIDER || '').toLowerCase();
 
+  // If APP_PROVIDER is not set, check if EAS Cloud passed EAS_PROJECT_ID or if project ID matches
+  if (!providerKey || !providers[providerKey]) {
+    const currentProjectId = process.env.EAS_PROJECT_ID || process.env.EXPO_PUBLIC_EAS_PROJECT_ID || config.extra?.eas?.projectId;
+    if (currentProjectId) {
+      const found = Object.keys(providers).find(k => providers[k].projectId === currentProjectId);
+      if (found) {
+        providerKey = found;
+      }
+    }
+  }
+
+  if (!providerKey || !providers[providerKey]) {
+    providerKey = 'cbrfibra';
+  }
+
+  const provider = providers[providerKey] || providers['cbrfibra'];
   const easProjectId = provider.projectId || '51c594bd-bf04-4140-ad43-04f31a6662f9';
 
   return {

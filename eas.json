@@ -20,6 +20,18 @@
       "ios": {
         "simulator": false
       }
+    },
+    "production:cbrfibra": {
+      "extends": "production",
+      "env": {
+        "APP_PROVIDER": "cbrfibra"
+      }
+    },
+    "production:webconnect": {
+      "extends": "production",
+      "env": {
+        "APP_PROVIDER": "webconnect"
+      }
     }
   },
   "submit": {
