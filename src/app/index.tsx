@@ -102,16 +102,7 @@ import BrandLogo from '@/components/BrandLogo';
 import { APP_CONFIG } from '@/config/providerConfig';
 import { getProviderConfig, ProviderConfig, supabase } from '@/services/supabase';
 import { getDetailedWifiInfo } from '@/services/wifiDiagnostic';
-import {
-  ML_CATEGORIES,
-  ML_COUPONS,
-  ML_PRODUCTS,
-  MLCategory,
-  MLProduct,
-  MLCoupon,
-  formatAffiliateUrl,
-  buildSearchAffiliateUrl,
-} from '@/services/mercadoLivre';
+import { ClubeProduct, fetchSheetProducts } from '@/services/googleSheets';
 
 // Silencia caixas de erro do LogBox para manter a experiência do usuário limpa
 LogBox.ignoreAllLogs(true);
@@ -1000,10 +991,12 @@ export default function LoginScreen() {
   const [loadingNotasFiscais, setLoadingNotasFiscais] = useState(false);
   const [downloadingNfcomId, setDownloadingNfcomId] = useState<number | null>(null);
 
-  // Mercado Livre Clube de Descontos State
-  const [mlCategory, setMlCategory] = useState<MLCategory>('todas');
-  const [mlSearchQuery, setMlSearchQuery] = useState('');
-  const [mlCopiedCouponId, setMlCopiedCouponId] = useState<string | null>(null);
+  // Clube de Desconto (Google Sheets) State
+  const [clubeProducts, setClubeProducts] = useState<ClubeProduct[]>([]);
+  const [loadingClubeProducts, setLoadingClubeProducts] = useState(false);
+  const [clubeCategory, setClubeCategory] = useState<string>('todos');
+  const [clubeSearchQuery, setClubeSearchQuery] = useState('');
+  const [clubeError, setClubeError] = useState<string | null>(null);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -2057,8 +2050,9 @@ export default function LoginScreen() {
     }
   }, [activeTab, screenState, providerConfig.banners]);
 
-  // Manipuladores do Clube de Descontos (Mercado Livre Afiliados)
-  const handleOpenMlUrl = async (url: string) => {
+  // Manipuladores do Clube de Desconto (Google Sheets)
+  const handleOpenProductUrl = async (url: string) => {
+    if (!url) return;
     try {
       const supported = await Linking.canOpenURL(url);
       if (supported) {
@@ -2071,19 +2065,26 @@ export default function LoginScreen() {
     }
   };
 
-  const handleCopyMlCoupon = (code: string, couponId: string) => {
-    Clipboard.setString(code);
-    setMlCopiedCouponId(couponId);
-    setTimeout(() => {
-      setMlCopiedCouponId(null);
-    }, 2500);
+  const loadClubeProducts = async () => {
+    try {
+      setLoadingClubeProducts(true);
+      setClubeError(null);
+      const sheetUrl = (providerConfig as any)?.planilha_clube_url;
+      const products = await fetchSheetProducts(sheetUrl);
+      setClubeProducts(products);
+    } catch (err: any) {
+      console.warn('Erro ao carregar produtos da planilha:', err);
+      setClubeError('Não foi possível carregar as ofertas no momento.');
+    } finally {
+      setLoadingClubeProducts(false);
+    }
   };
 
-  const handleSearchMlSubmit = () => {
-    if (!mlSearchQuery.trim()) return;
-    const url = buildSearchAffiliateUrl(mlSearchQuery.trim());
-    handleOpenMlUrl(url);
-  };
+  React.useEffect(() => {
+    if (activeTab === 'CLUBE') {
+      loadClubeProducts();
+    }
+  }, [activeTab]);
 
   // Consulta se há manutenção ativa na rede da operadora que afeta o contrato do cliente
   const checkNetworkMaintenance = async (targetContract?: ContractDisplay | null) => {
@@ -5564,370 +5565,218 @@ export default function LoginScreen() {
                       </View>
                     )}
 
-                    {/* CLUBE DE DESCONTOS (MERCADO LIVRE AFILIADOS) */}
+                    {/* CLUBE DE DESCONTO (GOOGLE SHEETS) */}
                     {activeTab === 'CLUBE' && (() => {
+                      // Lista de categorias presentes nos produtos
+                      const rawCategories = Array.from(new Set(clubeProducts.map(p => p.category?.trim()).filter(Boolean) as string[]));
+                      const availableCategories = ['todos', ...rawCategories];
+
                       // Filtragem dos produtos
-                      const filteredProducts = ML_PRODUCTS.filter(p => {
-                        const matchesCategory = mlCategory === 'todas' || p.category === mlCategory;
-                        const matchesSearch = !mlSearchQuery.trim() || 
-                          p.title.toLowerCase().includes(mlSearchQuery.toLowerCase()) ||
-                          p.category.toLowerCase().includes(mlSearchQuery.toLowerCase());
+                      const filteredProducts = clubeProducts.filter(p => {
+                        const matchesCategory = clubeCategory === 'todos' || (p.category && p.category.toLowerCase() === clubeCategory.toLowerCase());
+                        const matchesSearch = !clubeSearchQuery.trim() || 
+                          p.title.toLowerCase().includes(clubeSearchQuery.toLowerCase()) ||
+                          (p.category && p.category.toLowerCase().includes(clubeSearchQuery.toLowerCase())) ||
+                          (p.description && p.description.toLowerCase().includes(clubeSearchQuery.toLowerCase()));
                         return matchesCategory && matchesSearch;
                       });
 
                       return (
                         <View style={styles.planoTabWrapper}>
-                          {/* 1. HEADER HERO BANNER MERCADO LIVRE */}
-                          <View style={styles.mlHeroCard}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                              <View style={styles.mlPartnerBadge}>
-                                <ShoppingBag size={12} color="#0F172A" />
-                                <Text style={styles.mlPartnerBadgeText}>PARCERIA OFICIAL</Text>
+                          {/* 1. HEADER DO CLUBE DE DESCONTO */}
+                          <View style={styles.clubeHeaderCard}>
+                            <View style={styles.clubeHeaderTopRow}>
+                              <View style={styles.clubeHeaderBadge}>
+                                <ShoppingBag size={13} color="#0F172A" />
+                                <Text style={styles.clubeHeaderBadgeText}>EXCLUSIVO</Text>
                               </View>
-                              <Text style={styles.mlMeliText}>MERCADO LIVRE</Text>
+                              <TouchableOpacity 
+                                onPress={loadClubeProducts} 
+                                style={styles.clubeRefreshBtn}
+                                activeOpacity={0.7}
+                              >
+                                <RefreshCw size={13} color="#94A3B8" />
+                                <Text style={styles.clubeRefreshBtnText}>Atualizar</Text>
+                              </TouchableOpacity>
                             </View>
 
-                            <Text style={styles.mlHeroTitle}>Clube de Ofertas & Cupons</Text>
-                            <Text style={styles.mlHeroSubtitle}>
-                              Aproveite descontos exclusivos selecionados para clientes {providerConfig.nome || 'do Provedor'} com entrega rápida e garantia.
+                            <Text style={styles.clubeHeaderTitle}>Clube de Desconto</Text>
+                            <Text style={styles.clubeHeaderSubtitle}>
+                              Aproveite ofertas e descontos exclusivos selecionados para clientes {providerConfig.nome || 'do Provedor'}.
                             </Text>
-
-                            <View style={styles.mlBadgesRow}>
-                              <View style={styles.mlBadgeItem}>
-                                <Zap size={13} color="#FFE600" />
-                                <Text style={styles.mlBadgeText}>Até 50% OFF</Text>
-                              </View>
-                              <View style={styles.mlBadgeItem}>
-                                <CheckCircle size={13} color="#10B981" />
-                                <Text style={styles.mlBadgeText}>Compra Segura</Text>
-                              </View>
-                              <View style={styles.mlBadgeItem}>
-                                <Wifi size={13} color="#60A5FA" />
-                                <Text style={styles.mlBadgeText}>Entrega Rápida</Text>
-                              </View>
-                            </View>
                           </View>
 
-                          {/* 2. SEARCH BAR */}
-                          <View style={styles.mlSearchContainer}>
-                            <View style={styles.mlSearchInputWrapper}>
-                              <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
-                              <TextInput
-                                style={styles.mlSearchInput}
-                                placeholder="Buscar produto no Mercado Livre..."
-                                placeholderTextColor="#64748B"
-                                value={mlSearchQuery}
-                                onChangeText={setMlSearchQuery}
-                                returnKeyType="search"
-                                onSubmitEditing={handleSearchMlSubmit}
-                              />
-                              {mlSearchQuery.length > 0 && (
-                                <TouchableOpacity
-                                  onPress={() => setMlSearchQuery('')}
-                                  style={{ padding: 6, marginRight: 6 }}
-                                >
-                                  <X size={16} color="#94A3B8" />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                            {mlSearchQuery.trim().length > 0 && (
+                          {/* 2. BARRA DE BUSCA */}
+                          <View style={styles.clubeSearchContainer}>
+                            <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
+                            <TextInput
+                              style={styles.clubeSearchInput}
+                              placeholder="Buscar produto ou categoria..."
+                              placeholderTextColor="#64748B"
+                              value={clubeSearchQuery}
+                              onChangeText={setClubeSearchQuery}
+                              returnKeyType="search"
+                            />
+                            {clubeSearchQuery.length > 0 && (
                               <TouchableOpacity
-                                style={[styles.mlSearchSubmitBtn, { backgroundColor: primaryColor || '#2563EB' }]}
-                                onPress={handleSearchMlSubmit}
-                                activeOpacity={0.8}
+                                onPress={() => setClubeSearchQuery('')}
+                                style={{ padding: 6, marginRight: 6 }}
                               >
-                                <ExternalLink size={16} color="#FFFFFF" />
+                                <X size={16} color="#94A3B8" />
                               </TouchableOpacity>
                             )}
                           </View>
 
-                          {/* 3. CUPONS EM DESTAQUE (CARROSSEL) */}
-                          <View style={styles.mlSectionContainer}>
-                            <View style={styles.mlSectionHeader}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <Ticket size={18} color="#FFE600" />
-                                <Text style={styles.mlSectionTitle}>Cupons de Desconto</Text>
+                          {/* 3. CATEGORIAS (SOMENTE SE HOUVER CATEGORIAS CADASTRADAS) */}
+                          {availableCategories.length > 2 && (
+                            <View style={styles.clubeCatContainer}>
+                              <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
+                                style={{ flexGrow: 0 }}
+                              >
+                                {availableCategories.map(cat => {
+                                  const isActive = clubeCategory === cat;
+                                  return (
+                                    <TouchableOpacity
+                                      key={cat}
+                                      style={[
+                                        styles.clubeCatPill,
+                                        isActive && [styles.clubeCatPillActive, { backgroundColor: primaryColor || '#2563EB', borderColor: primaryColor || '#2563EB' }]
+                                      ]}
+                                      onPress={() => setClubeCategory(cat)}
+                                      activeOpacity={0.75}
+                                    >
+                                      <Text style={[styles.clubeCatPillText, isActive && styles.clubeCatPillTextActive]}>
+                                        {cat === 'todos' ? 'Todas as Ofertas' : cat}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </ScrollView>
+                            </View>
+                          )}
+
+                          {/* 4. LISTA DE PRODUTOS */}
+                          <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
+                            {loadingClubeProducts ? (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                                <ActivityIndicator size="large" color={primaryColor || '#2563EB'} style={{ marginBottom: 12 }} />
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                                  Carregando ofertas...
+                                </Text>
+                                <Text style={{ fontSize: 12, color: '#64748B' }}>
+                                  Buscando produtos atualizados da planilha
+                                </Text>
                               </View>
-                              <Text style={styles.mlSectionSubtitle}>Toque para copiar o código</Text>
-                            </View>
-
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={{ paddingHorizontal: 2, gap: 10, paddingBottom: 6, alignItems: 'flex-start' }}
-                              style={{ flexGrow: 0 }}
-                            >
-                              {ML_COUPONS.map(coupon => {
-                                const isCopied = mlCopiedCouponId === coupon.id;
-                                return (
-                                  <View key={coupon.id} style={styles.mlCouponCard}>
-                                    <View style={styles.mlCouponTopRow}>
-                                      <View style={styles.mlCouponDiscountPill}>
-                                        <Text style={styles.mlCouponDiscountText}>{coupon.discountTag}</Text>
-                                      </View>
-                                      {coupon.minPurchase && (
-                                        <Text style={styles.mlCouponMinPurchase}>{coupon.minPurchase}</Text>
-                                      )}
-                                    </View>
-
-                                    <Text style={styles.mlCouponTitle} numberOfLines={1}>{coupon.title}</Text>
-                                    <Text style={styles.mlCouponDesc} numberOfLines={2}>{coupon.description}</Text>
-
-                                    <View style={styles.mlCouponBottomRow}>
-                                      <TouchableOpacity
-                                        style={[
-                                          styles.mlCouponCodeBtn,
-                                          isCopied && { backgroundColor: '#10B98120', borderColor: '#10B981' }
-                                        ]}
-                                        onPress={() => handleCopyMlCoupon(coupon.code, coupon.id)}
-                                        activeOpacity={0.7}
-                                      >
-                                        <Text style={[styles.mlCouponCodeText, isCopied && { color: '#10B981' }]}>
-                                          {isCopied ? 'COPIADO! ✓' : coupon.code}
-                                        </Text>
-                                        {!isCopied && <Copy size={13} color="#94A3B8" style={{ marginLeft: 6 }} />}
-                                      </TouchableOpacity>
-
-                                      <TouchableOpacity
-                                        style={[styles.mlCouponUseBtn, { backgroundColor: primaryColor || '#2563EB' }]}
-                                        onPress={() => handleOpenMlUrl(coupon.affiliateUrl)}
-                                        activeOpacity={0.8}
-                                      >
-                                        <Text style={styles.mlCouponUseBtnText}>Usar</Text>
-                                        <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
-                                      </TouchableOpacity>
-                                    </View>
-                                  </View>
-                                );
-                              })}
-                            </ScrollView>
-                          </View>
-
-                          {/* 4. CATEGORIAS / ABAS */}
-                          <View style={{ marginTop: 14, marginBottom: 12, width: '100%', maxWidth: 400 }}>
-                            <ScrollView
-                              horizontal
-                              showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
-                              style={{ flexGrow: 0 }}
-                            >
-                              {ML_CATEGORIES.map(cat => {
-                                const isActive = mlCategory === cat.id;
-                                return (
-                                  <TouchableOpacity
-                                    key={cat.id}
-                                    style={[
-                                      styles.mlCatPill,
-                                      isActive && [styles.mlCatPillActive, { backgroundColor: primaryColor || '#2563EB', borderColor: primaryColor || '#2563EB' }]
-                                    ]}
-                                    onPress={() => setMlCategory(cat.id)}
-                                    activeOpacity={0.75}
-                                  >
-                                    {cat.icon === 'Flame' && <Flame size={14} color={isActive ? '#FFFFFF' : '#EF4444'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Ticket' && <Ticket size={14} color={isActive ? '#FFFFFF' : '#FFE600'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Smartphone' && <Smartphone size={14} color={isActive ? '#FFFFFF' : '#60A5FA'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Wifi' && <Wifi size={14} color={isActive ? '#FFFFFF' : '#10B981'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Tv' && <Tv size={14} color={isActive ? '#FFFFFF' : '#A855F7'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Zap' && <Zap size={14} color={isActive ? '#FFFFFF' : '#F59E0B'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Home' && <Home size={14} color={isActive ? '#FFFFFF' : '#EC4899'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'ShieldCheck' && <ShieldCheck size={14} color={isActive ? '#FFFFFF' : '#14B8A6'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'ShoppingBag' && <ShoppingBag size={14} color={isActive ? '#FFFFFF' : '#F97316'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Radio' && <Radio size={14} color={isActive ? '#FFFFFF' : '#8B5CF6'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Activity' && <Activity size={14} color={isActive ? '#FFFFFF' : '#06B6D4'} style={{ marginRight: 5 }} />}
-                                    {cat.icon === 'Sparkles' && <Sparkles size={14} color={isActive ? '#FFFFFF' : '#EAB308'} style={{ marginRight: 5 }} />}
-                                    <Text style={[styles.mlCatPillText, isActive && styles.mlCatPillTextActive]}>
-                                      {cat.label}
-                                    </Text>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </ScrollView>
-                          </View>
-
-                          {/* 5. LISTA DE PRODUTOS OU CUPONS DETALHADOS */}
-                          {mlCategory === 'cupons' ? (
-                            <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
-                              {ML_COUPONS.map(coupon => {
-                                const isCopied = mlCopiedCouponId === coupon.id;
-                                return (
-                                  <View key={coupon.id} style={styles.mlCouponDetailedCard}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                                      <View style={{ flex: 1, paddingRight: 8 }}>
-                                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginBottom: 4 }}>
-                                          {coupon.title}
-                                        </Text>
-                                        <Text style={{ fontSize: 13, color: '#94A3B8', lineHeight: 18 }}>
-                                          {coupon.description}
-                                        </Text>
-                                      </View>
-                                      <View style={styles.mlCouponDiscountPill}>
-                                        <Text style={styles.mlCouponDiscountText}>{coupon.discountTag}</Text>
-                                      </View>
-                                    </View>
-
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#33415550' }}>
-                                      <TouchableOpacity
-                                        style={[
-                                          styles.mlCouponCodeBtn,
-                                          { flex: 1, marginRight: 10 },
-                                          isCopied && { backgroundColor: '#10B98120', borderColor: '#10B981' }
-                                        ]}
-                                        onPress={() => handleCopyMlCoupon(coupon.code, coupon.id)}
-                                        activeOpacity={0.7}
-                                      >
-                                        <Text style={[styles.mlCouponCodeText, isCopied && { color: '#10B981' }]}>
-                                          {isCopied ? 'CÓDIGO COPIADO! ✓' : `CUPOM: ${coupon.code}`}
-                                        </Text>
-                                        {!isCopied && <Copy size={14} color="#94A3B8" style={{ marginLeft: 6 }} />}
-                                      </TouchableOpacity>
-
-                                      <TouchableOpacity
-                                        style={[styles.mlCouponUseBtn, { paddingHorizontal: 16, backgroundColor: primaryColor || '#2563EB' }]}
-                                        onPress={() => handleOpenMlUrl(coupon.affiliateUrl)}
-                                        activeOpacity={0.8}
-                                      >
-                                        <Text style={styles.mlCouponUseBtnText}>Abrir no Mercado Livre</Text>
-                                        <ExternalLink size={13} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                                      </TouchableOpacity>
-                                    </View>
-                                  </View>
-                                );
-                              })}
-                            </View>
-                          ) : (
-                            <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
-                              {filteredProducts.length === 0 ? (
-                                <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
-                                  <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
-                                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
-                                    Nenhum produto cadastrado nesta categoria
-                                  </Text>
-                                  <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 16 }}>
-                                    Acesse o Mercado Livre para encontrar milhares de ofertas desta categoria com a garantia do Clube.
-                                  </Text>
-                                  <TouchableOpacity
-                                    style={[styles.mlHeroBtn, { backgroundColor: primaryColor || '#2563EB' }]}
-                                    onPress={() => {
-                                      const currentCatObj = ML_CATEGORIES.find(c => c.id === mlCategory);
-                                      const catUrl = currentCatObj?.categoryUrl || 'https://www.mercadolivre.com.br/ofertas';
-                                      handleOpenMlUrl(formatAffiliateUrl(catUrl));
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={styles.mlHeroBtnText}>Buscar nesta Categoria no Mercado Livre</Text>
-                                    <ExternalLink size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                                  </TouchableOpacity>
-                                </View>
-                              ) : (
-                                filteredProducts.map(product => (
-                                  <TouchableOpacity
-                                    key={product.id}
-                                    style={styles.mlProductCard}
-                                    onPress={() => handleOpenMlUrl(product.url)}
-                                    activeOpacity={0.85}
-                                  >
-                                    <View style={styles.mlProductImageContainer}>
+                            ) : clubeProducts.length === 0 ? (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 }]}>
+                                <ShoppingBag size={38} color="#64748B" style={{ marginBottom: 12 }} />
+                                <Text style={{ fontSize: 16, fontWeight: '800', color: '#F8FAFC', marginBottom: 6, textAlign: 'center' }}>
+                                  Nenhum produto cadastrado
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19, marginBottom: 16 }}>
+                                  Adicione produtos na planilha do Google Sheets para que eles apareçam aqui automaticamente em tempo real.
+                                </Text>
+                                <TouchableOpacity
+                                  style={[styles.clubeRetryBtn, { backgroundColor: primaryColor || '#2563EB' }]}
+                                  onPress={loadClubeProducts}
+                                  activeOpacity={0.8}
+                                >
+                                  <RefreshCw size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                  <Text style={styles.clubeRetryBtnText}>Atualizar Lista</Text>
+                                </TouchableOpacity>
+                              </View>
+                            ) : filteredProducts.length === 0 ? (
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
+                                <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
+                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                                  Nenhum produto encontrado
+                                </Text>
+                                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                                  Tente buscar por outro termo ou selecione outra categoria.
+                                </Text>
+                              </View>
+                            ) : (
+                              filteredProducts.map(product => (
+                                <TouchableOpacity
+                                  key={product.id}
+                                  style={styles.clubeProductCard}
+                                  onPress={() => handleOpenProductUrl(product.url)}
+                                  activeOpacity={0.85}
+                                >
+                                  {product.image ? (
+                                    <View style={styles.clubeProductImageContainer}>
                                       <ExpoImage
                                         source={{ uri: product.image }}
-                                        style={styles.mlProductImage}
+                                        style={styles.clubeProductImage}
                                         contentFit="contain"
                                         transition={200}
                                         cachePolicy="memory-disk"
                                       />
                                       {product.discount && (
-                                        <View style={styles.mlProductDiscountTag}>
-                                          <Text style={styles.mlProductDiscountTagText}>{product.discount}</Text>
+                                        <View style={styles.clubeProductDiscountTag}>
+                                          <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
                                         </View>
                                       )}
                                       {product.badge && (
-                                        <View style={styles.mlProductHighlightBadge}>
-                                          <Text style={styles.mlProductHighlightBadgeText}>{product.badge}</Text>
+                                        <View style={styles.clubeProductHighlightBadge}>
+                                          <Text style={styles.clubeProductHighlightBadgeText}>{product.badge}</Text>
                                         </View>
                                       )}
                                     </View>
+                                  ) : (
+                                    <View style={[styles.clubeProductImageContainer, { backgroundColor: '#1E293B' }]}>
+                                      <ShoppingBag size={32} color="#64748B" />
+                                      {product.discount && (
+                                        <View style={styles.clubeProductDiscountTag}>
+                                          <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
+                                        </View>
+                                      )}
+                                    </View>
+                                  )}
 
-                                    <View style={styles.mlProductBody}>
-                                      <Text style={styles.mlProductTitle} numberOfLines={2}>
+                                  <View style={styles.clubeProductBody}>
+                                    <View>
+                                      {product.category && product.category !== 'Geral' && (
+                                        <Text style={styles.clubeProductCatLabel} numberOfLines={1}>
+                                          {product.category.toUpperCase()}
+                                        </Text>
+                                      )}
+                                      <Text style={styles.clubeProductTitle} numberOfLines={2}>
                                         {product.title}
                                       </Text>
+                                      {product.description && (
+                                        <Text style={styles.clubeProductDesc} numberOfLines={2}>
+                                          {product.description}
+                                        </Text>
+                                      )}
+                                    </View>
 
-                                      <View style={{ marginTop: 6 }}>
-                                        {product.originalPrice && (
-                                          <Text style={styles.mlProductOriginalPrice}>
-                                            {product.originalPrice}
-                                          </Text>
-                                        )}
-                                        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                                          <Text style={styles.mlProductPrice}>
-                                            {product.price}
-                                          </Text>
-                                        </View>
-                                        {product.installments && (
-                                          <Text style={styles.mlProductInstallments}>
-                                            {product.installments}
-                                          </Text>
-                                        )}
-                                      </View>
+                                    <View style={{ marginTop: 6 }}>
+                                      {product.originalPrice && (
+                                        <Text style={styles.clubeProductOriginalPrice}>
+                                          {product.originalPrice}
+                                        </Text>
+                                      )}
+                                      {product.price ? (
+                                        <Text style={styles.clubeProductPrice}>
+                                          {product.price}
+                                        </Text>
+                                      ) : null}
+                                    </View>
 
-                                      <View style={styles.mlProductFooterRow}>
-                                        {product.freeShipping ? (
-                                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                            <CheckCircle size={12} color="#10B981" />
-                                            <Text style={styles.mlProductShippingText}>Frete Grátis</Text>
-                                          </View>
-                                        ) : (
-                                          <View />
-                                        )}
-
-                                        <View style={[styles.mlProductBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
-                                          <Text style={styles.mlProductBuyBtnText}>Ver no Mercado Livre</Text>
-                                          <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
-                                        </View>
+                                    <View style={styles.clubeProductFooterRow}>
+                                      <View style={[styles.clubeProductBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
+                                        <Text style={styles.clubeProductBuyBtnText}>Aproveitar Oferta</Text>
+                                        <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
                                       </View>
                                     </View>
-                                  </TouchableOpacity>
-                                ))
-                              )}
-
-                              {/* BOTÃO PARA VER TODAS AS OFERTAS DA CATEGORIA NO MERCADO LIVRE */}
-                              {(() => {
-                                const currentCatObj = ML_CATEGORIES.find(c => c.id === mlCategory);
-                                const catUrl = currentCatObj?.categoryUrl || 'https://www.mercadolivre.com.br/ofertas';
-                                const catLabel = currentCatObj?.label || 'desta Categoria';
-                                return (
-                                  <TouchableOpacity
-                                    style={[styles.mlCatExploreBtn, { borderColor: primaryColor || '#2563EB' }]}
-                                    onPress={() => handleOpenMlUrl(formatAffiliateUrl(catUrl))}
-                                    activeOpacity={0.8}
-                                  >
-                                    <ShoppingBag size={16} color={primaryColor || '#60A5FA'} style={{ marginRight: 8 }} />
-                                    <Text style={[styles.mlCatExploreBtnText, { color: primaryColor || '#60A5FA' }]}>
-                                      Ver todas as ofertas de {catLabel} no Mercado Livre
-                                    </Text>
-                                    <ExternalLink size={14} color={primaryColor || '#60A5FA'} style={{ marginLeft: 6 }} />
-                                  </TouchableOpacity>
-                                );
-                              })()}
-                            </View>
-                          )}
-
-                          {/* 6. BANNER INFORMATIVO / MAIS OFERTAS */}
-                          <View style={styles.mlFooterBanner}>
-                            <ShoppingBag size={22} color="#FFE600" style={{ marginBottom: 6 }} />
-                            <Text style={styles.mlFooterBannerTitle}>
-                              Procurando outro produto ou promoção?
-                            </Text>
-                            <Text style={styles.mlFooterBannerSubtitle}>
-                              Acesse o Mercado Livre com todos os benefícios do nosso Clube de Descontos e encontre milhares de ofertas diárias.
-                            </Text>
-                            <TouchableOpacity
-                              style={[styles.mlFooterBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}
-                              onPress={() => handleOpenMlUrl(formatAffiliateUrl('https://www.mercadolivre.com.br/ofertas'))}
-                              activeOpacity={0.8}
-                            >
-                              <Text style={styles.mlFooterBannerBtnText}>Ver Todas as Ofertas do Dia</Text>
-                              <ExternalLink size={14} color="#FFFFFF" style={{ marginLeft: 6 }} />
-                            </TouchableOpacity>
+                                  </View>
+                                </TouchableOpacity>
+                              ))
+                            )}
                           </View>
                         </View>
                       );
@@ -6235,7 +6084,7 @@ export default function LoginScreen() {
                             <>
                               <View style={styles.sideMenuDivider} />
 
-                              {/* 2. Clube de Descontos */}
+                              {/* Clube de Desconto */}
                               <TouchableOpacity
                                 style={styles.sideMenuRow}
                                 onPress={() => {
@@ -6249,38 +6098,12 @@ export default function LoginScreen() {
                                 </View>
                                 <View style={{ flex: 1 }}>
                                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Text style={styles.sideMenuRowTitle}>Clube de Descontos</Text>
+                                    <Text style={styles.sideMenuRowTitle}>Clube de Desconto</Text>
                                     <View style={styles.sideMenuBadgeTag}>
-                                      <Text style={styles.sideMenuBadgeTagText}>CUPONS</Text>
+                                      <Text style={styles.sideMenuBadgeTagText}>OFERTAS</Text>
                                     </View>
                                   </View>
-                                  <Text style={styles.sideMenuRowSubtitle}>Parcerias em lojas e farmácias</Text>
-                                </View>
-                                <ChevronRight size={16} color="#475569" />
-                              </TouchableOpacity>
-
-                              <View style={styles.sideMenuDivider} />
-
-                              {/* 3. Clube do Cliente */}
-                              <TouchableOpacity
-                                style={styles.sideMenuRow}
-                                onPress={() => {
-                                  setActiveTab('CLUBE_CLIENTE');
-                                  setIsSideMenuOpen(false);
-                                }}
-                                activeOpacity={0.65}
-                              >
-                                <View style={styles.sideMenuIconWrapper}>
-                                  <Sparkles size={20} color="#94A3B8" strokeWidth={1.7} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <Text style={styles.sideMenuRowTitle}>Clube do Cliente</Text>
-                                    <View style={[styles.sideMenuBadgeTag, { backgroundColor: 'rgba(148, 163, 184, 0.12)' }]}>
-                                      <Text style={[styles.sideMenuBadgeTagText, { color: '#CBD5E1' }]}>VIP</Text>
-                                    </View>
-                                  </View>
-                                  <Text style={styles.sideMenuRowSubtitle}>Vantagens e fidelidade do assinante</Text>
+                                  <Text style={styles.sideMenuRowSubtitle}>Ofertas e descontos exclusivos</Text>
                                 </View>
                                 <ChevronRight size={16} color="#475569" />
                               </TouchableOpacity>
@@ -9102,8 +8925,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  /* MERCADO LIVRE CLUBE DE DESCONTOS STYLES */
-  mlHeroCard: {
+  /* CLUBE DE DESCONTO (GOOGLE SHEETS) STYLES */
+  clubeHeaderCard: {
     width: '100%',
     maxWidth: 400,
     backgroundColor: '#111827',
@@ -9118,7 +8941,13 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  mlPartnerBadge: {
+  clubeHeaderTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  clubeHeaderBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
@@ -9127,66 +8956,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius: 6,
   },
-  mlPartnerBadgeText: {
+  clubeHeaderBadgeText: {
     fontSize: 9.5,
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: 0.5,
   },
-  mlMeliText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#94A3B8',
-    letterSpacing: 1,
+  clubeRefreshBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#1E293B',
   },
-  mlHeroTitle: {
-    fontSize: 17,
+  clubeRefreshBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+  },
+  clubeHeaderTitle: {
+    fontSize: 18,
     fontWeight: '800',
     color: '#F8FAFC',
-    marginTop: 6,
     marginBottom: 4,
   },
-  mlHeroSubtitle: {
+  clubeHeaderSubtitle: {
     fontSize: 12.5,
     color: '#94A3B8',
     lineHeight: 17,
-    marginBottom: 12,
-  },
-  mlBadgesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#1F2937',
-    flexWrap: 'wrap',
-  },
-  mlBadgeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#1E293B',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  mlBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#E2E8F0',
   },
 
   /* BUSCA */
-  mlSearchContainer: {
+  clubeSearchContainer: {
     width: '100%',
     maxWidth: 400,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  mlSearchInputWrapper: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
@@ -9194,137 +8999,22 @@ const styles = StyleSheet.create({
     borderColor: '#334155',
     borderRadius: 12,
     height: 44,
+    marginBottom: 12,
   },
-  mlSearchInput: {
+  clubeSearchInput: {
     flex: 1,
     fontSize: 13,
     color: '#F8FAFC',
     paddingVertical: 0,
   },
-  mlSearchSubmitBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  /* SEÇÕES E CUPONS */
-  mlSectionContainer: {
-    width: '100%',
-    maxWidth: 400,
-    marginBottom: 10,
-  },
-  mlSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    paddingHorizontal: 2,
-  },
-  mlSectionTitle: {
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: '#F8FAFC',
-  },
-  mlSectionSubtitle: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  mlCouponCard: {
-    width: 220,
-    height: 142,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.2,
-    borderColor: '#1E293B',
-    borderRadius: 14,
-    padding: 12,
-    justifyContent: 'space-between',
-  },
-  mlCouponTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
-  mlCouponDiscountPill: {
-    backgroundColor: '#FFE60025',
-    borderWidth: 1,
-    borderColor: '#FFE60050',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  mlCouponDiscountText: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: '#FFE600',
-  },
-  mlCouponMinPurchase: {
-    fontSize: 10,
-    color: '#64748B',
-  },
-  mlCouponTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 2,
-  },
-  mlCouponDesc: {
-    fontSize: 11,
-    color: '#94A3B8',
-    lineHeight: 15,
-    marginBottom: 10,
-  },
-  mlCouponBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  mlCouponCodeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: '#475569',
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 6,
-  },
-  mlCouponCodeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    letterSpacing: 0.5,
-  },
-  mlCouponUseBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 7,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-  },
-  mlCouponUseBtnText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  mlCouponDetailedCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#0F172A',
-    borderWidth: 1.2,
-    borderColor: '#1E293B',
-    borderRadius: 14,
-    padding: 14,
-  },
 
   /* CATEGORIAS */
-  mlCatPill: {
+  clubeCatContainer: {
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 12,
+  },
+  clubeCatPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
@@ -9334,21 +9024,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
   },
-  mlCatPillActive: {
+  clubeCatPillActive: {
     borderWidth: 1,
   },
-  mlCatPillText: {
+  clubeCatPillText: {
     fontSize: 12,
     fontWeight: '600',
     color: '#94A3B8',
   },
-  mlCatPillTextActive: {
+  clubeCatPillTextActive: {
     color: '#FFFFFF',
     fontWeight: '800',
   },
 
   /* CARDS DE PRODUTOS */
-  mlProductCard: {
+  clubeProductCard: {
     width: '100%',
     maxWidth: 400,
     flexDirection: 'row',
@@ -9360,7 +9050,7 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 12,
   },
-  mlProductImageContainer: {
+  clubeProductImageContainer: {
     width: 105,
     height: 115,
     borderRadius: 12,
@@ -9370,11 +9060,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  mlProductImage: {
+  clubeProductImage: {
     width: '100%',
     height: '100%',
   },
-  mlProductDiscountTag: {
+  clubeProductDiscountTag: {
     position: 'absolute',
     bottom: 4,
     left: 4,
@@ -9383,12 +9073,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     borderRadius: 4,
   },
-  mlProductDiscountTagText: {
+  clubeProductDiscountTagText: {
     fontSize: 9.5,
     fontWeight: '900',
     color: '#FFFFFF',
   },
-  mlProductHighlightBadge: {
+  clubeProductHighlightBadge: {
     position: 'absolute',
     top: 4,
     left: 4,
@@ -9397,135 +9087,77 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     borderRadius: 4,
   },
-  mlProductHighlightBadgeText: {
+  clubeProductHighlightBadgeText: {
     fontSize: 8.5,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  mlProductBody: {
+  clubeProductBody: {
     flex: 1,
     justifyContent: 'space-between',
   },
-  mlProductTitle: {
+  clubeProductCatLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  clubeProductTitle: {
     fontSize: 13,
     fontWeight: '700',
     color: '#F8FAFC',
     lineHeight: 17,
   },
-  mlProductOriginalPrice: {
+  clubeProductDesc: {
+    fontSize: 11,
+    color: '#94A3B8',
+    lineHeight: 15,
+    marginTop: 2,
+  },
+  clubeProductOriginalPrice: {
     fontSize: 11,
     color: '#64748B',
     textDecorationLine: 'line-through',
     marginBottom: 1,
   },
-  mlProductPrice: {
+  clubeProductPrice: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#F8FAFC',
-  },
-  mlProductInstallments: {
-    fontSize: 10.5,
     color: '#10B981',
-    fontWeight: '600',
-    marginTop: 1,
   },
-  mlProductFooterRow: {
+  clubeProductFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 6,
     paddingTop: 6,
     borderTopWidth: 1,
     borderTopColor: '#1E293B',
   },
-  mlProductShippingText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#10B981',
-  },
-  mlProductBuyBtn: {
+  clubeProductBuyBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
   },
-  mlProductBuyBtnText: {
-    fontSize: 10.5,
+  clubeProductBuyBtnText: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-
-  /* FOOTER */
-  mlFooterBanner: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#111827',
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  mlFooterBannerTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  mlFooterBannerSubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    lineHeight: 16,
-    marginBottom: 12,
-  },
-  mlFooterBannerBtn: {
+  clubeRetryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     borderRadius: 10,
   },
-  mlFooterBannerBtnText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  mlHeroBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-  },
-  mlHeroBtnText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  mlCatExploreBtn: {
-    width: '100%',
-    maxWidth: 400,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0F172A',
-    borderWidth: 1.5,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  mlCatExploreBtnText: {
+  clubeRetryBtnText: {
     fontSize: 13,
     fontWeight: '800',
-    textAlign: 'center',
+    color: '#FFFFFF',
   },
 });
