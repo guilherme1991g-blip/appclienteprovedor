@@ -5583,30 +5583,7 @@ export default function LoginScreen() {
 
                       return (
                         <View style={styles.planoTabWrapper}>
-                          {/* 1. HEADER DO CLUBE DE DESCONTO */}
-                          <View style={styles.clubeHeaderCard}>
-                            <View style={styles.clubeHeaderTopRow}>
-                              <View style={styles.clubeHeaderBadge}>
-                                <ShoppingBag size={13} color="#0F172A" />
-                                <Text style={styles.clubeHeaderBadgeText}>EXCLUSIVO</Text>
-                              </View>
-                              <TouchableOpacity 
-                                onPress={loadClubeProducts} 
-                                style={styles.clubeRefreshBtn}
-                                activeOpacity={0.7}
-                              >
-                                <RefreshCw size={13} color="#94A3B8" />
-                                <Text style={styles.clubeRefreshBtnText}>Atualizar</Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            <Text style={styles.clubeHeaderTitle}>Clube de Desconto</Text>
-                            <Text style={styles.clubeHeaderSubtitle}>
-                              Aproveite ofertas e descontos exclusivos selecionados para clientes {providerConfig.nome || 'do Provedor'}.
-                            </Text>
-                          </View>
-
-                          {/* 2. BARRA DE BUSCA */}
+                          {/* 1. BARRA DE BUSCA COM BOTÃO DE ATUALIZAR */}
                           <View style={styles.clubeSearchContainer}>
                             <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
                             <TextInput
@@ -5620,14 +5597,21 @@ export default function LoginScreen() {
                             {clubeSearchQuery.length > 0 && (
                               <TouchableOpacity
                                 onPress={() => setClubeSearchQuery('')}
-                                style={{ padding: 6, marginRight: 6 }}
+                                style={{ padding: 6, marginRight: 4 }}
                               >
                                 <X size={16} color="#94A3B8" />
                               </TouchableOpacity>
                             )}
+                            <TouchableOpacity
+                              onPress={loadClubeProducts}
+                              style={{ padding: 6, marginRight: 8 }}
+                              activeOpacity={0.7}
+                            >
+                              <RefreshCw size={16} color="#94A3B8" />
+                            </TouchableOpacity>
                           </View>
 
-                          {/* 3. CATEGORIAS (SOMENTE SE HOUVER CATEGORIAS CADASTRADAS) */}
+                          {/* 2. CATEGORIAS (SOMENTE SE HOUVER CATEGORIAS CADASTRADAS) */}
                           {availableCategories.length > 2 && (
                             <View style={styles.clubeCatContainer}>
                               <ScrollView
