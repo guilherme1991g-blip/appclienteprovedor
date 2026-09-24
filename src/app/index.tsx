@@ -5951,10 +5951,10 @@ export default function LoginScreen() {
                             )}
                           </View>
 
-                          {/* 5. LISTA DE PRODUTOS */}
-                          <View style={{ gap: 10, marginTop: 2, width: '100%', maxWidth: 400 }}>
+                          {/* 5. LISTA DE PRODUTOS EM GRID (2 POR LINHA) */}
+                          <View style={styles.clubeProductGridContainer}>
                             {loadingClubeProducts ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 36 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 36 }]}>
                                 <ActivityIndicator size="large" color={primaryColor || '#2563EB'} style={{ marginBottom: 12 }} />
                                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
                                   Carregando as melhores ofertas...
@@ -5964,7 +5964,7 @@ export default function LoginScreen() {
                                 </Text>
                               </View>
                             ) : clubeProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 }]}>
                                 <ShoppingBag size={36} color="#64748B" style={{ marginBottom: 10 }} />
                                 <Text style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginBottom: 4, textAlign: 'center' }}>
                                   Nenhuma oferta disponível no momento
@@ -5982,7 +5982,7 @@ export default function LoginScreen() {
                                 </TouchableOpacity>
                               </View>
                             ) : filteredProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 28 }]}>
+                              <View style={[styles.infoCard, { width: '100%', alignItems: 'center', paddingVertical: 28 }]}>
                                 <ShoppingBag size={28} color="#64748B" style={{ marginBottom: 8 }} />
                                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
                                   Nenhum produto encontrado
@@ -5995,86 +5995,66 @@ export default function LoginScreen() {
                               filteredProducts.map(product => (
                                 <TouchableOpacity
                                   key={product.id}
-                                  style={styles.clubeProductCard}
+                                  style={styles.clubeProductGridCard}
                                   onPress={() => handleOpenProductUrl(product.url)}
                                   activeOpacity={0.85}
                                 >
-                                  {product.image ? (
-                                    <View style={styles.clubeProductImageContainer}>
+                                  {/* Imagem do Produto no Card Grid */}
+                                  <View style={styles.clubeProductGridImageContainer}>
+                                    {product.image ? (
                                       <ExpoImage
                                         source={{ uri: product.image }}
-                                        style={styles.clubeProductImage}
+                                        style={styles.clubeProductGridImage}
                                         contentFit="contain"
                                         transition={200}
                                         cachePolicy="memory-disk"
                                       />
-                                      {product.discount && (
-                                        <View style={styles.clubeProductDiscountTag}>
-                                          <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
-                                        </View>
-                                      )}
-                                      {product.tvSizeGroup ? (
-                                        <View style={styles.clubeTvSizeBadge}>
-                                          <Text style={styles.clubeTvSizeBadgeText}>{product.tvSizeGroup}</Text>
-                                        </View>
-                                      ) : product.badge ? (
-                                        <View style={styles.clubeProductHighlightBadge}>
-                                          <Text style={styles.clubeProductHighlightBadgeText}>{product.badge}</Text>
-                                        </View>
-                                      ) : null}
-                                    </View>
-                                  ) : (
-                                    <View style={[styles.clubeProductImageContainer, { backgroundColor: '#1E293B' }]}>
-                                      <ShoppingBag size={30} color="#64748B" />
-                                      {product.discount && (
-                                        <View style={styles.clubeProductDiscountTag}>
-                                          <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
-                                        </View>
-                                      )}
-                                      {product.tvSizeGroup && (
-                                        <View style={styles.clubeTvSizeBadge}>
-                                          <Text style={styles.clubeTvSizeBadgeText}>{product.tvSizeGroup}</Text>
-                                        </View>
-                                      )}
-                                    </View>
-                                  )}
+                                    ) : (
+                                      <ShoppingBag size={28} color="#64748B" />
+                                    )}
+                                    {product.discount && (
+                                      <View style={styles.clubeProductDiscountTag}>
+                                        <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
+                                      </View>
+                                    )}
+                                    {product.tvSizeGroup ? (
+                                      <View style={styles.clubeTvSizeBadge}>
+                                        <Text style={styles.clubeTvSizeBadgeText}>{product.tvSizeGroup}</Text>
+                                      </View>
+                                    ) : product.badge ? (
+                                      <View style={styles.clubeProductHighlightBadge}>
+                                        <Text style={styles.clubeProductHighlightBadgeText}>{product.badge}</Text>
+                                      </View>
+                                    ) : null}
+                                  </View>
 
-                                  <View style={styles.clubeProductBody}>
-                                    <View>
-                                      {product.category && product.category !== 'Geral' && (
-                                        <Text style={styles.clubeProductCatLabel} numberOfLines={1}>
-                                          {product.category.toUpperCase()}
-                                          {product.tvSizeGroup ? ` • ${product.tvSizeGroup}` : product.subcategory && product.subcategory !== 'Geral' ? ` • ${product.subcategory.toUpperCase()}` : ''}
-                                        </Text>
-                                      )}
-                                      <Text style={styles.clubeProductTitle} numberOfLines={2}>
-                                        {product.title}
+                                  {/* Informações e Preço */}
+                                  <View style={styles.clubeProductGridBody}>
+                                    {product.category && product.category !== 'Geral' && (
+                                      <Text style={styles.clubeProductCatLabel} numberOfLines={1}>
+                                        {product.category.toUpperCase()}{product.tvSizeGroup ? ` • ${product.tvSizeGroup}` : ''}
                                       </Text>
-                                      {product.description && (
-                                        <Text style={styles.clubeProductDesc} numberOfLines={2}>
-                                          {product.description}
-                                        </Text>
-                                      )}
-                                    </View>
+                                    )}
+                                    <Text style={styles.clubeProductGridTitle} numberOfLines={2}>
+                                      {product.title}
+                                    </Text>
 
-                                    <View style={{ marginTop: 4 }}>
+                                    <View style={{ marginTop: 'auto', paddingTop: 6 }}>
                                       {product.originalPrice && (
-                                        <Text style={styles.clubeProductOriginalPrice}>
+                                        <Text style={styles.clubeProductOriginalPrice} numberOfLines={1}>
                                           {product.originalPrice}
                                         </Text>
                                       )}
                                       {product.price ? (
-                                        <Text style={styles.clubeProductPrice}>
+                                        <Text style={styles.clubeProductGridPrice} numberOfLines={1}>
                                           {product.price}
                                         </Text>
                                       ) : null}
                                     </View>
 
-                                    <View style={styles.clubeProductFooterRow}>
-                                      <View style={[styles.clubeProductBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
-                                        <Text style={styles.clubeProductBuyBtnText}>Aproveitar Oferta</Text>
-                                        <ExternalLink size={11} color="#FFFFFF" style={{ marginLeft: 3 }} />
-                                      </View>
+                                    <View style={[styles.clubeProductGridBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
+                                      <Text style={styles.clubeProductGridBuyBtnText}>Ver Oferta</Text>
+                                      <ExternalLink size={10} color="#FFFFFF" style={{ marginLeft: 3 }} />
                                     </View>
                                   </View>
                                 </TouchableOpacity>
@@ -9799,6 +9779,74 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontWeight: '800',
     color: '#38BDF8',
+  },
+
+  /* GRID DE PRODUTOS (2 POR LINHA) */
+  clubeProductGridContainer: {
+    width: '100%',
+    maxWidth: 400,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 4,
+  },
+  clubeProductGridCard: {
+    width: '48.5%',
+    backgroundColor: '#0F172A',
+    borderWidth: 1.2,
+    borderColor: '#1E293B',
+    borderRadius: 14,
+    overflow: 'hidden',
+    padding: 9,
+    marginBottom: 4,
+    justifyContent: 'space-between',
+  },
+  clubeProductGridImageContainer: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  clubeProductGridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  clubeProductGridBody: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  clubeProductGridTitle: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    lineHeight: 15.5,
+    minHeight: 31,
+  },
+  clubeProductGridPrice: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#10B981',
+    marginTop: 1,
+  },
+  clubeProductGridBuyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  clubeProductGridBuyBtnText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   /* CARDS DE PRODUTOS */
