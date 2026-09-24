@@ -5610,17 +5610,14 @@ export default function LoginScreen() {
 
                     {/* CLUBE DE DESCONTO (GOOGLE SHEETS) */}
                     {activeTab === 'CLUBE' && (() => {
-                      // 1. Categorias Principais (Vitrine com Melhores Ofertas em destaque)
+                      // 1. Categorias Principais (Sem emojis, limpo e direto)
                       const rawCategories = Array.from(new Set(clubeProducts.map(p => p.category?.trim()).filter(Boolean) as string[]));
                       
                       const mainCategories: { id: string; label: string }[] = [
-                        { id: 'destaques', label: '🔥 Melhores Ofertas' },
+                        { id: 'destaques', label: 'Destaques' },
                         ...rawCategories.map(cat => ({
                           id: cat,
-                          label: cat === 'Moda & Calçados' ? '👟 Moda & Calçados' :
-                                 cat === 'Celulares' ? '📱 Celulares' :
-                                 cat === 'Smart TVs' ? '📺 Smart TVs' :
-                                 cat === 'Ferramentas' ? '🛠️ Ferramentas' : cat
+                          label: cat === 'Moda & Calçados' ? 'Moda e Calçados' : cat
                         }))
                       ];
 
@@ -5629,20 +5626,20 @@ export default function LoginScreen() {
 
                       if (clubeCategory === 'destaques') {
                         availableSubcategories = [
-                          { id: 'todas', label: 'Todos os Destaques' },
-                          { id: '50_off', label: '🔥 +50% OFF' },
-                          { id: 'Smart TVs', label: '📺 Smart TVs' },
-                          { id: 'Celulares', label: '📱 Celulares' },
-                          { id: 'Ferramentas', label: '🛠️ Ferramentas' },
-                          { id: 'Moda & Calçados', label: '👟 Moda' },
+                          { id: 'todas', label: 'Todos' },
+                          { id: '50_off', label: '+50% OFF' },
+                          { id: 'Smart TVs', label: 'Smart TVs' },
+                          { id: 'Celulares', label: 'Celulares' },
+                          { id: 'Ferramentas', label: 'Ferramentas' },
+                          { id: 'Moda & Calçados', label: 'Moda' },
                         ];
                       } else if (clubeCategory === 'Smart TVs') {
                         availableSubcategories = [
-                          { id: 'todas', label: 'Todas as TVs' },
-                          { id: 'size_under32', label: '📏 Até 32"' },
-                          { id: 'size_40to43', label: '📏 40" a 43"' },
-                          { id: 'size_50to55', label: '📏 50" a 55"' },
-                          { id: 'size_above60', label: '📏 60" ou mais' },
+                          { id: 'todas', label: 'Todas' },
+                          { id: 'size_under32', label: 'Até 32"' },
+                          { id: 'size_40to43', label: '40" a 43"' },
+                          { id: 'size_50to55', label: '50" a 55"' },
+                          { id: 'size_above60', label: '60" ou mais' },
                           { id: 'brand_lg', label: 'LG' },
                           { id: 'brand_samsung', label: 'Samsung' },
                           { id: 'brand_philco', label: 'Philco' },
@@ -5650,44 +5647,44 @@ export default function LoginScreen() {
                         ];
                       } else if (clubeCategory === 'Celulares') {
                         availableSubcategories = [
-                          { id: 'todas', label: 'Todos os Celulares' },
-                          { id: 'brand_samsung', label: 'Samsung Galaxy' },
-                          { id: 'brand_motorola', label: 'Motorola Moto' },
-                          { id: 'brand_xiaomi', label: 'Xiaomi & Poco' },
+                          { id: 'todas', label: 'Todos' },
+                          { id: 'brand_samsung', label: 'Samsung' },
+                          { id: 'brand_motorola', label: 'Motorola' },
+                          { id: 'brand_xiaomi', label: 'Xiaomi' },
                           { id: 'brand_realme', label: 'Realme' },
-                          { id: 'feat_5g', label: '⚡ Rede 5G' },
-                          { id: 'feat_storage', label: '💾 256GB+' },
+                          { id: 'feat_5g', label: '5G' },
+                          { id: 'feat_storage', label: '256GB+' },
                         ];
                       } else if (clubeCategory === 'Ferramentas') {
                         availableSubcategories = [
-                          { id: 'todas', label: 'Todas as Ferramentas' },
+                          { id: 'todas', label: 'Todas' },
                           { id: 'Furadeiras & Parafusadeiras', label: 'Furadeiras & Parafusadeiras' },
                           { id: 'Esmerilhadeiras', label: 'Esmerilhadeiras' },
                           { id: 'Serras & Discos', label: 'Serras & Discos' },
-                          { id: 'Máquinas de Solda', label: 'Máquinas de Solda' },
-                          { id: 'Jogos de Ferramentas', label: 'Jogos de Ferramentas' },
+                          { id: 'Máquinas de Solda', label: 'Solda' },
+                          { id: 'Jogos de Ferramentas', label: 'Jogos & Kits' },
                         ];
                       } else if (clubeCategory === 'Moda & Calçados') {
                         availableSubcategories = [
-                          { id: 'todas', label: 'Toda a Moda' },
+                          { id: 'todas', label: 'Todas' },
                           { id: 'Tênis & Calçados', label: 'Tênis & Calçados' },
                           { id: 'Mochilas & Bolsas', label: 'Mochilas & Bolsas' },
-                          { id: 'Fitness & Treino', label: 'Fitness & Treino' },
-                          { id: 'Moda Feminina', label: 'Moda Feminina' },
-                          { id: 'Moda Masculina', label: 'Moda Masculina' },
+                          { id: 'Fitness & Treino', label: 'Fitness' },
+                          { id: 'Moda Feminina', label: 'Feminino' },
+                          { id: 'Moda Masculina', label: 'Masculino' },
                         ];
                       } else {
                         const catProducts = clubeProducts.filter(p => p.category?.toLowerCase() === clubeCategory.toLowerCase());
                         const rawSubs = Array.from(new Set(catProducts.map(p => p.subcategory?.trim()).filter(Boolean) as string[]));
                         availableSubcategories = [
-                          { id: 'todas', label: 'Todas as Ofertas' },
+                          { id: 'todas', label: 'Todas' },
                           ...rawSubs.map(s => ({ id: s, label: s }))
                         ];
                       }
 
                       // Opções de Faixa de Preço
                       const priceRanges: { id: 'all' | 'under100' | '100to300' | '300to1000' | 'above1000'; label: string }[] = [
-                        { id: 'all', label: 'Todos os Preços' },
+                        { id: 'all', label: 'Qualquer Preço' },
                         { id: 'under100', label: 'Até R$ 100' },
                         { id: '100to300', label: 'R$ 100 a R$ 300' },
                         { id: '300to1000', label: 'R$ 300 a R$ 1.000' },
@@ -5696,9 +5693,9 @@ export default function LoginScreen() {
 
                       // Opções de Ordenação
                       const sortOptions: { id: 'discount' | 'price_asc' | 'price_desc'; label: string }[] = [
-                        { id: 'discount', label: '🔥 Maior Desconto' },
-                        { id: 'price_asc', label: '💰 Menor Preço' },
-                        { id: 'price_desc', label: '💎 Maior Preço' },
+                        { id: 'discount', label: 'Maior Desconto' },
+                        { id: 'price_asc', label: 'Menor Preço' },
+                        { id: 'price_desc', label: 'Maior Preço' },
                       ];
 
                       // 3. Filtragem dos produtos
@@ -5812,40 +5809,42 @@ export default function LoginScreen() {
 
                       return (
                         <View style={styles.planoTabWrapper}>
-                          {/* 1. BARRA DE BUSCA COM BOTÃO DE ATUALIZAR */}
-                          <View style={styles.clubeSearchContainer}>
-                            <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
-                            <TextInput
-                              style={styles.clubeSearchInput}
-                              placeholder="Buscar produto, marca ou categoria..."
-                              placeholderTextColor="#64748B"
-                              value={clubeSearchQuery}
-                              onChangeText={setClubeSearchQuery}
-                              returnKeyType="search"
-                            />
-                            {clubeSearchQuery.length > 0 && (
+                          {/* 1. BARRA DE BUSCA COMPACTA */}
+                          <View style={styles.clubeCompactSearchRow}>
+                            <View style={styles.clubeSearchContainer}>
+                              <Search size={16} color="#64748B" style={{ marginLeft: 10, marginRight: 6 }} />
+                              <TextInput
+                                style={styles.clubeSearchInput}
+                                placeholder="Buscar produtos e marcas..."
+                                placeholderTextColor="#64748B"
+                                value={clubeSearchQuery}
+                                onChangeText={setClubeSearchQuery}
+                                returnKeyType="search"
+                              />
+                              {clubeSearchQuery.length > 0 && (
+                                <TouchableOpacity
+                                  onPress={() => setClubeSearchQuery('')}
+                                  style={{ padding: 4, marginRight: 2 }}
+                                >
+                                  <X size={15} color="#94A3B8" />
+                                </TouchableOpacity>
+                              )}
                               <TouchableOpacity
-                                onPress={() => setClubeSearchQuery('')}
-                                style={{ padding: 6, marginRight: 4 }}
+                                onPress={loadClubeProducts}
+                                style={{ padding: 6, marginRight: 6 }}
+                                activeOpacity={0.7}
                               >
-                                <X size={16} color="#94A3B8" />
+                                <RefreshCw size={14} color="#94A3B8" />
                               </TouchableOpacity>
-                            )}
-                            <TouchableOpacity
-                              onPress={loadClubeProducts}
-                              style={{ padding: 6, marginRight: 8 }}
-                              activeOpacity={0.7}
-                            >
-                              <RefreshCw size={16} color="#94A3B8" />
-                            </TouchableOpacity>
+                            </View>
                           </View>
 
-                          {/* 2. CATEGORIAS PRINCIPAIS */}
+                          {/* 2. CATEGORIAS PRINCIPAIS (DESIGN CLEAN E COMPACTO) */}
                           <View style={styles.clubeCatContainer}>
                             <ScrollView
                               horizontal
                               showsHorizontalScrollIndicator={false}
-                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 6, alignItems: 'center' }}
                               style={{ flexGrow: 0 }}
                             >
                               {mainCategories.map(cat => {
@@ -5872,9 +5871,9 @@ export default function LoginScreen() {
                             </ScrollView>
                           </View>
 
-                          {/* 3. SUBCATEGORIAS E TAMANHOS DE TELA */}
+                          {/* 3. SUBCATEGORIAS & TAMANHOS DE TELA (CHIPS COMPACTOS) */}
                           {availableSubcategories.length > 1 && (
-                            <View style={[styles.clubeCatContainer, { marginTop: -4, marginBottom: 10 }]}>
+                            <View style={[styles.clubeCatContainer, { marginTop: -4, marginBottom: 6 }]}>
                               <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
@@ -5903,79 +5902,70 @@ export default function LoginScreen() {
                             </View>
                           )}
 
-                          {/* 4. FILTROS DE PREÇO E ORDENAÇÃO */}
-                          <View style={styles.clubeFilterBarContainer}>
-                            {/* Linha de Faixas de Preço */}
-                            <View style={styles.clubeFilterRow}>
-                              <View style={styles.clubeFilterLabelGroup}>
-                                <Tag size={12} color="#94A3B8" />
-                                <Text style={styles.clubeFilterLabel}>Preço:</Text>
-                              </View>
-                              <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ gap: 6, paddingRight: 4 }}
-                                style={{ flexGrow: 0 }}
-                              >
-                                {priceRanges.map(pr => {
-                                  const isActive = clubePriceRange === pr.id;
-                                  return (
-                                    <TouchableOpacity
-                                      key={pr.id}
-                                      style={[
-                                        styles.clubeFilterChip,
-                                        isActive && styles.clubeFilterChipActive
-                                      ]}
-                                      onPress={() => setClubePriceRange(pr.id)}
-                                      activeOpacity={0.75}
-                                    >
-                                      <Text style={[styles.clubeFilterChipText, isActive && styles.clubeFilterChipTextActive]}>
-                                        {pr.label}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </ScrollView>
-                            </View>
+                          {/* 4. FILTRO DE PREÇO & ORDENAÇÃO (FITA COMPACTA HORIZONTAL) */}
+                          <View style={styles.clubeCompactFilterStrip}>
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={{ gap: 5, paddingHorizontal: 2, alignItems: 'center' }}
+                              style={{ flexGrow: 0 }}
+                            >
+                              {/* Faixas de Preço */}
+                              {priceRanges.map(pr => {
+                                const isActive = clubePriceRange === pr.id;
+                                if (!isActive && pr.id === 'all') return null;
+                                return (
+                                  <TouchableOpacity
+                                    key={pr.id}
+                                    style={[
+                                      styles.clubeFilterChip,
+                                      isActive && pr.id !== 'all' && styles.clubeFilterChipActive
+                                    ]}
+                                    onPress={() => {
+                                      // Toggle se já selecionado
+                                      if (isActive && pr.id !== 'all') {
+                                        setClubePriceRange('all');
+                                      } else {
+                                        setClubePriceRange(pr.id);
+                                      }
+                                    }}
+                                    activeOpacity={0.75}
+                                  >
+                                    <Text style={[styles.clubeFilterChipText, isActive && pr.id !== 'all' && styles.clubeFilterChipTextActive]}>
+                                      {pr.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
 
-                            {/* Linha de Ordenação */}
-                            <View style={[styles.clubeFilterRow, { marginTop: 8 }]}>
-                              <View style={styles.clubeFilterLabelGroup}>
-                                <ArrowUpDown size={12} color="#94A3B8" />
-                                <Text style={styles.clubeFilterLabel}>Ordenar:</Text>
-                              </View>
-                              <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ gap: 6, paddingRight: 4 }}
-                                style={{ flexGrow: 0 }}
-                              >
-                                {sortOptions.map(sort => {
-                                  const isActive = clubeSortOrder === sort.id;
-                                  return (
-                                    <TouchableOpacity
-                                      key={sort.id}
-                                      style={[
-                                        styles.clubeFilterChip,
-                                        isActive && styles.clubeSortChipActive
-                                      ]}
-                                      onPress={() => setClubeSortOrder(sort.id)}
-                                      activeOpacity={0.75}
-                                    >
-                                      <Text style={[styles.clubeFilterChipText, isActive && styles.clubeSortChipTextActive]}>
-                                        {sort.label}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  );
-                                })}
-                              </ScrollView>
-                            </View>
+                              <View style={styles.clubeFilterDivider} />
+
+                              {/* Ordenação */}
+                              {sortOptions.map(sort => {
+                                const isActive = clubeSortOrder === sort.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={sort.id}
+                                    style={[
+                                      styles.clubeFilterChip,
+                                      isActive && styles.clubeSortChipActive
+                                    ]}
+                                    onPress={() => setClubeSortOrder(sort.id)}
+                                    activeOpacity={0.75}
+                                  >
+                                    <Text style={[styles.clubeFilterChipText, isActive && styles.clubeSortChipTextActive]}>
+                                      {sort.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </ScrollView>
                           </View>
 
-                          {/* 5. STATUS BAR / CONTAGEM DE PRODUTOS */}
+                          {/* 5. STATUS BAR DISCRETA */}
                           <View style={styles.clubeStatusBar}>
                             <Text style={styles.clubeStatusBarText}>
-                              {filteredProducts.length === 1 ? '1 oferta encontrada' : `${filteredProducts.length} ofertas encontradas`}
+                              {filteredProducts.length === 1 ? '1 oferta' : `${filteredProducts.length} ofertas`}
                             </Text>
                             {hasActiveFilters && (
                               <TouchableOpacity
@@ -5983,16 +5973,16 @@ export default function LoginScreen() {
                                 onPress={resetClubeFilters}
                                 activeOpacity={0.7}
                               >
-                                <Text style={styles.clubeClearFiltersBtnText}>Limpar filtros</Text>
-                                <X size={12} color="#38BDF8" />
+                                <Text style={styles.clubeClearFiltersBtnText}>Limpar</Text>
+                                <X size={11} color="#38BDF8" />
                               </TouchableOpacity>
                             )}
                           </View>
 
                           {/* 6. LISTA DE PRODUTOS */}
-                          <View style={{ gap: 12, marginTop: 4, width: '100%', maxWidth: 400 }}>
+                          <View style={{ gap: 10, marginTop: 2, width: '100%', maxWidth: 400 }}>
                             {loadingClubeProducts ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 40 }]}>
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 36 }]}>
                                 <ActivityIndicator size="large" color={primaryColor || '#2563EB'} style={{ marginBottom: 12 }} />
                                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
                                   Carregando as melhores ofertas...
@@ -6002,12 +5992,12 @@ export default function LoginScreen() {
                                 </Text>
                               </View>
                             ) : clubeProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 }]}>
-                                <ShoppingBag size={38} color="#64748B" style={{ marginBottom: 12 }} />
-                                <Text style={{ fontSize: 16, fontWeight: '800', color: '#F8FAFC', marginBottom: 6, textAlign: 'center' }}>
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 }]}>
+                                <ShoppingBag size={36} color="#64748B" style={{ marginBottom: 10 }} />
+                                <Text style={{ fontSize: 15, fontWeight: '800', color: '#F8FAFC', marginBottom: 4, textAlign: 'center' }}>
                                   Nenhuma oferta disponível no momento
                                 </Text>
-                                <Text style={{ fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19, marginBottom: 16 }}>
+                                <Text style={{ fontSize: 12.5, color: '#94A3B8', textAlign: 'center', lineHeight: 18, marginBottom: 14 }}>
                                   Novos produtos e promoções exclusivas serão adicionados em breve.
                                 </Text>
                                 <TouchableOpacity
@@ -6015,18 +6005,18 @@ export default function LoginScreen() {
                                   onPress={loadClubeProducts}
                                   activeOpacity={0.8}
                                 >
-                                  <RefreshCw size={14} color="#FFFFFF" style={{ marginRight: 6 }} />
-                                  <Text style={styles.clubeRetryBtnText}>Atualizar Lista</Text>
+                                  <RefreshCw size={13} color="#FFFFFF" style={{ marginRight: 6 }} />
+                                  <Text style={styles.clubeRetryBtnText}>Atualizar</Text>
                                 </TouchableOpacity>
                               </View>
                             ) : filteredProducts.length === 0 ? (
-                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 32 }]}>
-                                <ShoppingBag size={32} color="#64748B" style={{ marginBottom: 10 }} />
-                                <Text style={{ fontSize: 15, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
+                              <View style={[styles.infoCard, { alignItems: 'center', paddingVertical: 28 }]}>
+                                <ShoppingBag size={28} color="#64748B" style={{ marginBottom: 8 }} />
+                                <Text style={{ fontSize: 14, fontWeight: '700', color: '#F8FAFC', marginBottom: 4 }}>
                                   Nenhum produto encontrado
                                 </Text>
-                                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
-                                  Tente ajustar os filtros de preço ou buscar por outro termo.
+                                <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center' }}>
+                                  Tente ajustar os filtros ou buscar por outro termo.
                                 </Text>
                               </View>
                             ) : (
@@ -6063,7 +6053,7 @@ export default function LoginScreen() {
                                     </View>
                                   ) : (
                                     <View style={[styles.clubeProductImageContainer, { backgroundColor: '#1E293B' }]}>
-                                      <ShoppingBag size={32} color="#64748B" />
+                                      <ShoppingBag size={30} color="#64748B" />
                                       {product.discount && (
                                         <View style={styles.clubeProductDiscountTag}>
                                           <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
@@ -6095,7 +6085,7 @@ export default function LoginScreen() {
                                       )}
                                     </View>
 
-                                    <View style={{ marginTop: 6 }}>
+                                    <View style={{ marginTop: 4 }}>
                                       {product.originalPrice && (
                                         <Text style={styles.clubeProductOriginalPrice}>
                                           {product.originalPrice}
@@ -6111,7 +6101,7 @@ export default function LoginScreen() {
                                     <View style={styles.clubeProductFooterRow}>
                                       <View style={[styles.clubeProductBuyBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
                                         <Text style={styles.clubeProductBuyBtnText}>Aproveitar Oferta</Text>
-                                        <ExternalLink size={12} color="#FFFFFF" style={{ marginLeft: 4 }} />
+                                        <ExternalLink size={11} color="#FFFFFF" style={{ marginLeft: 3 }} />
                                       </View>
                                     </View>
                                   </View>
@@ -9427,123 +9417,25 @@ const styles = StyleSheet.create({
     color: '#38BDF8',
   },
 
-  /* FILTROS DE PREÇO E ORDENAÇÃO */
-  clubeFilterBarContainer: {
+  /* BUSCA COMPACTA */
+  clubeCompactSearchRow: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    borderRadius: 14,
-    padding: 10,
-    marginBottom: 10,
-  },
-  clubeFilterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  clubeFilterLabelGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    minWidth: 70,
-  },
-  clubeFilterLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-  },
-  clubeFilterChip: {
-    backgroundColor: '#1E293B',
-    borderWidth: 1,
-    borderColor: '#334155',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-  },
-  clubeFilterChipActive: {
-    backgroundColor: '#064E3B',
-    borderColor: '#10B981',
-  },
-  clubeSortChipActive: {
-    backgroundColor: '#78350F',
-    borderColor: '#F59E0B',
-  },
-  clubeFilterChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  clubeFilterChipTextActive: {
-    color: '#34D399',
-    fontWeight: '800',
-  },
-  clubeSortChipTextActive: {
-    color: '#FCD34D',
-    fontWeight: '800',
-  },
-  clubeStatusBar: {
-    width: '100%',
-    maxWidth: 400,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
     marginBottom: 8,
   },
-  clubeStatusBarText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  clubeClearFiltersBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#1E293B',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  clubeClearFiltersBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#38BDF8',
-  },
-  clubeTvSizeBadge: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: '#0F172ACC',
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-    paddingVertical: 2,
-    paddingHorizontal: 5,
-    borderRadius: 4,
-  },
-  clubeTvSizeBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '800',
-    color: '#38BDF8',
-  },
-
-  /* BUSCA */
   clubeSearchContainer: {
     width: '100%',
-    maxWidth: 400,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#0F172A',
     borderWidth: 1,
     borderColor: '#334155',
-    borderRadius: 12,
-    height: 44,
-    marginBottom: 12,
+    borderRadius: 10,
+    height: 38,
   },
   clubeSearchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     color: '#F8FAFC',
     paddingVertical: 0,
   },
@@ -9552,7 +9444,7 @@ const styles = StyleSheet.create({
   clubeCatContainer: {
     width: '100%',
     maxWidth: 400,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   clubeCatPill: {
     flexDirection: 'row',
@@ -9560,9 +9452,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0F172A',
     borderWidth: 1,
     borderColor: '#334155',
-    paddingVertical: 7,
+    paddingVertical: 5,
     paddingHorizontal: 12,
-    borderRadius: 20,
+    borderRadius: 14,
   },
   clubeCatPillActive: {
     borderWidth: 1,
@@ -9581,10 +9473,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#0F172A',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingVertical: 5,
-    paddingHorizontal: 11,
-    borderRadius: 16,
+    borderColor: '#1E293B',
+    paddingVertical: 3.5,
+    paddingHorizontal: 9,
+    borderRadius: 12,
   },
   clubeSubCatPillActive: {
     backgroundColor: '#1E293B',
@@ -9598,6 +9490,93 @@ const styles = StyleSheet.create({
   clubeSubCatPillTextActive: {
     color: '#38BDF8',
     fontWeight: '800',
+  },
+
+  /* FITA DE FILTROS COMPACTA */
+  clubeCompactFilterStrip: {
+    width: '100%',
+    maxWidth: 400,
+    marginBottom: 6,
+  },
+  clubeFilterDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: '#334155',
+    marginHorizontal: 3,
+  },
+  clubeFilterChip: {
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  clubeFilterChipActive: {
+    backgroundColor: '#064E3B',
+    borderColor: '#10B981',
+  },
+  clubeSortChipActive: {
+    backgroundColor: '#78350F',
+    borderColor: '#F59E0B',
+  },
+  clubeFilterChipText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  clubeFilterChipTextActive: {
+    color: '#34D399',
+    fontWeight: '800',
+  },
+  clubeSortChipTextActive: {
+    color: '#FCD34D',
+    fontWeight: '800',
+  },
+  clubeStatusBar: {
+    width: '100%',
+    maxWidth: 400,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
+    marginBottom: 6,
+  },
+  clubeStatusBarText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  clubeClearFiltersBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#1E293B',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+  },
+  clubeClearFiltersBtnText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#38BDF8',
+  },
+
+  clubeTvSizeBadge: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    backgroundColor: '#0F172ACC',
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 4,
+  },
+  clubeTvSizeBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#38BDF8',
   },
 
   /* CARDS DE PRODUTOS */
