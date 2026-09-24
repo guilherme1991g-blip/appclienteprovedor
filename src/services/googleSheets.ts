@@ -7,9 +7,11 @@ export interface ClubeProduct {
   price: string;
   originalPrice?: string;
   discount?: string;
+  discountNumber?: number;
   image?: string;
   url: string;
   category?: string;
+  subcategory?: string;
   badge?: string;
   description?: string;
   sheetTab?: string;
@@ -308,29 +310,67 @@ export function inferCategory(title: string): string {
 }
 
 /**
- * Define a categoria principal do produto com base na aba da planilha e título
+ * Define a categoria e subcategoria do produto com base na aba da planilha e título
  */
-export function resolveCategory(tabName: string, title: string, explicitCategory?: string): string {
-  if (explicitCategory && explicitCategory.trim() && explicitCategory.trim() !== 'Geral') {
-    return explicitCategory.trim();
-  }
-
+export function resolveCategoryAndSubcategory(
+  tabName: string,
+  title: string,
+  explicitCategory?: string
+): { category: string; subcategory: string } {
   const cleanTab = tabName.toLowerCase().trim();
 
+  // 1. Celulares
   if (cleanTab.includes('celular') || cleanTab.includes('smartphone')) {
-    return 'Celulares';
-  }
-  if (cleanTab.includes('tv') || cleanTab.includes('televis')) {
-    return 'Smart TVs';
-  }
-  if (cleanTab.includes('ferramenta')) {
-    return 'Ferramentas';
-  }
-  if (cleanTab.includes('calcado') || cleanTab.includes('roupa') || cleanTab.includes('bolsa')) {
-    return inferCategory(title);
+    const t = title.toLowerCase();
+    let sub = 'Outros Celulares';
+    if (/samsung|galaxy/i.test(t)) sub = 'Samsung Galaxy';
+    else if (/motorola|moto/i.test(t)) sub = 'Motorola Moto';
+    else if (/xiaomi|poco|redmi/i.test(t)) sub = 'Xiaomi & Poco';
+    else if (/realme/i.test(t)) sub = 'Realme';
+    return { category: 'Celulares', subcategory: sub };
   }
 
-  return tabName.charAt(0).toUpperCase() + tabName.slice(1);
+  // 2. Smart TVs
+  if (cleanTab.includes('tv') || cleanTab.includes('televis')) {
+    const t = title.toLowerCase();
+    let sub = 'Outras Smart TVs';
+    if (/lg/i.test(t)) sub = 'Smart TVs LG';
+    else if (/samsung/i.test(t)) sub = 'Smart TVs Samsung';
+    else if (/philco/i.test(t)) sub = 'Smart TVs Philco';
+    else if (/tcl|philips/i.test(t)) sub = 'TCL & Philips';
+    return { category: 'Smart TVs', subcategory: sub };
+  }
+
+  // 3. Ferramentas
+  if (cleanTab.includes('ferramenta')) {
+    const t = title.toLowerCase();
+    let sub = 'Outras Ferramentas';
+    if (/(furadeira|parafusadeira|impacto)/i.test(t)) sub = 'Furadeiras & Parafusadeiras';
+    else if (/(esmerilhadeira|lixadeira)/i.test(t)) sub = 'Esmerilhadeiras';
+    else if (/(serra)/i.test(t)) sub = 'Serras & Discos';
+    else if (/(solda|inversora|mig|tig)/i.test(t)) sub = 'Máquinas de Solda';
+    else if (/(jogo|kit|chave|maleta|soquete|catraca|broca)/i.test(t)) sub = 'Jogos de Ferramentas';
+    return { category: 'Ferramentas', subcategory: sub };
+  }
+
+  // 4. Moda, Calçados e Bolsas
+  if (cleanTab.includes('calcado') || cleanTab.includes('roupa') || cleanTab.includes('bolsa')) {
+    const t = title.toLowerCase();
+    let sub = 'Vestuário & Moda';
+    if (/(t[eê]nis|sapat[eê]nis|chinelo|botina|bota|sand[aá]lia|sapato|cal[cç]ado)/i.test(t)) sub = 'Tênis & Calçados';
+    else if (/(mochila|bolsa|mala|carteira|pochete)/i.test(t)) sub = 'Mochilas & Bolsas';
+    else if (/(fitness|treino|academia|dry[\s-]?fit|t[eé]rmica|legging|corrida)/i.test(t)) sub = 'Fitness & Treino';
+    else if (/(feminina|feminino|mulher|saia|vestido|calcinha|cropped|pantalona|blusinha|flare)/i.test(t)) sub = 'Moda Feminina';
+    else if (/(masculin[oa]|homem|sunga|cueca|bermuda|camisa|camiseta|cal[cç]a|short)/i.test(t)) sub = 'Moda Masculina';
+    return { category: 'Moda & Calçados', subcategory: sub };
+  }
+
+  // Fallback
+  const catName = explicitCategory && explicitCategory.trim() && explicitCategory.trim() !== 'Geral'
+    ? explicitCategory.trim()
+    : tabName.charAt(0).toUpperCase() + tabName.slice(1);
+
+  return { category: catName, subcategory: 'Geral' };
 }
 
 /**
@@ -359,18 +399,22 @@ function parseSheetCsvRecords(csvText: string, tab: SheetTab): ClubeProduct[] {
     // 4. Imagem (com fallback posicional da coluna 5)
     const imageRaw = findField(rec, ['imagem', 'image', 'foto', 'foto_url', 'img', 'link_imagem', 'foto_link']) || rec._row[5] || '';
 
-    // 5. Categoria (baseada na aba da planilha e título)
+    // 5. Categoria e Subcategoria (baseadas na aba da planilha e título)
     const explicitCategory = findField(rec, ['categoria', 'category', 'departamento', 'secao', 'tipo']);
-    const category = resolveCategory(tab.name, title, explicitCategory);
+    const { category, subcategory } = resolveCategoryAndSubcategory(tab.name, title, explicitCategory);
 
-    // 6. Badge em destaque (ex: Oferta imperdível se desconto for alto)
+    // 6. Percentual numérico de desconto
+    const discountNumber = discountRaw ? parseInt(discountRaw.replace(/\D/g, ''), 10) || 0 : 0;
+
+    // 7. Badge em destaque (ex: Oferta imperdível se desconto for alto)
     let badge = findField(rec, ['badge', 'destaque', 'tag', 'selo', 'tipo_destaque']);
-    if (!badge && discountRaw) {
-      const discountNumber = parseInt(discountRaw.replace(/\D/g, ''), 10);
+    if (!badge && discountNumber > 0) {
       if (discountNumber >= 65) {
         badge = 'OFERTA IMPERDÍVEL';
       } else if (discountNumber >= 50) {
         badge = 'SUPER DESCONTO';
+      } else if (discountNumber >= 40) {
+        badge = 'DESTAQUE';
       }
     }
 
@@ -388,9 +432,11 @@ function parseSheetCsvRecords(csvText: string, tab: SheetTab): ClubeProduct[] {
       price: formatPrice(priceRaw),
       originalPrice: originalPriceRaw ? formatPrice(originalPriceRaw) : undefined,
       discount: discount,
+      discountNumber,
       image: imageRaw || undefined,
       url: formatProductLink(urlRaw),
       category: category || 'Geral',
+      subcategory: subcategory || 'Geral',
       badge: badge || undefined,
       description: description || undefined,
       sheetTab: tab.name,

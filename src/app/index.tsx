@@ -994,7 +994,8 @@ export default function LoginScreen() {
   // Clube de Desconto (Google Sheets) State
   const [clubeProducts, setClubeProducts] = useState<ClubeProduct[]>([]);
   const [loadingClubeProducts, setLoadingClubeProducts] = useState(false);
-  const [clubeCategory, setClubeCategory] = useState<string>('todos');
+  const [clubeCategory, setClubeCategory] = useState<string>('destaques');
+  const [clubeSubcategory, setClubeSubcategory] = useState<string>('todas');
   const [clubeSearchQuery, setClubeSearchQuery] = useState('');
   const [clubeError, setClubeError] = useState<string | null>(null);
 
@@ -5567,19 +5568,80 @@ export default function LoginScreen() {
 
                     {/* CLUBE DE DESCONTO (GOOGLE SHEETS) */}
                     {activeTab === 'CLUBE' && (() => {
-                      // Lista de categorias presentes nos produtos
+                      // 1. Categorias Principais (Ao invés de "Todas", a vitrine inicia em "🔥 Melhores Ofertas")
                       const rawCategories = Array.from(new Set(clubeProducts.map(p => p.category?.trim()).filter(Boolean) as string[]));
-                      const availableCategories = ['todos', ...rawCategories];
+                      
+                      const mainCategories: { id: string; label: string }[] = [
+                        { id: 'destaques', label: '🔥 Melhores Ofertas' },
+                        ...rawCategories.map(cat => ({
+                          id: cat,
+                          label: cat === 'Moda & Calçados' ? '👟 Moda & Calçados' :
+                                 cat === 'Celulares' ? '📱 Celulares' :
+                                 cat === 'Smart TVs' ? '📺 Smart TVs' :
+                                 cat === 'Ferramentas' ? '🛠️ Ferramentas' : cat
+                        }))
+                      ];
 
-                      // Filtragem dos produtos
-                      const filteredProducts = clubeProducts.filter(p => {
-                        const matchesCategory = clubeCategory === 'todos' || (p.category && p.category.toLowerCase() === clubeCategory.toLowerCase());
+                      // 2. Subcategorias contextuais baseadas na Categoria selecionada
+                      let availableSubcategories: { id: string; label: string }[] = [];
+
+                      if (clubeCategory === 'destaques') {
+                        availableSubcategories = [
+                          { id: 'todas', label: 'Todos os Destaques' },
+                          { id: '50_off', label: '🔥 +50% OFF' },
+                          { id: 'Celulares', label: '📱 Celulares' },
+                          { id: 'Smart TVs', label: '📺 Smart TVs' },
+                          { id: 'Ferramentas', label: '🛠️ Ferramentas' },
+                          { id: 'Moda & Calçados', label: '👟 Moda' },
+                        ];
+                      } else {
+                        const catProducts = clubeProducts.filter(p => p.category?.toLowerCase() === clubeCategory.toLowerCase());
+                        const rawSubs = Array.from(new Set(catProducts.map(p => p.subcategory?.trim()).filter(Boolean) as string[]));
+                        availableSubcategories = [
+                          { id: 'todas', label: 'Todas as Ofertas' },
+                          ...rawSubs.map(s => ({ id: s, label: s }))
+                        ];
+                      }
+
+                      // 3. Filtragem dos produtos
+                      let filteredProducts = clubeProducts.filter(p => {
+                        // Busca textual
                         const matchesSearch = !clubeSearchQuery.trim() || 
                           p.title.toLowerCase().includes(clubeSearchQuery.toLowerCase()) ||
                           (p.category && p.category.toLowerCase().includes(clubeSearchQuery.toLowerCase())) ||
+                          (p.subcategory && p.subcategory.toLowerCase().includes(clubeSearchQuery.toLowerCase())) ||
                           (p.description && p.description.toLowerCase().includes(clubeSearchQuery.toLowerCase()));
-                        return matchesCategory && matchesSearch;
+
+                        if (!matchesSearch) return false;
+
+                        // Filtro de Destaques
+                        if (clubeCategory === 'destaques') {
+                          if (clubeSubcategory === '50_off') {
+                            return (p.discountNumber || 0) >= 50;
+                          }
+                          if (clubeSubcategory !== 'todas') {
+                            return p.category?.toLowerCase() === clubeSubcategory.toLowerCase();
+                          }
+                          // Exibe ofertas com desconto relevante (>= 35% OFF)
+                          return (p.discountNumber || 0) >= 35 || !!p.discount;
+                        }
+
+                        // Categoria selecionada
+                        const matchesCategory = p.category?.toLowerCase() === clubeCategory.toLowerCase();
+                        if (!matchesCategory) return false;
+
+                        // Subcategoria selecionada
+                        if (clubeSubcategory !== 'todas') {
+                          return p.subcategory?.toLowerCase() === clubeSubcategory.toLowerCase();
+                        }
+
+                        return true;
                       });
+
+                      // Em "Melhores Ofertas", ordena do maior para o menor desconto
+                      if (clubeCategory === 'destaques') {
+                        filteredProducts = [...filteredProducts].sort((a, b) => (b.discountNumber || 0) - (a.discountNumber || 0));
+                      }
 
                       return (
                         <View style={styles.planoTabWrapper}>
@@ -5588,7 +5650,7 @@ export default function LoginScreen() {
                             <Search size={18} color="#94A3B8" style={{ marginLeft: 12, marginRight: 8 }} />
                             <TextInput
                               style={styles.clubeSearchInput}
-                              placeholder="Buscar produto ou categoria..."
+                              placeholder="Buscar produto, marca ou categoria..."
                               placeholderTextColor="#64748B"
                               value={clubeSearchQuery}
                               onChangeText={setClubeSearchQuery}
@@ -5611,29 +5673,61 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                           </View>
 
-                          {/* 2. CATEGORIAS (SOMENTE SE HOUVER CATEGORIAS CADASTRADAS) */}
-                          {availableCategories.length > 2 && (
-                            <View style={styles.clubeCatContainer}>
+                          {/* 2. CATEGORIAS PRINCIPAIS */}
+                          <View style={styles.clubeCatContainer}>
+                            <ScrollView
+                              horizontal
+                              showsHorizontalScrollIndicator={false}
+                              contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
+                              style={{ flexGrow: 0 }}
+                            >
+                              {mainCategories.map(cat => {
+                                const isActive = clubeCategory === cat.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={cat.id}
+                                    style={[
+                                      styles.clubeCatPill,
+                                      isActive && [styles.clubeCatPillActive, { backgroundColor: primaryColor || '#2563EB', borderColor: primaryColor || '#2563EB' }]
+                                    ]}
+                                    onPress={() => {
+                                      setClubeCategory(cat.id);
+                                      setClubeSubcategory('todas');
+                                    }}
+                                    activeOpacity={0.75}
+                                  >
+                                    <Text style={[styles.clubeCatPillText, isActive && styles.clubeCatPillTextActive]}>
+                                      {cat.label}
+                                    </Text>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </ScrollView>
+                          </View>
+
+                          {/* 3. SUBCATEGORIAS (CHIPS REFINADOS) */}
+                          {availableSubcategories.length > 1 && (
+                            <View style={[styles.clubeCatContainer, { marginTop: -4, marginBottom: 12 }]}>
                               <ScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={{ paddingHorizontal: 2, gap: 8, alignItems: 'center' }}
+                                contentContainerStyle={{ paddingHorizontal: 2, gap: 6, alignItems: 'center' }}
                                 style={{ flexGrow: 0 }}
                               >
-                                {availableCategories.map(cat => {
-                                  const isActive = clubeCategory === cat;
+                                {availableSubcategories.map(sub => {
+                                  const isActive = clubeSubcategory === sub.id;
                                   return (
                                     <TouchableOpacity
-                                      key={cat}
+                                      key={sub.id}
                                       style={[
-                                        styles.clubeCatPill,
-                                        isActive && [styles.clubeCatPillActive, { backgroundColor: primaryColor || '#2563EB', borderColor: primaryColor || '#2563EB' }]
+                                        styles.clubeSubCatPill,
+                                        isActive && styles.clubeSubCatPillActive
                                       ]}
-                                      onPress={() => setClubeCategory(cat)}
+                                      onPress={() => setClubeSubcategory(sub.id)}
                                       activeOpacity={0.75}
                                     >
-                                      <Text style={[styles.clubeCatPillText, isActive && styles.clubeCatPillTextActive]}>
-                                        {cat === 'todos' ? 'Todas as Ofertas' : cat}
+                                      <Text style={[styles.clubeSubCatPillText, isActive && styles.clubeSubCatPillTextActive]}>
+                                        {sub.label}
                                       </Text>
                                     </TouchableOpacity>
                                   );
@@ -5725,7 +5819,7 @@ export default function LoginScreen() {
                                     <View>
                                       {product.category && product.category !== 'Geral' && (
                                         <Text style={styles.clubeProductCatLabel} numberOfLines={1}>
-                                          {product.category.toUpperCase()}
+                                          {product.category.toUpperCase()}{product.subcategory && product.subcategory !== 'Geral' ? ` • ${product.subcategory.toUpperCase()}` : ''}
                                         </Text>
                                       )}
                                       <Text style={styles.clubeProductTitle} numberOfLines={2}>
@@ -9018,6 +9112,29 @@ const styles = StyleSheet.create({
   },
   clubeCatPillTextActive: {
     color: '#FFFFFF',
+    fontWeight: '800',
+  },
+  clubeSubCatPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#334155',
+    paddingVertical: 5,
+    paddingHorizontal: 11,
+    borderRadius: 16,
+  },
+  clubeSubCatPillActive: {
+    backgroundColor: '#1E293B',
+    borderColor: '#38BDF8',
+  },
+  clubeSubCatPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  clubeSubCatPillTextActive: {
+    color: '#38BDF8',
     fontWeight: '800',
   },
 
