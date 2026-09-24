@@ -3250,7 +3250,11 @@ export default function LoginScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={[styles.safeArea, (screenState === 'DASHBOARD' && activeTab === 'CLUBE') && { backgroundColor: '#FFFFFF' }]}>
+      <StatusBar
+        barStyle={(screenState === 'DASHBOARD' && activeTab === 'CLUBE') ? 'dark-content' : 'light-content'}
+        backgroundColor={(screenState === 'DASHBOARD' && activeTab === 'CLUBE') ? '#FFFFFF' : '#080B11'}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoid}
@@ -3264,10 +3268,10 @@ export default function LoginScreen() {
 
             if (isActiveOrSuspended) {
               return (
-                <View style={styles.dashboardWrapper}>
+                <View style={[styles.dashboardWrapper, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF' }]}>
                   
                   {/* TOP HEADER BAR (Sleek layout with initials avatar and metadata badges) */}
-                  <View style={styles.dashboardHeader}>
+                  <View style={[styles.dashboardHeader, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
                     <View style={styles.headerInfoLeft}>
                       <View style={styles.avatarRow}>
                         <View style={styles.avatarCircle}>
@@ -3276,14 +3280,14 @@ export default function LoginScreen() {
                           </Text>
                         </View>
                         <View style={styles.headerGreetingCol}>
-                          <Text style={styles.headerGreeting}>Olá, {firstName}!</Text>
-                          <Text style={styles.headerMetaText}>Contrato: #{selectedContract.id}</Text>
+                          <Text style={[styles.headerGreeting, activeTab === 'CLUBE' && { color: '#0F172A' }]}>Olá, {firstName}!</Text>
+                          <Text style={[styles.headerMetaText, activeTab === 'CLUBE' && { color: '#64748B' }]}>Contrato: #{selectedContract.id}</Text>
                         </View>
                       </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       <TouchableOpacity
-                        style={styles.logoutButton}
+                        style={[styles.logoutButton, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
                         onPress={handleOpenNotificationCenter}
                         activeOpacity={0.7}
                       >
@@ -3297,7 +3301,7 @@ export default function LoginScreen() {
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity
-                        style={styles.logoutButton}
+                        style={[styles.logoutButton, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0' }]}
                         onPress={handleLogout}
                         activeOpacity={0.7}
                       >
@@ -3307,10 +3311,10 @@ export default function LoginScreen() {
                   </View>
 
                   {/* SUB-HEADER: BADGES ROW (Clean wifi and status tags) */}
-                  <View style={styles.badgesRow}>
-                    <View style={styles.badgeItem}>
+                  <View style={[styles.badgesRow, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
+                    <View style={[styles.badgeItem, activeTab === 'CLUBE' && { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' }]}>
                       <Wifi size={12} color="#2563EB" style={{ marginRight: 5 }} />
-                      <Text style={styles.badgeText} numberOfLines={1}>
+                      <Text style={[styles.badgeText, activeTab === 'CLUBE' && { color: '#0F172A' }]} numberOfLines={1}>
                         {selectedContract.planName.toUpperCase()}
                       </Text>
                     </View>
@@ -3333,7 +3337,7 @@ export default function LoginScreen() {
 
                   {/* CENTER CONTENT AREA (Scrolls independently inside dashboard) */}
                   <ScrollView 
-                    style={styles.dashboardScroll}
+                    style={[styles.dashboardScroll, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF' }]}
                     contentContainerStyle={styles.dashboardContent}
                     keyboardShouldPersistTaps="handled"
                   >
@@ -6168,7 +6172,7 @@ export default function LoginScreen() {
                   )}
 
                   {/* BOTTOM NAVIGATION TAB BAR WITH MODERN NATIVE STYLING */}
-                  <View style={styles.bottomTabBarContainer}>
+                  <View style={[styles.bottomTabBarContainer, activeTab === 'CLUBE' && { backgroundColor: '#FFFFFF', borderTopColor: '#E2E8F0', shadowOpacity: 0.06 }]}>
                     <View style={styles.bottomTabBar}>
                       {/* Tab 1: Conexão */}
                       <TouchableOpacity
