@@ -2,7 +2,7 @@
   "expo": {
     "name": "CBR FIBRA",
     "slug": "isp-client-app",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "default",
     "icon": "./assets/providers/cbrfibra/icon.png",
     "scheme": "ispclientapp",

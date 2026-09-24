@@ -25,7 +25,7 @@ module.exports = {
     projectId: 'aafada6b-7654-4823-8342-8b3b691d1db6',
     bundleIdentifier: 'br.com.webconnect.cliente',
     package: 'br.com.webconnect.cliente',
-    version: '1.0.1',
+    version: '1.0.2',
     buildNumber: '4',
     versionCode: 4,
     scheme: 'webconnect',
