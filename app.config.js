@@ -89,7 +89,7 @@ module.exports = ({ config }) => {
       ...(provider.projectId ? { eas: { projectId: provider.projectId } } : {}),
       providerCode: provider.code,
     },
-    runtimeVersion: {
+    runtimeVersion: process.env.EXPO_RUNTIME_VERSION || provider.runtimeVersion || {
       policy: 'appVersion',
     },
     ...(provider.projectId

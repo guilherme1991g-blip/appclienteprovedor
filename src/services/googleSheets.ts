@@ -346,16 +346,180 @@ export function inferCategory(title: string): string {
 }
 
 /**
- * Define a categoria e subcategoria do produto com base na aba da planilha e título
+ * Infere categoria E subcategoria de um produto a partir do título (para abas genéricas)
+ */
+export function inferCategoryAndSubcategory(title: string): { category: string; subcategory: string } {
+  const t = title.toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  // ── Celulares & Smartphones ────────────────────────────────────────────────
+  if (/(celular|smartphone|iphone|moto\s*[a-z0-9]|galaxy|xiaomi|redmi|poco|realme|android\s*phone|jovi|tcl\s*\d|note\s*\d.*gb|ram.*boost|gb\s*ram)/i.test(t)) {
+    let sub = 'Outros Celulares';
+    if (/samsung|galaxy/i.test(t)) sub = 'Samsung Galaxy';
+    else if (/motorola|moto/i.test(t)) sub = 'Motorola Moto';
+    else if (/xiaomi|poco|redmi/i.test(t)) sub = 'Xiaomi & Poco';
+    else if (/realme/i.test(t)) sub = 'Realme';
+    else if (/iphone/i.test(t)) sub = 'iPhone';
+    return { category: 'Celulares', subcategory: sub };
+  }
+
+  // ── Smart TVs ─────────────────────────────────────────────────────────────
+  if (/(smart\s*tv|televisao|nano.*tv|tv.*portati|tv.*android|\btv\b|qled|oled|4k.*uhd|hdr10)/i.test(t)
+    && !/(suporte.*tv|painel.*tv|rack.*tv)/i.test(t)) {
+    let sub = 'Outras Smart TVs';
+    if (/\blg\b/i.test(t)) sub = 'Smart TVs LG';
+    else if (/samsung/i.test(t)) sub = 'Smart TVs Samsung';
+    else if (/philco/i.test(t)) sub = 'Smart TVs Philco';
+    else if (/tcl|philips/i.test(t)) sub = 'TCL & Philips';
+    return { category: 'Smart TVs', subcategory: sub };
+  }
+
+  // ── Ar Condicionado, Climatização & Ventiladores ──────────────────────────
+  if (/(ar\s*condicionado|split|inverter|btu|climatizador|desumidificador|ventilad|ventoinha|clima)/i.test(t)) {
+    let sub = 'Ventiladores & Climatização';
+    if (/(ar\s*condicionado|split|btu)/i.test(t)) sub = 'Ar Condicionado';
+    else if (/climatizador/i.test(t)) sub = 'Climatizadores';
+    else if (/desumidificador/i.test(t)) sub = 'Desumidificadores';
+    else if (/ventilad/i.test(t)) sub = 'Ventiladores';
+    return { category: 'Climatização', subcategory: sub };
+  }
+
+  // ── Suplementos, Saúde & Nutrição ─────────────────────────────────────────
+  if (/(whey|creatina|suplemento|proteina|bcaa|pre.*treino|colageno|vitamina|hipercalorico|albumina|glutamina|omega|termogenico|cafeina|multivitaminico|ganho.*massa|bebida.*lactea.*whey|simfort|vitafor|max.*titanium|growth|integralmédica|integralmedica|magnesio|magnesios|coenzima|supercoffee|super.*coffee|nac\s*600|cisteina|capsulas|candidase)/i.test(t)) {
+    return { category: 'Suplementos', subcategory: 'Suplementos & Nutrição' };
+  }
+
+  // ── Beleza, Cabelo & Cuidados Pessoais ────────────────────────────────────
+  if (/(protetor.*solar|fps|shampoo|condicionador|oleo.*capilar|serum|hidratante|loção|la.*roche|cerave|cetaphil|kerastase|creme|secador|escova|chapinha|prancha|aparador.*pelo|barbeador|maquina.*barbear|modelador|alisador|depilador|perfume|maquiagem|esmalt|batom|cabelo|anti.*queda|kemei|gama.*italy|progressiva|massageador|pente)/i.test(t)) {
+    return { category: 'Beleza & Saúde', subcategory: 'Cuidados Pessoais & Cabelo' };
+  }
+
+  // ── Ferramentas & Construção ──────────────────────────────────────────────
+  if (/(furadeira|parafusadeira|esmerilhadeira|lixadeira|serra|inversora|solda|compressor|catraca|soquete|alicate|broca|rebarbadora|pregador|pulverizador|atomizador|borrifador|vonder|chave|jogo.*chave|kit.*chave|maleta.*ferramenta|nivel.*laser|trena|desempenadeira|martelete|morsa|alicate|biela)/i.test(t)) {
+    let sub = 'Outras Ferramentas';
+    if (/(furadeira|parafusadeira|impacto)/i.test(t)) sub = 'Furadeiras & Parafusadeiras';
+    else if (/(esmerilhadeira|lixadeira|rebarbadora)/i.test(t)) sub = 'Esmerilhadeiras';
+    else if (/(serra)/i.test(t)) sub = 'Serras & Discos';
+    else if (/(solda|inversora)/i.test(t)) sub = 'Máquinas de Solda';
+    else if (/(chave|soquete|catraca|broca)/i.test(t)) sub = 'Chaves & Jogos de Ferramentas';
+    return { category: 'Ferramentas', subcategory: sub };
+  }
+
+  // ── Eletrodomésticos & Eletroportáteis ─────────────────────────────────────
+  if (/(geladeira|refrigerador|frigobar|fogao|cooktop|forno|micro.*ondas|lavadora|maquina.*lavar|maquina.*costura|liquidificador|batedeira|cafeteira|nespresso|dolce.*gusto|airfryer|air.*fryer|fritadeira|aspirador|ferro.*a|ferro.*vapor|panela.*eletrica|panificadora|extrator|chaleira|blender|mixer|balanca|marmita|lancheira|robo.*aspirador|aquecedor|sanduicheira|misteira|grill|purificador|filtro.*agua|moedor|triturador|multiprocessador|processador|adega|chopeira|maquina.*gelo|torradeira|singer|amaciante)/i.test(t)) {
+    let sub = 'Eletrodomésticos Gerais';
+    if (/(cafeteira|nespresso|dolce.*gusto|moedor)/i.test(t)) sub = 'Cafeteiras & Café';
+    else if (/(airfryer|air.*fryer|fritadeira)/i.test(t)) sub = 'Air Fryers & Fritadeiras';
+    else if (/(aspirador|robo.*aspirador|extratora)/i.test(t)) sub = 'Aspiradores & Limpeza';
+    else if (/(lavadora|maquina.*lavar)/i.test(t)) sub = 'Lavadoras de Roupa';
+    else if (/(geladeira|refrigerador|frigobar)/i.test(t)) sub = 'Geladeiras & Refrigeradores';
+    else if (/(liquidificador|blender|mixer|multiprocessador|triturador)/i.test(t)) sub = 'Processadores & Mixers';
+    else if (/(purificador|filtro.*agua|refil.*filtro)/i.test(t)) sub = 'Purificadores de Água';
+    else if (/(fogao|cooktop|forno)/i.test(t)) sub = 'Fogões & Fornos';
+    return { category: 'Eletrodomésticos', subcategory: sub };
+  }
+
+  // ── Câmeras, Segurança & Casa Inteligente ────────────────────────────────
+  if (/(camera|fechadura|videoporteiro|porteiro|interfone|tapo|yoosee|intelbras|sensor|lampada.*smart|tomada.*smart|casa.*inteligente|ipr\s*8010|ivr\s*1010)/i.test(t)) {
+    return { category: 'Câmeras & Segurança', subcategory: 'Câmeras & Monitoramento' };
+  }
+
+  // ── Eletrônicos & Informática ──────────────────────────────────────────────
+  if (/(roteador|router|mesh|switch|notebook|laptop|tablet|lenovo.*tab|monitor|teclado|mouse|ssd|pendrive|hd.*externo|cabo|conversor|modulo|caixa.*som|headphone|fone.*ouvido|headset|gopro|drone|impressora|nobreak|no-break|estabilizador|carregador|power.*bank|filamento|3d|scanner|leitor.*codigo|access.*point|grandstream)/i.test(t)) {
+    let sub = 'Informática & Periféricos';
+    if (/(roteador|router|mesh|switch|conversor|access.*point)/i.test(t)) sub = 'Redes & Conectividade';
+    else if (/(headphone|fone|headset|caixa.*som|speaker|soundbar)/i.test(t)) sub = 'Áudio & Som';
+    else if (/(tablet|lenovo.*tab|ipad)/i.test(t)) sub = 'Tablets';
+    return { category: 'Eletrônicos', subcategory: sub };
+  }
+
+  // ── Casa, Móveis & Decoração ──────────────────────────────────────────────
+  if (/(toalha|jogo.*banho|jogo.*toalha|protetor.*colchao|capa|cabide|pendente|luminaria|lampada|saco.*lixo|roupa.*cama|jogo.*cama|travesseiro|edredom|lençol|lencol|cadeira|estante|organizador|mesa|sofa|poltrona|rack|painel|espelho|quadro|tapete|cortina|almofada|lixeira|niple|conector|adaptador)/i.test(t)) {
+    let sub = 'Casa & Decoração';
+    if (/(toalha|banho|colchao|travesseiro|lençol|lencol|edredom)/i.test(t)) sub = 'Cama, Mesa & Banho';
+    else if (/(cadeira|estante|organizador|mesa|sofa|poltrona|rack)/i.test(t)) sub = 'Móveis & Organização';
+    return { category: 'Casa & Móveis', subcategory: sub };
+  }
+
+  // ── Bebê, Criança & Brinquedos ────────────────────────────────────────────
+  if (/(bebe|cadeirinha|carrinho|berco|fralda|brinquedo|boneca|carrinho.*controle|jogos|asmodee|things.*in.*rings|lego|quebra.*cabeca|game|pelucia|urso|pooh|capivara)/i.test(t)) {
+    return { category: 'Bebê & Brinquedos', subcategory: 'Bebê & Brinquedos' };
+  }
+
+  // ── Automotivo ────────────────────────────────────────────────────────────
+  if (/(radiador|kit.*embreagem|bomba.*dagua|bomba.*agua|central.*multimidia|modulo.*taramps|tubo.*pex|amp.*automotiv|pneu|calota|oleo.*motor|capacete|som.*automotivo|caixa.*trio)/i.test(t)) {
+    return { category: 'Automotivo', subcategory: 'Peças & Acessórios' };
+  }
+
+  // ── Tênis & Calçados ──────────────────────────────────────────────────────
+  if (/(tenis|sapato|chinelo|botina|\bbota\b|sandalia|sapatenis|calcado|crocs|slip.*on|mocassim|vizzano|hocks|olympikus|under.*armour|pampili|kapp)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Tênis & Calçados' };
+  }
+
+  // ── Mochilas, Bolsas & Malas ──────────────────────────────────────────────
+  if (/(mochila|\bbolsa\b|\bmala\b|carteira|pochete|porta.*notebook|crossbody|mala.*viagem)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Mochilas & Bolsas' };
+  }
+
+  // ── Moda Esportiva & Fitness ─────────────────────────────────────────────
+  if (/(dry.?fit|termica|legging|protecao.?uv|academia|treino|corrida|ciclismo|puma|esport)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Moda Esportiva & Fitness' };
+  }
+
+  // ── Moda Feminina ────────────────────────────────────────────────────────
+  if (/(feminin|mulher|saia|vestido|macacão|macacao|cropped|pantalona|flare|calcinha|biquini|maio|laise|blusa.*feminin|regata.*feminin|calca.*feminin|jaqueta.*feminin)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Moda Feminina' };
+  }
+
+  // ── Moda Masculina ───────────────────────────────────────────────────────
+  if (/(masculin|homem|sunga|bermuda|\bcamisa\b|camiseta|regata|calca|\bshort\b|jaqueta|blazer|slim.*fit|social|cueca|polo|country|carpinteira|ogochi)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Moda Masculina' };
+  }
+
+  // ── Moda Infantil / Unissex / Kits ────────────────────────────────────────
+  if (/(infantil|menino|menina|kit|conjunto|top|sutia|oculos|bone|relogio|cinto|meia|suia|lingerie)/i.test(t)) {
+    return { category: 'Moda & Calçados', subcategory: 'Moda & Acessórios' };
+  }
+
+  return { category: 'Moda & Calçados', subcategory: 'Vestuário & Estilo' };
+}
+
+/**
+ * Define a categoria e subcategoria do produto com base na coluna explícita, aba da planilha ou título
  */
 export function resolveCategoryAndSubcategory(
   tabName: string,
   title: string,
   explicitCategory?: string
 ): { category: string; subcategory: string } {
+  // 1. Normalização de categorias escritas pelo usuário na planilha (evita categorias duplicadas/parecidas)
+  const expClean = explicitCategory ? explicitCategory.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') : '';
+  const IGNORED = ['geral', 'outros', 'todas', 'todos', 'all', 'gerais', 'outras', 'undefined', 'null'];
+
+  if (expClean && !IGNORED.includes(expClean)) {
+    let canonicalCategory = explicitCategory!.trim();
+
+    if (/celular|smartphone|telefone|iphone/i.test(expClean)) canonicalCategory = 'Celulares';
+    else if (/tv|televis|qled|oled/i.test(expClean)) canonicalCategory = 'Smart TVs';
+    else if (/ar|clima|ventilad/i.test(expClean)) canonicalCategory = 'Climatização';
+    else if (/ferramenta|obra|construc/i.test(expClean)) canonicalCategory = 'Ferramentas';
+    else if (/eletro|cozinha|portate/i.test(expClean)) canonicalCategory = 'Eletrodomésticos';
+    else if (/suplemento|nutric|whey|saude/i.test(expClean)) canonicalCategory = 'Suplementos';
+    else if (/beleza|cosmetic|cabelo|cuidad/i.test(expClean)) canonicalCategory = 'Beleza & Saúde';
+    else if (/moda|roupa|calcado|tenis|sapato|bolsa|vestuari|acessori/i.test(expClean)) canonicalCategory = 'Moda & Calçados';
+    else if (/casa|moveis|decorac|cama|mesa|banho/i.test(expClean)) canonicalCategory = 'Casa & Móveis';
+    else if (/camera|seguranc|porteiro|interfone/i.test(expClean)) canonicalCategory = 'Câmeras & Segurança';
+    else if (/bebe|brinquedo|infantil/i.test(expClean)) canonicalCategory = 'Bebê & Brinquedos';
+    else if (/auto|carro|peca/i.test(expClean)) canonicalCategory = 'Automotivo';
+    else canonicalCategory = canonicalCategory.charAt(0).toUpperCase() + canonicalCategory.slice(1);
+
+    return { category: canonicalCategory, subcategory: 'Geral' };
+  }
+
   const cleanTab = tabName.toLowerCase().trim();
 
-  // 1. Celulares
+  // 2. Celulares (por nome de aba)
   if (cleanTab.includes('celular') || cleanTab.includes('smartphone')) {
     const t = title.toLowerCase();
     let sub = 'Outros Celulares';
@@ -366,7 +530,7 @@ export function resolveCategoryAndSubcategory(
     return { category: 'Celulares', subcategory: sub };
   }
 
-  // 2. Smart TVs
+  // 3. Smart TVs (por nome de aba)
   if (cleanTab.includes('tv') || cleanTab.includes('televis')) {
     const t = title.toLowerCase();
     let sub = 'Outras Smart TVs';
@@ -377,7 +541,7 @@ export function resolveCategoryAndSubcategory(
     return { category: 'Smart TVs', subcategory: sub };
   }
 
-  // 3. Ferramentas
+  // 4. Ferramentas (por nome de aba)
   if (cleanTab.includes('ferramenta')) {
     const t = title.toLowerCase();
     let sub = 'Outras Ferramentas';
@@ -389,7 +553,7 @@ export function resolveCategoryAndSubcategory(
     return { category: 'Ferramentas', subcategory: sub };
   }
 
-  // 4. Moda, Calçados e Bolsas
+  // 5. Moda, Calçados e Bolsas (por nome de aba)
   if (cleanTab.includes('calcado') || cleanTab.includes('roupa') || cleanTab.includes('bolsa')) {
     const t = title.toLowerCase();
     let sub = 'Vestuário & Moda';
@@ -401,12 +565,8 @@ export function resolveCategoryAndSubcategory(
     return { category: 'Moda & Calçados', subcategory: sub };
   }
 
-  // Fallback
-  const catName = explicitCategory && explicitCategory.trim() && explicitCategory.trim() !== 'Geral'
-    ? explicitCategory.trim()
-    : tabName.charAt(0).toUpperCase() + tabName.slice(1);
-
-  return { category: catName, subcategory: 'Geral' };
+  // 6. Abas genéricas ou fallback: usa classificação automática inteligente por título
+  return inferCategoryAndSubcategory(title);
 }
 
 /**

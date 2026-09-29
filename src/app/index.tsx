@@ -1006,6 +1006,11 @@ export default function LoginScreen() {
   const [tempClubePriceRange, setTempClubePriceRange] = useState<'all' | 'under100' | '100to300' | '300to1000' | 'above1000'>('all');
   const [tempClubeSortOrder, setTempClubeSortOrder] = useState<'discount' | 'price_asc' | 'price_desc'>('discount');
   const [tempClubeSubcategory, setTempClubeSubcategory] = useState<string>('todas');
+  const [clubeCurrentPage, setClubeCurrentPage] = useState(1);
+
+  React.useEffect(() => {
+    setClubeCurrentPage(1);
+  }, [clubeCategory, clubeSubcategory, clubeSearchQuery, clubePriceRange, clubeSortOrder]);
 
   // Live Connection Status States
   const [loadingConexao, setLoadingConexao] = useState(false);
@@ -1015,6 +1020,7 @@ export default function LoginScreen() {
   const [selectedChartIndex, setSelectedChartIndex] = useState<number | null>(null);
   const [statusPendingContractId, setPendingStatusContractId] = useState<number | null>(null);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [bannerAspectRatios, setBannerAspectRatios] = useState<Record<string, number>>({});
 
   // Active Network Maintenance State
   const [activeMaintenance, setActiveMaintenance] = useState<{
@@ -1100,6 +1106,21 @@ export default function LoginScreen() {
     }
     checkForUpdates();
 
+    // Listener para recarregar banners, ofertas do clube e atualizações OTA quando o app volta do segundo plano
+    const updateAppStateSub = AppState.addEventListener('change', async (nextAppState) => {
+      if (nextAppState === 'active') {
+        console.log('App retornou do segundo plano (Foreground). Recarregando banners e verificando atualizações...');
+        checkForUpdates();
+        loadClubeProducts();
+        try {
+          const freshConfig = await getProviderConfig(APP_CONFIG.PROVIDER_CODE);
+          if (freshConfig) setProviderConfig(freshConfig);
+        } catch (e) {
+          console.log('Erro ao atualizar banners do provedor:', e);
+        }
+      }
+    });
+
     registerForPushNotificationsAsync().then(token => {
       if (token) {
         setExpoPushToken(token);
@@ -1133,6 +1154,7 @@ export default function LoginScreen() {
 
     return () => {
       try {
+        updateAppStateSub?.remove?.();
         notificationListener?.remove?.();
         responseListener?.remove?.();
       } catch (e) {}
@@ -2046,18 +2068,15 @@ export default function LoginScreen() {
     }
   }, [activeTab, screenState, selectedContract]);
 
-  // Auto-rotate Stories Banner on Home Screen
+  // Auto-rotate Stories Banner & Clube Deals on Home Screen
   useEffect(() => {
     if (activeTab === 'HOME' && screenState === 'DASHBOARD') {
-      const bannerCount = providerConfig.banners?.length || 0;
-      if (bannerCount > 1) {
-        const timer = setInterval(() => {
-          setBannerIndex(prev => (prev + 1) % bannerCount);
-        }, 5000);
-        return () => clearInterval(timer);
-      }
+      const timer = setInterval(() => {
+        setBannerIndex(prev => prev + 1);
+      }, 4000);
+      return () => clearInterval(timer);
     }
-  }, [activeTab, screenState, providerConfig.banners]);
+  }, [activeTab, screenState]);
 
   // Manipuladores do Clube de Desconto (Google Sheets)
   const handleOpenProductUrl = async (url: string) => {
@@ -2090,7 +2109,7 @@ export default function LoginScreen() {
   };
 
   React.useEffect(() => {
-    if (activeTab === 'CLUBE') {
+    if (activeTab === 'CLUBE' || (activeTab === 'HOME' && clubeProducts.length === 0)) {
       loadClubeProducts();
     }
   }, [activeTab]);
@@ -3441,7 +3460,7 @@ export default function LoginScreen() {
                         )}
 
                         {/* ⚡ QUICK ACTIONS GRID (3 Buttons) */}
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8, width: '100%', maxWidth: 400, alignSelf: 'stretch' }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16, gap: 8, width: '100%' }}>
                           <TouchableOpacity
                             style={{ flex: 1, backgroundColor: '#020617', borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1E293B' }}
                             onPress={() => setActiveTab('VELOCIDADE')}
@@ -3479,45 +3498,160 @@ export default function LoginScreen() {
                           </TouchableOpacity>
                         </View>
 
-                        {/* 🎁 BANNER CLUBE DE DESCONTO NO INÍCIO */}
-                        <TouchableOpacity
-                          style={styles.clubeHomeBanner}
-                          onPress={() => setActiveTab('CLUBE')}
-                          activeOpacity={0.88}
-                        >
-                          <View style={styles.clubeHomeBannerContent}>
-                            <View style={styles.clubeHomeBannerLeft}>
-                              <View style={styles.clubeHomeBannerTag}>
-                                <Flame size={12} color="#EF4444" />
-                                <Text style={styles.clubeHomeBannerTagText}>CLUBE DE DESCONTO</Text>
-                              </View>
-                              <Text style={styles.clubeHomeBannerTitle}>
-                                Economize até <Text style={{ color: '#FFE600' }}>70% OFF</Text>
-                              </Text>
-                              <Text style={styles.clubeHomeBannerSub}>
-                                TVs, Celulares, Ferramentas, Moda e muito mais com ofertas exclusivas.
-                              </Text>
-                              <View style={[styles.clubeHomeBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
-                                <Text style={styles.clubeHomeBannerBtnText}>Explorar Ofertas</Text>
-                                <ChevronRight size={13} color="#FFFFFF" />
-                              </View>
-                            </View>
-                            <View style={styles.clubeHomeBannerRight}>
-                              <View style={[styles.clubeHomeBannerIconCircle, { backgroundColor: '#FFE60020' }]}>
-                                <ShoppingBag size={28} color="#FFE600" />
-                              </View>
-                              {clubeProducts.length > 0 && (
-                                <View style={styles.clubeHomeBannerCountBadge}>
-                                  <Text style={styles.clubeHomeBannerCountText}>+{clubeProducts.length} ofertas</Text>
+                        {/* 🎁 BANNER CLUBE DE DESCONTO NO INÍCIO (DINÂMICO ROTATIVO COM AS MELHORES OFERTAS) */}
+                        {(() => {
+                          const topDeals = clubeProducts
+                            .filter(p => p.title && p.price)
+                            .sort((a, b) => (b.discountNumber || 0) - (a.discountNumber || 0))
+                            .slice(0, 15);
+
+                          const currentDeal = topDeals.length > 0 ? topDeals[bannerIndex % topDeals.length] : null;
+
+                          if (currentDeal) {
+                            return (
+                              <TouchableOpacity
+                                style={styles.clubeHomeBanner}
+                                onPress={() => {
+                                  if (currentDeal.category) {
+                                    setClubeCategory(currentDeal.category);
+                                  }
+                                  setClubeSubcategory('todas');
+                                  setClubeSearchQuery(currentDeal.title);
+                                  setActiveTab('CLUBE');
+                                }}
+                                activeOpacity={0.9}
+                              >
+                                <View style={styles.clubeBannerBlob1} />
+                                <View style={styles.clubeBannerBlob2} />
+                                <View style={styles.clubeBannerBlob3} />
+
+                                <View style={styles.clubeHomeBannerContent}>
+                                  {/* LEFT: deal details */}
+                                  <View style={styles.clubeHomeBannerLeft}>
+                                    <View style={styles.clubeHomeBannerTag}>
+                                      <Flame size={11} color="#FF6B35" />
+                                      <Text style={styles.clubeHomeBannerTagText}>
+                                        {currentDeal.discount ? `${currentDeal.discount}` : 'DESTAQUE DO CLUBE'}
+                                      </Text>
+                                    </View>
+
+                                    <Text style={styles.clubeHomeBannerDealTitle} numberOfLines={2}>
+                                      {currentDeal.title}
+                                    </Text>
+
+                                    <View style={styles.clubeHomeBannerPriceRow}>
+                                      {currentDeal.originalPrice ? (
+                                        <Text style={styles.clubeHomeBannerOrigPrice}>
+                                          De {currentDeal.originalPrice}
+                                        </Text>
+                                      ) : null}
+                                      <Text style={styles.clubeHomeBannerDealPrice}>
+                                        {currentDeal.price || 'Ver Preço'}
+                                      </Text>
+                                    </View>
+
+                                    <View style={[styles.clubeHomeBannerBtn, { backgroundColor: primaryColor || '#2563EB', marginTop: 8 }]}>
+                                      <Tag size={12} color="#FFFFFF" />
+                                      <Text style={styles.clubeHomeBannerBtnText}>Aproveitar Oferta</Text>
+                                      <ChevronRight size={12} color="#FFFFFF" />
+                                    </View>
+                                  </View>
+
+                                  {/* RIGHT: product image & dots */}
+                                  <View style={styles.clubeHomeBannerRight}>
+                                    {currentDeal.image ? (
+                                      <View style={styles.clubeDealImageContainer}>
+                                        <Image
+                                          source={{ uri: currentDeal.image }}
+                                          style={styles.clubeDealImage}
+                                          resizeMode="contain"
+                                        />
+                                        {currentDeal.discountNumber ? (
+                                          <View style={styles.clubeDealImageBadge}>
+                                            <Text style={styles.clubeDealImageBadgeText}>-{currentDeal.discountNumber}%</Text>
+                                          </View>
+                                        ) : null}
+                                      </View>
+                                    ) : (
+                                      <View style={styles.clubeBannerIconWrap}>
+                                        <View style={styles.clubeBannerIconRing} />
+                                        <ShoppingBag size={30} color="#FFE600" />
+                                      </View>
+                                    )}
+
+                                    {topDeals.length > 1 && (
+                                      <View style={styles.clubeBannerDotsRow}>
+                                        {topDeals.map((_, idx) => (
+                                          <View
+                                            key={idx}
+                                            style={[
+                                              styles.clubeBannerDot,
+                                              idx === (bannerIndex % topDeals.length) && styles.clubeBannerDotActive,
+                                            ]}
+                                          />
+                                        ))}
+                                      </View>
+                                    )}
+                                  </View>
                                 </View>
-                              )}
-                            </View>
-                          </View>
-                        </TouchableOpacity>
+                              </TouchableOpacity>
+                            );
+                          }
+
+                          return (
+                            <TouchableOpacity
+                              style={styles.clubeHomeBanner}
+                              onPress={() => setActiveTab('CLUBE')}
+                              activeOpacity={0.9}
+                            >
+                              <View style={styles.clubeBannerBlob1} />
+                              <View style={styles.clubeBannerBlob2} />
+                              <View style={styles.clubeBannerBlob3} />
+
+                              <View style={styles.clubeHomeBannerContent}>
+                                <View style={styles.clubeHomeBannerLeft}>
+                                  <View style={styles.clubeHomeBannerTag}>
+                                    <Flame size={11} color="#FF6B35" />
+                                    <Text style={styles.clubeHomeBannerTagText}>CLUBE DE DESCONTO</Text>
+                                  </View>
+
+                                  <Text style={styles.clubeHomeBannerTitle}>
+                                    Economize{'\n'}
+                                    <Text style={styles.clubeBannerPercent}>70%</Text>
+                                    <Text style={styles.clubeBannerOff}> OFF</Text>
+                                  </Text>
+
+                                  <Text style={styles.clubeHomeBannerSub}>
+                                    TVs, Celulares, Moda e muito mais — só para clientes.
+                                  </Text>
+
+                                  <View style={[styles.clubeHomeBannerBtn, { backgroundColor: primaryColor || '#2563EB' }]}>
+                                    <Tag size={12} color="#FFFFFF" />
+                                    <Text style={styles.clubeHomeBannerBtnText}>Ver Ofertas</Text>
+                                    <ChevronRight size={12} color="#FFFFFF" />
+                                  </View>
+                                </View>
+
+                                <View style={styles.clubeHomeBannerRight}>
+                                  <View style={styles.clubeBannerIconWrap}>
+                                    <View style={styles.clubeBannerIconRing} />
+                                    <ShoppingBag size={30} color="#FFE600" />
+                                  </View>
+                                  {clubeProducts.length > 0 && (
+                                    <View style={styles.clubeHomeBannerCountBadge}>
+                                      <Zap size={9} color="#38BDF8" />
+                                      <Text style={styles.clubeHomeBannerCountText}>+{clubeProducts.length} ofertas</Text>
+                                    </View>
+                                  )}
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })()}
 
                         {/* 🎬 DYNAMIC IMAGE BANNERS FROM SUPABASE (MAX 3 - ONLY RENDER IF REGISTERED) */}
                         {providerConfig.banners && providerConfig.banners.length > 0 && (
-                          <View style={{ width: '100%', maxWidth: 400, alignSelf: 'stretch', marginBottom: 16 }}>
+                          <View style={{ width: '100%', marginBottom: 16 }}>
                             {(() => {
                               const activeBanners = providerConfig.banners!.slice(0, 3);
                               const currentBanner = activeBanners[bannerIndex % activeBanners.length];
@@ -3537,7 +3671,6 @@ export default function LoginScreen() {
                               return (
                                 <View style={{
                                   width: '100%',
-                                  alignSelf: 'stretch',
                                   backgroundColor: 'transparent',
                                   borderRadius: 16,
                                   overflow: 'hidden',
@@ -3566,7 +3699,7 @@ export default function LoginScreen() {
                                   <TouchableOpacity
                                     style={{
                                       width: '100%',
-                                      aspectRatio: 16 / 9,
+                                      aspectRatio: (currentBanner?.imagem_url && bannerAspectRatios[currentBanner.imagem_url]) || (16 / 9),
                                       position: 'relative',
                                       backgroundColor: 'transparent',
                                       justifyContent: 'center',
@@ -3578,14 +3711,27 @@ export default function LoginScreen() {
                                     activeOpacity={currentBanner.link_url ? 0.85 : 1}
                                     disabled={!currentBanner.link_url}
                                   >
-                                    <Image
+                                    <ExpoImage
                                       source={{ uri: currentBanner.imagem_url }}
                                       style={{
                                         width: '100%',
                                         height: '100%',
                                         borderRadius: 16,
                                       }}
-                                      resizeMode="contain"
+                                      contentFit="contain"
+                                      transition={150}
+                                      cachePolicy="disk"
+                                      onLoad={(e) => {
+                                        if (e.source?.width && e.source?.height && e.source.height > 0) {
+                                          const ratio = e.source.width / e.source.height;
+                                          if (ratio > 0.5 && ratio < 4) {
+                                            setBannerAspectRatios(prev => {
+                                              if (prev[currentBanner.imagem_url] === ratio) return prev;
+                                              return { ...prev, [currentBanner.imagem_url]: ratio };
+                                            });
+                                          }
+                                        }
+                                      }}
                                     />
 
                                     {/* Link Badge if banner has action URL */}
@@ -6041,68 +6187,165 @@ export default function LoginScreen() {
                                   Tente ajustar os filtros ou buscar por outro termo.
                                 </Text>
                               </View>
-                            ) : (
-                              filteredProducts.map(product => (
-                                <TouchableOpacity
-                                  key={product.id}
-                                  style={styles.clubeProductGridCard}
-                                  onPress={() => handleOpenProductUrl(product.url)}
-                                  activeOpacity={0.85}
-                                >
-                                  {/* Imagem do Produto no Card Grid */}
-                                  <View style={styles.clubeProductGridImageContainer}>
-                                    {product.image ? (
-                                      <ExpoImage
-                                        source={{ uri: product.image }}
-                                        style={styles.clubeProductGridImage}
-                                        contentFit="contain"
-                                        transition={200}
-                                        cachePolicy="memory-disk"
-                                      />
-                                    ) : (
-                                      <ShoppingBag size={28} color="#64748B" />
-                                    )}
-                                    {product.discount && (
-                                      <View style={styles.clubeProductDiscountTag}>
-                                        <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
-                                      </View>
-                                    )}
-                                    {product.tvSizeGroup ? (
-                                      <View style={styles.clubeTvSizeBadge}>
-                                        <Text style={styles.clubeTvSizeBadgeText}>{product.tvSizeGroup}</Text>
-                                      </View>
-                                    ) : product.badge ? (
-                                      <View style={styles.clubeProductHighlightBadge}>
-                                        <Text style={styles.clubeProductHighlightBadgeText}>{product.badge}</Text>
-                                      </View>
-                                    ) : null}
-                                  </View>
+                            ) : (() => {
+                              const ITEMS_PER_PAGE = 24;
+                              const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
+                              const safePage = Math.min(Math.max(1, clubeCurrentPage), totalPages || 1);
+                              const startIndex = (safePage - 1) * ITEMS_PER_PAGE;
+                              const pageProducts = filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-                                  {/* Informações e Preço */}
-                                  <View style={styles.clubeProductGridBody}>
+                              const pageNumbers: number[] = [];
+                              let startP = Math.max(1, safePage - 2);
+                              let endP = Math.min(totalPages, startP + 4);
+                              if (endP - startP < 4) {
+                                startP = Math.max(1, endP - 4);
+                              }
+                              for (let p = startP; p <= endP; p++) {
+                                pageNumbers.push(p);
+                              }
 
-                                    <Text style={styles.clubeProductGridTitle} numberOfLines={2}>
-                                      {product.title}
-                                    </Text>
+                              return (
+                                <>
+                                  {pageProducts.map(product => (
+                                    <TouchableOpacity
+                                      key={product.id}
+                                      style={styles.clubeProductGridCard}
+                                      onPress={() => handleOpenProductUrl(product.url)}
+                                      activeOpacity={0.85}
+                                    >
+                                      {/* Imagem do Produto no Card Grid */}
+                                      <View style={styles.clubeProductGridImageContainer}>
+                                        {product.image ? (
+                                          <ExpoImage
+                                            source={{ uri: product.image }}
+                                            style={styles.clubeProductGridImage}
+                                            contentFit="contain"
+                                            transition={100}
+                                            cachePolicy="disk"
+                                          />
+                                        ) : (
+                                          <ShoppingBag size={28} color="#64748B" />
+                                        )}
+                                        {product.discount && (
+                                          <View style={styles.clubeProductDiscountTag}>
+                                            <Text style={styles.clubeProductDiscountTagText}>{product.discount}</Text>
+                                          </View>
+                                        )}
+                                        {product.tvSizeGroup ? (
+                                          <View style={styles.clubeTvSizeBadge}>
+                                            <Text style={styles.clubeTvSizeBadgeText}>{product.tvSizeGroup}</Text>
+                                          </View>
+                                        ) : product.badge ? (
+                                          <View style={styles.clubeProductHighlightBadge}>
+                                            <Text style={styles.clubeProductHighlightBadgeText}>{product.badge}</Text>
+                                          </View>
+                                        ) : null}
+                                      </View>
 
-                                    <View style={{ marginTop: 'auto', paddingTop: 6 }}>
-                                      {product.originalPrice && (
-                                        <Text style={styles.clubeProductOriginalPrice} numberOfLines={1}>
-                                          {product.originalPrice}
+                                      {/* Informações e Preço */}
+                                      <View style={styles.clubeProductGridBody}>
+                                        <Text style={styles.clubeProductGridTitle} numberOfLines={2}>
+                                          {product.title}
                                         </Text>
-                                      )}
-                                      {product.price ? (
-                                        <Text style={styles.clubeProductGridPrice} numberOfLines={1}>
-                                          {product.price}
-                                        </Text>
-                                      ) : null}
+
+                                        <View style={{ marginTop: 'auto', paddingTop: 6 }}>
+                                          {product.originalPrice && (
+                                            <Text style={styles.clubeProductOriginalPrice} numberOfLines={1}>
+                                              {product.originalPrice}
+                                            </Text>
+                                          )}
+                                          {product.price ? (
+                                            <Text style={styles.clubeProductGridPrice} numberOfLines={1}>
+                                              {product.price}
+                                            </Text>
+                                          ) : null}
+                                        </View>
+                                      </View>
+                                    </TouchableOpacity>
+                                  ))}
+
+                                  {/* 📄 BARRA DE PAGINAÇÃO LIMPA E MODERNA (PÁGINAS 1, 2, 3...) */}
+                                  {totalPages > 1 && (
+                                    <View style={styles.clubePaginationWrapper}>
+                                      <Text style={styles.clubePaginationInfoText}>
+                                        Página {safePage} de {totalPages} • Exibindo {startIndex + 1}–{Math.min(startIndex + ITEMS_PER_PAGE, filteredProducts.length)} de {filteredProducts.length} ofertas
+                                      </Text>
+
+                                      <View style={styles.clubePaginationRow}>
+                                        <TouchableOpacity
+                                          style={[
+                                            styles.clubePaginationNavBtn,
+                                            safePage === 1 && styles.clubePaginationNavBtnDisabled
+                                          ]}
+                                          disabled={safePage === 1}
+                                          onPress={() => setClubeCurrentPage(prev => Math.max(1, prev - 1))}
+                                          activeOpacity={0.7}
+                                        >
+                                          <ChevronLeft size={16} color={safePage === 1 ? '#94A3B8' : '#0F172A'} />
+                                        </TouchableOpacity>
+
+                                        {startP > 1 && (
+                                          <>
+                                            <TouchableOpacity
+                                              style={styles.clubePaginationNumBtn}
+                                              onPress={() => setClubeCurrentPage(1)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <Text style={styles.clubePaginationNumText}>1</Text>
+                                            </TouchableOpacity>
+                                            {startP > 2 && <Text style={styles.clubePaginationDots}>...</Text>}
+                                          </>
+                                        )}
+
+                                        {pageNumbers.map(num => {
+                                          const isCurrent = num === safePage;
+                                          return (
+                                            <TouchableOpacity
+                                              key={num}
+                                              style={[
+                                                styles.clubePaginationNumBtn,
+                                                isCurrent && [styles.clubePaginationNumBtnActive, { backgroundColor: primaryColor || '#2563EB' }]
+                                              ]}
+                                              onPress={() => setClubeCurrentPage(num)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <Text style={[styles.clubePaginationNumText, isCurrent && styles.clubePaginationNumTextActive]}>
+                                                {num}
+                                              </Text>
+                                            </TouchableOpacity>
+                                          );
+                                        })}
+
+                                        {endP < totalPages && (
+                                          <>
+                                            {endP < totalPages - 1 && <Text style={styles.clubePaginationDots}>...</Text>}
+                                            <TouchableOpacity
+                                              style={styles.clubePaginationNumBtn}
+                                              onPress={() => setClubeCurrentPage(totalPages)}
+                                              activeOpacity={0.7}
+                                            >
+                                              <Text style={styles.clubePaginationNumText}>{totalPages}</Text>
+                                            </TouchableOpacity>
+                                          </>
+                                        )}
+
+                                        <TouchableOpacity
+                                          style={[
+                                            styles.clubePaginationNavBtn,
+                                            safePage === totalPages && styles.clubePaginationNavBtnDisabled
+                                          ]}
+                                          disabled={safePage === totalPages}
+                                          onPress={() => setClubeCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                          activeOpacity={0.7}
+                                        >
+                                          <ChevronRight size={16} color={safePage === totalPages ? '#94A3B8' : '#0F172A'} />
+                                        </TouchableOpacity>
+                                      </View>
                                     </View>
-
-
-                                  </View>
-                                </TouchableOpacity>
-                              ))
-                            )}
+                                  )}
+                                </>
+                              );
+                            })()}
                           </View>
                         </View>
                       );
@@ -9437,24 +9680,52 @@ const styles = StyleSheet.create({
   /* BANNER CLUBE DE DESCONTO NO INÍCIO */
   clubeHomeBanner: {
     width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#111827',
-    borderWidth: 1.5,
-    borderColor: '#F59E0B50',
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: '#0D1117',
+    borderWidth: 1,
+    borderColor: '#FFE60030',
+    borderRadius: 20,
+    padding: 18,
+    paddingRight: 14,
     marginBottom: 16,
-    shadowColor: '#F59E0B',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    overflow: 'hidden',
+    shadowColor: '#FFE600',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  clubeBannerBlob1: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    backgroundColor: '#FFE60012',
+    top: -30,
+    right: 50,
+  },
+  clubeBannerBlob2: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#2563EB18',
+    bottom: -20,
+    right: 20,
+  },
+  clubeBannerBlob3: {
+    position: 'absolute',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#EF444418',
+    top: 10,
+    right: 100,
   },
   clubeHomeBannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 10,
   },
   clubeHomeBannerLeft: {
     flex: 1,
@@ -9463,41 +9734,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EF444420',
+    backgroundColor: '#FF6B3520',
     alignSelf: 'flex-start',
     paddingVertical: 3,
-    paddingHorizontal: 7,
-    borderRadius: 6,
-    marginBottom: 6,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#EF444440',
+    borderColor: '#FF6B3545',
   },
   clubeHomeBannerTagText: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '900',
-    color: '#EF4444',
-    letterSpacing: 0.5,
+    color: '#FF6B35',
+    letterSpacing: 0.8,
   },
   clubeHomeBannerTitle: {
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#CBD5E1',
+    lineHeight: 20,
+    marginBottom: 2,
+  },
+  clubeBannerPercent: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: '#FFE600',
+    lineHeight: 38,
+  },
+  clubeBannerOff: {
+    fontSize: 18,
     fontWeight: '900',
     color: '#FFFFFF',
-    marginBottom: 4,
   },
   clubeHomeBannerSub: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    lineHeight: 16,
-    marginBottom: 10,
+    fontSize: 11,
+    color: '#64748B',
+    lineHeight: 15,
+    marginBottom: 12,
+    marginTop: 4,
   },
   clubeHomeBannerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 13,
+    borderRadius: 10,
   },
   clubeHomeBannerBtnText: {
     fontSize: 11.5,
@@ -9507,6 +9791,25 @@ const styles = StyleSheet.create({
   clubeHomeBannerRight: {
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+  },
+  clubeBannerIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFE60015',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFE60040',
+  },
+  clubeBannerIconRing: {
+    position: 'absolute',
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 1,
+    borderColor: '#FFE60020',
   },
   clubeHomeBannerIconCircle: {
     width: 56,
@@ -9519,17 +9822,107 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   clubeHomeBannerCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     backgroundColor: '#0F172A',
     borderWidth: 1,
-    borderColor: '#334155',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-    borderRadius: 6,
+    borderColor: '#1E40AF50',
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+    borderRadius: 8,
   },
   clubeHomeBannerCountText: {
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '800',
     color: '#38BDF8',
+  },
+  clubeHomeBannerDealTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    lineHeight: 17,
+    marginBottom: 4,
+  },
+  clubeHomeBannerPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginVertical: 2,
+  },
+  clubeHomeBannerOrigPrice: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+  },
+  clubeHomeBannerDealPrice: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#FFE600',
+  },
+  clubeDealImageContainer: {
+    width: 68,
+    height: 68,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    padding: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFE60040',
+    position: 'relative',
+  },
+  clubeDealImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 10,
+  },
+  clubeDealImageBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#EF4444',
+    paddingVertical: 2,
+    paddingHorizontal: 5,
+    borderRadius: 8,
+  },
+  clubeDealImageBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  clubeBannerDotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 6,
+  },
+  clubeBannerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  clubeBannerDotActive: {
+    width: 12,
+    backgroundColor: '#FFE600',
+  },
+  clubeLoadMoreBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  clubeLoadMoreBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
 
   /* MARKETPLACE HEADER & BUSCA - TEMA CLARO */
@@ -9847,22 +10240,20 @@ const styles = StyleSheet.create({
   /* GRID DE PRODUTOS (2 POR LINHA) - TEMA CLARO */
   clubeProductGridContainer: {
     width: '100%',
-    maxWidth: 400,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 10,
     marginTop: 4,
   },
   clubeProductGridCard: {
-    width: '48.5%',
+    width: '48%',
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 14,
     overflow: 'hidden',
     padding: 9,
-    marginBottom: 4,
+    marginBottom: 10,
     justifyContent: 'space-between',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
@@ -10043,5 +10434,83 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+
+  /* PAGINAÇÃO DO CLUBE DE DESCONTO */
+  clubePaginationWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+    marginBottom: 28,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  clubePaginationInfoText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  clubePaginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  clubePaginationNavBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  clubePaginationNavBtnDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    opacity: 0.5,
+  },
+  clubePaginationNumBtn: {
+    minWidth: 36,
+    height: 36,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  clubePaginationNumBtnActive: {
+    backgroundColor: '#2563EB',
+    borderColor: 'transparent',
+  },
+  clubePaginationNumText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  clubePaginationNumTextActive: {
+    color: '#FFFFFF',
+  },
+  clubePaginationDots: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#94A3B8',
+    paddingHorizontal: 2,
   },
 });
