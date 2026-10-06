@@ -6728,7 +6728,7 @@ export default function LoginScreen() {
                         </View>
 
                         {/* FOOTER */}
-                        <Text style={styles.sideMenuFooterText}>Web Connect • Versão 1.0.0</Text>
+                        <Text style={styles.sideMenuFooterText}>Versão 1.0.0</Text>
                       </View>
                     </View>
                   </Modal>
