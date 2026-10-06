@@ -727,6 +727,7 @@ export default function LoginScreen() {
     primary_color: '#2563EB',
     secondary_color: '#1E40AF',
     accent_color: '#10B981',
+    habilitar_suporte: true,
   });
 
   const primaryColor = providerConfig.primary_color || '#2563EB';
@@ -6506,18 +6507,20 @@ export default function LoginScreen() {
                       </TouchableOpacity>
 
                       {/* Tab 4: Suporte */}
-                      <TouchableOpacity
-                        style={styles.tabButton}
-                        onPress={() => setActiveTab('SUPORTE')}
-                        activeOpacity={0.7}
-                      >
-                        <View style={[styles.tabIconWrapper, activeTab === 'SUPORTE' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
-                          <Headphones size={20} color={activeTab === 'SUPORTE' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'SUPORTE' ? 2.2 : 1.7} />
-                        </View>
-                        <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'SUPORTE' ? '700' : '500' }]}>
-                          Suporte
-                        </Text>
-                      </TouchableOpacity>
+                      {providerConfig.habilitar_suporte !== false && (
+                        <TouchableOpacity
+                          style={styles.tabButton}
+                          onPress={() => setActiveTab('SUPORTE')}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.tabIconWrapper, activeTab === 'SUPORTE' && [styles.tabIconWrapperActive, { backgroundColor: `${primaryColor}18` }]]}>
+                            <Headphones size={20} color={activeTab === 'SUPORTE' ? primaryColor : '#64748B'} strokeWidth={activeTab === 'SUPORTE' ? 2.2 : 1.7} />
+                          </View>
+                          <Text style={[styles.tabLabel, { color: activeTab === 'SUPORTE' ? primaryColor : '#64748B', fontWeight: activeTab === 'SUPORTE' ? '700' : '500' }]}>
+                            Suporte
+                          </Text>
+                        </TouchableOpacity>
+                      )}
 
                       {/* Tab 5: Menu Sanduíche */}
                       <TouchableOpacity

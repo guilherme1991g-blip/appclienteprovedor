@@ -35,6 +35,7 @@ export interface ProviderConfig {
   forcar_atualizacao?: boolean;
   mensagem_atualizacao?: string;
   habilitar_clube?: boolean;
+  habilitar_suporte?: boolean;
   exigir_confirmacao_numero?: boolean;
   ip_diagnostico?: string;
   banners?: ProviderBanner[];
@@ -252,6 +253,7 @@ export async function getProviderConfig(providerCode: string): Promise<ProviderC
         forcar_atualizacao: data.forcar_atualizacao === true || data.force_update === true,
         mensagem_atualizacao: data.mensagem_atualizacao || data.update_message || undefined,
         habilitar_clube: data.habilitar_clube === true || data.clube_ativo === true || data.habilitar_clube_descontos === true,
+        habilitar_suporte: data.habilitar_suporte !== undefined ? (data.habilitar_suporte === true || data.habilitar_suporte === 'true') : (data.suporte_ativo !== undefined ? data.suporte_ativo === true : true),
         exigir_confirmacao_numero: data.exigir_confirmacao_numero === true || data.confirmar_numero_chamado === true || data.verificar_telefone_suporte === true,
         ip_diagnostico: (data.ip_diagnostico || data.ip_provedor || data.ip_servidor || data.ip_teste || DEFAULT_PROVIDER_CONFIG.ip_diagnostico || '177.221.128.60').trim(),
         banners: fetchedBanners,
