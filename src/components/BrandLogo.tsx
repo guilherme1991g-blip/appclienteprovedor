@@ -1,16 +1,19 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, Animated } from 'react-native';
 import { Image } from 'expo-image';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { APP_CONFIG } from '@/config/providerConfig';
 
 interface BrandLogoProps {
   logoUrl?: string;
 }
 
-const CACHE_KEY = '@isp_app_cached_logo_url';
+const PROVIDER_LOGOS: Record<string, any> = {
+  cbrfibra: require('@/assets/providers/cbrfibra/logo.png'),
+  webconnect: require('@/assets/providers/webconnect/logo.png'),
+  default: require('@/assets/providers/default/logo.png'),
+};
 
 export default function BrandLogo({ logoUrl }: BrandLogoProps) {
-  const [activeLogo, setActiveLogo] = useState<string | undefined>(logoUrl);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -33,54 +36,27 @@ export default function BrandLogo({ logoUrl }: BrandLogoProps) {
     return () => pulseLoop.stop();
   }, []);
 
-  useEffect(() => {
-    if (logoUrl && logoUrl.trim().length > 0) {
-      setActiveLogo(logoUrl);
-    }
-  }, [logoUrl]);
-
-  useEffect(() => {
-    const syncLogo = async () => {
-      try {
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
-        if (logoUrl && logoUrl.trim().length > 0) {
-          const cleanUrl = logoUrl.trim();
-          if (cached !== cleanUrl) {
-            // A logo mudou no Supabase! Atualiza o cache local
-            await AsyncStorage.setItem(CACHE_KEY, cleanUrl);
-            setActiveLogo(cleanUrl);
-          } else {
-            setActiveLogo(cached);
-          }
-        } else if (cached && cached.trim().length > 0) {
-          setActiveLogo(cached);
-        }
-      } catch (e) {
-        console.log('Erro ao sincronizar logo:', e);
-      }
-    };
-    syncLogo();
-  }, [logoUrl]);
-
-  const effectiveLogo = activeLogo || logoUrl;
-  const hasLogo = Boolean(effectiveLogo && effectiveLogo.trim().length > 0);
+  const providerCode = (APP_CONFIG.PROVIDER_CODE || 'cbrfibra').toLowerCase();
 
   const getLogoSource = () => {
-    if (!hasLogo || !effectiveLogo) {
-      return require('@/assets/images/login_logo.png');
+    if (PROVIDER_LOGOS[providerCode]) {
+      return PROVIDER_LOGOS[providerCode];
     }
-    const clean = effectiveLogo.trim();
-    if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image')) {
-      return { uri: clean };
+    if (logoUrl && logoUrl.trim().length > 0) {
+      const clean = logoUrl.trim();
+      if (clean.startsWith('http://') || clean.startsWith('https://') || clean.startsWith('data:image')) {
+        return { uri: clean };
+      }
+      return { uri: `data:image/png;base64,${clean}` };
     }
-    return { uri: `data:image/png;base64,${clean}` };
+    return PROVIDER_LOGOS.default;
   };
 
   return (
     <View style={styles.container}>
       <Animated.View style={{ transform: [{ scale: pulseAnim }], alignItems: 'center', justifyContent: 'center', width: '100%' }}>
         <Image
-          key={hasLogo ? effectiveLogo : 'default_logo'}
+          key={providerCode}
           style={styles.logoImage}
           source={getLogoSource()}
           contentFit="contain"
